@@ -6,7 +6,7 @@
 import { ClaudeClient } from './client.js';
 import { Session } from './session.js';
 import { toolRegistry } from '../tools/index.js';
-import type { Message, ContentBlock, ToolDefinition } from '../types/index.js';
+import type { Message, ContentBlock, ToolDefinition, PermissionMode } from '../types/index.js';
 import chalk from 'chalk';
 
 export interface LoopOptions {
@@ -15,6 +15,12 @@ export interface LoopOptions {
   systemPrompt?: string;
   verbose?: boolean;
   maxTurns?: number;
+  // 新增选项
+  permissionMode?: PermissionMode;
+  allowedTools?: string[];
+  disallowedTools?: string[];
+  dangerouslySkipPermissions?: boolean;
+  maxBudgetUSD?: number;
 }
 
 const DEFAULT_SYSTEM_PROMPT = `You are Claude, an AI assistant made by Anthropic. You are an expert software engineer.
@@ -32,6 +38,7 @@ export class ConversationLoop {
   private session: Session;
   private options: LoopOptions;
   private tools: ToolDefinition[];
+  private totalCostUSD: number = 0;
 
   constructor(options: LoopOptions = {}) {
     this.client = new ClaudeClient({
@@ -40,7 +47,22 @@ export class ConversationLoop {
     });
     this.session = new Session();
     this.options = options;
-    this.tools = toolRegistry.getDefinitions();
+
+    // 获取并过滤工具
+    let tools = toolRegistry.getDefinitions();
+
+    // 应用工具过滤
+    if (options.allowedTools && options.allowedTools.length > 0) {
+      const allowed = new Set(options.allowedTools.flatMap(t => t.split(',')).map(t => t.trim()));
+      tools = tools.filter(t => allowed.has(t.name));
+    }
+
+    if (options.disallowedTools && options.disallowedTools.length > 0) {
+      const disallowed = new Set(options.disallowedTools.flatMap(t => t.split(',')).map(t => t.trim()));
+      tools = tools.filter(t => !disallowed.has(t.name));
+    }
+
+    this.tools = tools;
   }
 
   async processMessage(userInput: string): Promise<string> {

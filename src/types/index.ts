@@ -27,6 +27,13 @@ export interface BashOutputInput {
   filter?: string;
 }
 
+// TaskOutputInput - 官方 API 兼容
+export interface TaskOutputInput {
+  task_id: string;
+  block?: boolean;
+  timeout?: number;
+}
+
 export interface KillShellInput {
   shell_id: string;
 }
@@ -221,6 +228,7 @@ export type ToolInputSchemas =
   | AgentInput
   | BashInput
   | BashOutputInput
+  | TaskOutputInput
   | KillShellInput
   | FileReadInput
   | FileWriteInput
@@ -236,3 +244,16 @@ export type ToolInputSchemas =
   | ReadMcpResourceInput
   | AskUserQuestionInput
   | ExitPlanModeInput;
+
+// ============ 权限模式 ============
+export type PermissionMode =
+  | 'acceptEdits'
+  | 'bypassPermissions'
+  | 'default'
+  | 'delegate'
+  | 'dontAsk'
+  | 'plan';
+
+// ============ 输出格式 ============
+export type OutputFormat = 'text' | 'json' | 'stream-json';
+export type InputFormat = 'text' | 'stream-json';
