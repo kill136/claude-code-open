@@ -156,12 +156,13 @@ const LANGUAGE_CONFIGS: Record<string, LanguageConfig> = {
   },
 };
 
-// Tree-sitter WASM 解析器
+// Tree-sitter 解析器（优先使用原生，回退到 WASM）
 export class TreeSitterWasmParser {
   private ParserClass: any = null;
   private languages: Map<string, any> = new Map();
   private initialized: boolean = false;
   private initPromise: Promise<boolean> | null = null;
+  private useNative: boolean = false;
 
   async initialize(): Promise<boolean> {
     if (this.initialized) return true;
@@ -172,6 +173,19 @@ export class TreeSitterWasmParser {
   }
 
   private async doInitialize(): Promise<boolean> {
+    // 首先尝试原生 tree-sitter
+    try {
+      const nativeTreeSitter = await import('tree-sitter');
+      const Parser = (nativeTreeSitter as any).default || nativeTreeSitter;
+      this.ParserClass = Parser;
+      this.useNative = true;
+      this.initialized = true;
+      console.log('Tree-sitter: 使用原生模块');
+      return true;
+    } catch {
+      // 原生模块不可用，尝试 WASM
+    }
+
     try {
       // 动态导入 web-tree-sitter
       const TreeSitter = await import('web-tree-sitter');
@@ -181,12 +195,18 @@ export class TreeSitterWasmParser {
         await Parser.init();
       }
       this.ParserClass = Parser;
+      this.useNative = false;
       this.initialized = true;
+      console.log('Tree-sitter: 使用 WASM 模块');
       return true;
     } catch (err) {
-      console.warn('Tree-sitter WASM 初始化失败，使用 Regex 回退:', err);
+      console.warn('Tree-sitter 初始化失败，使用 Regex 回退:', err);
       return false;
     }
+  }
+
+  isNative(): boolean {
+    return this.useNative;
   }
 
   async loadLanguage(languageName: string): Promise<any | null> {

@@ -72,11 +72,12 @@ export interface SvgInfo {
   };
 }
 
-// SVG 渲染器
+// SVG 渲染器（优先使用原生，回退到 WASM）
 export class SvgRenderer {
   private Resvg: any = null;
   private initialized: boolean = false;
   private initPromise: Promise<boolean> | null = null;
+  private useNative: boolean = false;
 
   async initialize(): Promise<boolean> {
     if (this.initialized) return true;
@@ -87,6 +88,20 @@ export class SvgRenderer {
   }
 
   private async doInitialize(): Promise<boolean> {
+    // 首先尝试原生 resvg
+    try {
+      const nativeResvg = await import('@resvg/resvg-js');
+      this.Resvg = (nativeResvg as any).Resvg || (nativeResvg as any).default?.Resvg;
+      if (this.Resvg) {
+        this.useNative = true;
+        this.initialized = true;
+        console.log('resvg: 使用原生模块');
+        return true;
+      }
+    } catch {
+      // 原生模块不可用，尝试 WASM
+    }
+
     try {
       // 动态导入 @resvg/resvg-wasm
       const resvgModule = await import('@resvg/resvg-wasm');
@@ -102,12 +117,18 @@ export class SvgRenderer {
       }
 
       this.Resvg = resvgModule.Resvg;
+      this.useNative = false;
       this.initialized = true;
+      console.log('resvg: 使用 WASM 模块');
       return true;
     } catch (err) {
-      console.warn('resvg-wasm 初始化失败:', err);
+      console.warn('resvg 初始化失败:', err);
       return false;
     }
+  }
+
+  isNative(): boolean {
+    return this.useNative;
   }
 
   private findWasmPath(): string | null {
