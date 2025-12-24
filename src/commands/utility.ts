@@ -184,39 +184,229 @@ Example:
   },
 };
 
-// /todos - Todo 列表
+// /todos - Todo 列表 (官方风格 - 完整实现)
 export const todosCommand: SlashCommand = {
   name: 'todos',
   aliases: ['todo'],
   description: 'Show or manage the current todo list',
-  usage: '/todos [add|clear|done]',
+  usage: '/todos [add <item>|clear|done <n>]',
   category: 'utility',
   execute: (ctx: CommandContext): CommandResult => {
-    const { args } = ctx;
+    const { args, session } = ctx;
     const action = args[0] || 'list';
 
-    const todosInfo = `Todo List:
+    // 获取当前 todos
+    const todos = session.getTodos();
 
-Current Todos:
-  (Managed by Claude during conversation)
+    // list - 显示所有 todos（默认操作）
+    if (action === 'list' || !['add', 'clear', 'done'].includes(action)) {
+      if (todos.length === 0) {
+        const emptyInfo = `╭─ Todo List ──────────────────────────────────────────╮
+│                                                     │
+│  No todos yet                                       │
+│                                                     │
+╰─────────────────────────────────────────────────────╯
 
 The todo list helps Claude track:
-  - Multi-step tasks
-  - Implementation progress
-  - Pending items
+  • Multi-step tasks
+  • Implementation progress
+  • Pending items
+
+Claude automatically manages todos during complex tasks.
+
+You can also:
+  • Ask Claude to "add X to the todo list"
+  • Use /todos add <item> to add manually
+  • Use /todos clear to clear all todos
+  • Use /todos done <n> to mark item as done
+
+💡 Tip: For complex tasks, ask Claude to create a todo list
+   to track progress and ensure nothing is missed.`;
+
+        ctx.ui.addMessage('assistant', emptyInfo);
+        return { success: true };
+      }
+
+      // 格式化显示 todos
+      let todosInfo = `╭─ Todo List ──────────────────────────────────────────╮
+│                                                     │`;
+
+      const pendingTodos = todos.filter(t => t.status === 'pending');
+      const inProgressTodos = todos.filter(t => t.status === 'in_progress');
+      const completedTodos = todos.filter(t => t.status === 'completed');
+
+      // 显示进行中的任务
+      if (inProgressTodos.length > 0) {
+        todosInfo += `
+│  🔄 In Progress                                      │
+│                                                     │`;
+        for (const todo of inProgressTodos) {
+          const content = todo.activeForm.substring(0, 45);
+          todosInfo += `
+│    ▸ ${content.padEnd(45)}│`;
+        }
+        todosInfo += `
+│                                                     │`;
+      }
+
+      // 显示待处理的任务
+      if (pendingTodos.length > 0) {
+        todosInfo += `
+│  ⏳ Pending                                          │
+│                                                     │`;
+        for (let i = 0; i < pendingTodos.length; i++) {
+          const todo = pendingTodos[i];
+          const num = String(i + 1).padStart(2);
+          const content = todo.content.substring(0, 42);
+          todosInfo += `
+│    ${num}. ${content.padEnd(44)}│`;
+        }
+        todosInfo += `
+│                                                     │`;
+      }
+
+      // 显示已完成的任务
+      if (completedTodos.length > 0) {
+        todosInfo += `
+│  ✓ Completed                                        │
+│                                                     │`;
+        for (const todo of completedTodos) {
+          const content = todo.content.substring(0, 45);
+          todosInfo += `
+│    ✓ ${content.padEnd(45)}│`;
+        }
+        todosInfo += `
+│                                                     │`;
+      }
+
+      // 统计
+      const total = todos.length;
+      const completed = completedTodos.length;
+      const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+      todosInfo += `
+╰─────────────────────────────────────────────────────╯
+
+Progress: ${completed}/${total} completed (${progress}%)
 
 Commands:
+  /todos           - Show this list
+  /todos add <item> - Add a new todo
+  /todos clear     - Clear all todos
+  /todos done <n>  - Mark todo #n as done`;
+
+      ctx.ui.addMessage('assistant', todosInfo);
+      return { success: true };
+    }
+
+    // add - 添加新的 todo
+    if (action === 'add') {
+      if (args.length < 2) {
+        ctx.ui.addMessage('assistant', `Usage: /todos add <item>
+
+Example:
+  /todos add Fix the authentication bug`);
+        return { success: false };
+      }
+
+      const content = args.slice(1).join(' ');
+      const activeForm = content.startsWith('Fix') || content.startsWith('Build') ||
+                         content.startsWith('Create') || content.startsWith('Update') ||
+                         content.startsWith('Add') || content.startsWith('Remove') ||
+                         content.startsWith('Implement') || content.startsWith('Refactor')
+        ? content.replace(/^(Fix|Build|Create|Update|Add|Remove|Implement|Refactor)/, (match) => {
+            const map: Record<string, string> = {
+              'Fix': 'Fixing',
+              'Build': 'Building',
+              'Create': 'Creating',
+              'Update': 'Updating',
+              'Add': 'Adding',
+              'Remove': 'Removing',
+              'Implement': 'Implementing',
+              'Refactoring': 'Refactoring'
+            };
+            return map[match] || match;
+          })
+        : content;
+
+      const newTodo = {
+        content,
+        status: 'pending' as const,
+        activeForm,
+      };
+
+      todos.push(newTodo);
+      session.setTodos(todos);
+
+      ctx.ui.addMessage('assistant', `✓ Added to todo list: ${content}
+
+Run /todos to see the updated list.`);
+      return { success: true };
+    }
+
+    // clear - 清除所有 todos
+    if (action === 'clear') {
+      if (todos.length === 0) {
+        ctx.ui.addMessage('assistant', 'Todo list is already empty.');
+        return { success: true };
+      }
+
+      session.setTodos([]);
+      ctx.ui.addMessage('assistant', `✓ Cleared ${todos.length} todo${todos.length === 1 ? '' : 's'} from the list.`);
+      return { success: true };
+    }
+
+    // done - 标记为已完成
+    if (action === 'done') {
+      if (args.length < 2) {
+        ctx.ui.addMessage('assistant', `Usage: /todos done <number>
+
+Example:
+  /todos done 1
+
+Run /todos to see the numbered list.`);
+        return { success: false };
+      }
+
+      const num = parseInt(args[1], 10);
+      if (isNaN(num) || num < 1) {
+        ctx.ui.addMessage('assistant', 'Please provide a valid todo number (e.g., /todos done 1)');
+        return { success: false };
+      }
+
+      const pendingTodos = todos.filter(t => t.status === 'pending');
+      if (num > pendingTodos.length) {
+        ctx.ui.addMessage('assistant', `Todo #${num} not found. You have ${pendingTodos.length} pending todo${pendingTodos.length === 1 ? '' : 's'}.
+
+Run /todos to see the current list.`);
+        return { success: false };
+      }
+
+      // 找到对应的 todo 并标记为完成
+      const targetTodo = pendingTodos[num - 1];
+      const index = todos.indexOf(targetTodo);
+      if (index !== -1) {
+        todos[index].status = 'completed';
+        session.setTodos(todos);
+
+        ctx.ui.addMessage('assistant', `✓ Marked as completed: ${targetTodo.content}
+
+Run /todos to see the updated list.`);
+        return { success: true };
+      }
+
+      return { success: false };
+    }
+
+    // 未知的子命令
+    ctx.ui.addMessage('assistant', `Unknown action: ${action}
+
+Available commands:
   /todos           - Show current todos
   /todos add <item> - Add a todo item
   /todos clear     - Clear all todos
-  /todos done <n>  - Mark item as done
-
-Note: Claude automatically manages todos during
-complex tasks. You can also ask Claude to
-"add X to the todo list" or "show todos".`;
-
-    ctx.ui.addMessage('assistant', todosInfo);
-    return { success: true };
+  /todos done <n>  - Mark item as done`);
+    return { success: false };
   },
 };
 

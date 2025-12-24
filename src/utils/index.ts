@@ -165,3 +165,36 @@ export function findProjectRoot(startDir: string = process.cwd()): string | null
 
   return null;
 }
+
+/**
+ * 打开浏览器URL
+ * @param url - 要打开的URL
+ * @returns Promise<boolean> - 成功返回true，失败返回false
+ */
+export async function openUrl(url: string): Promise<boolean> {
+  const { exec } = await import('child_process');
+  const { promisify } = await import('util');
+  const execAsync = promisify(exec);
+
+  try {
+    const platform = process.platform;
+    let command: string;
+
+    switch (platform) {
+      case 'darwin': // macOS
+        command = `open "${url}"`;
+        break;
+      case 'win32': // Windows
+        command = `start "" "${url}"`;
+        break;
+      default: // Linux and others
+        command = `xdg-open "${url}"`;
+        break;
+    }
+
+    await execAsync(command);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}

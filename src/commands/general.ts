@@ -5,11 +5,11 @@
 import type { SlashCommand, CommandContext, CommandResult } from './types.js';
 import { commandRegistry } from './registry.js';
 
-// /help - 显示帮助信息
+// /help - 显示帮助信息 (官方风格)
 export const helpCommand: SlashCommand = {
   name: 'help',
-  aliases: ['?', 'h'],
-  description: 'Show available commands and help information',
+  aliases: ['?'],
+  description: 'Show available commands and keyboard shortcuts',
   usage: '/help [command]',
   category: 'general',
   execute: (ctx: CommandContext): CommandResult => {
@@ -21,22 +21,29 @@ export const helpCommand: SlashCommand = {
       const cmd = commandRegistry.get(cmdName);
 
       if (cmd) {
-        const helpText = `Command: /${cmd.name}
-${cmd.aliases ? `Aliases: ${cmd.aliases.map(a => '/' + a).join(', ')}` : ''}
-Category: ${cmd.category}
+        let helpText = `\n/${cmd.name}\n`;
+        helpText += `${'='.repeat(cmd.name.length + 1)}\n\n`;
+        helpText += `${cmd.description}\n\n`;
 
-Description: ${cmd.description}
-${cmd.usage ? `Usage: ${cmd.usage}` : ''}`;
+        if (cmd.usage) {
+          helpText += `Usage:\n  ${cmd.usage}\n\n`;
+        }
+
+        if (cmd.aliases && cmd.aliases.length > 0) {
+          helpText += `Aliases:\n  ${cmd.aliases.map(a => '/' + a).join(', ')}\n\n`;
+        }
+
+        helpText += `Category: ${cmd.category}\n`;
 
         ctx.ui.addMessage('assistant', helpText);
         return { success: true };
       } else {
-        ctx.ui.addMessage('assistant', `Unknown command: /${cmdName}`);
+        ctx.ui.addMessage('assistant', `Unknown command: /${cmdName}\n\nUse /help to see all available commands.`);
         return { success: false };
       }
     }
 
-    // 显示所有命令
+    // 显示所有命令（官方风格：按类别分组）
     const categories: Record<string, SlashCommand[]> = {};
     for (const cmd of commandRegistry.getAll()) {
       if (!categories[cmd.category]) {
@@ -45,28 +52,73 @@ ${cmd.usage ? `Usage: ${cmd.usage}` : ''}`;
       categories[cmd.category].push(cmd);
     }
 
+    const categoryOrder = ['general', 'session', 'config', 'tools', 'auth', 'utility', 'development'];
     const categoryNames: Record<string, string> = {
       general: 'General',
-      session: 'Session',
+      session: 'Session Management',
       config: 'Configuration',
       tools: 'Tools & Integrations',
-      auth: 'Authentication',
-      utility: 'Utility',
+      auth: 'Authentication & Billing',
+      utility: 'Utilities',
       development: 'Development',
     };
 
-    let helpText = 'Available Commands:\n\n';
+    let helpText = `\nClaude Code - Available Commands\n`;
+    helpText += `${'='.repeat(35)}\n\n`;
 
-    for (const [category, cmds] of Object.entries(categories)) {
-      helpText += `${categoryNames[category] || category}:\n`;
+    // 按预定义顺序显示分类
+    for (const category of categoryOrder) {
+      const cmds = categories[category];
+      if (!cmds || cmds.length === 0) continue;
+
+      helpText += `${categoryNames[category] || category}\n`;
+      helpText += `${'-'.repeat((categoryNames[category] || category).length)}\n`;
+
       for (const cmd of cmds.sort((a, b) => a.name.localeCompare(b.name))) {
-        const aliasStr = cmd.aliases ? ` (${cmd.aliases.join(', ')})` : '';
-        helpText += `  /${cmd.name.padEnd(16)}${aliasStr.padEnd(12)} - ${cmd.description}\n`;
+        const cmdDisplay = `/${cmd.name}`;
+        const aliasStr = cmd.aliases && cmd.aliases.length > 0
+          ? ` (${cmd.aliases.map(a => '/' + a).join(', ')})`
+          : '';
+        helpText += `  ${cmdDisplay.padEnd(20)}${cmd.description}${aliasStr}\n`;
       }
       helpText += '\n';
     }
 
-    helpText += 'Press ? for keyboard shortcuts\nUse /help <command> for detailed help';
+    // 其他未分类的命令
+    for (const [category, cmds] of Object.entries(categories)) {
+      if (categoryOrder.includes(category)) continue;
+
+      helpText += `${categoryNames[category] || category}\n`;
+      helpText += `${'-'.repeat((categoryNames[category] || category).length)}\n`;
+
+      for (const cmd of cmds.sort((a, b) => a.name.localeCompare(b.name))) {
+        const cmdDisplay = `/${cmd.name}`;
+        const aliasStr = cmd.aliases && cmd.aliases.length > 0
+          ? ` (${cmd.aliases.map(a => '/' + a).join(', ')})`
+          : '';
+        helpText += `  ${cmdDisplay.padEnd(20)}${cmd.description}${aliasStr}\n`;
+      }
+      helpText += '\n';
+    }
+
+    // 快捷键提示
+    helpText += `Keyboard Shortcuts\n`;
+    helpText += `-----------------\n`;
+    helpText += `  Ctrl+C              Cancel current operation\n`;
+    helpText += `  Ctrl+D              Exit Claude Code\n`;
+    helpText += `  Ctrl+L              Clear screen\n`;
+    helpText += `  Ctrl+R              Search history\n`;
+    helpText += `  Tab                 Autocomplete\n`;
+    helpText += `  Up/Down arrows      Navigate history\n\n`;
+
+    // 底部提示
+    helpText += `Tips\n`;
+    helpText += `----\n`;
+    helpText += `  • Use /help <command> for detailed information about a specific command\n`;
+    helpText += `  • Type ? at any time to see this help message\n`;
+    helpText += `  • Visit https://code.claude.com/docs for full documentation\n\n`;
+
+    helpText += `Version: ${ctx.config.version || 'unknown'}\n`;
 
     ctx.ui.addMessage('assistant', helpText);
     return { success: true };
@@ -99,7 +151,7 @@ export const exitCommand: SlashCommand = {
   },
 };
 
-// /status - 显示会话状态 (官方风格)
+// /status - 显示会话状态 (完全基于官方实现)
 export const statusCommand: SlashCommand = {
   name: 'status',
   description: 'Show Claude Code status including version, model, account, API connectivity, and tool statuses',
@@ -113,11 +165,11 @@ export const statusCommand: SlashCommand = {
 
     let statusText = `Claude Code Status\n\n`;
 
-    // 版本信息
+    // ===== 版本信息 =====
     statusText += `Version: v${config.version}\n`;
     statusText += `Model: ${config.modelDisplayName}\n\n`;
 
-    // 账户信息
+    // ===== 账户信息 =====
     statusText += `Account\n`;
     statusText += `  ${config.username ? `User: ${config.username}` : 'Not logged in'}\n`;
     statusText += `  API Type: ${config.apiType}\n`;
@@ -126,19 +178,49 @@ export const statusCommand: SlashCommand = {
     }
     statusText += '\n';
 
-    // API 连接状态
+    // ===== API 连接状态 =====
     statusText += `API Connectivity\n`;
     statusText += `  API Key: ${apiKeySet ? '✓ Configured' : '✗ Not configured'}\n`;
     statusText += `  Status: ${apiKeySet ? '✓ Connected' : '✗ Not connected'}\n\n`;
 
-    // 会话信息
+    // ===== 会话信息 =====
     statusText += `Session\n`;
     statusText += `  ID: ${ctx.session.id.slice(0, 8)}\n`;
     statusText += `  Messages: ${stats.messageCount}\n`;
-    statusText += `  Duration: ${Math.round(stats.duration / 1000)}s\n`;
+    statusText += `  Duration: ${formatDuration(stats.duration)}\n`;
     statusText += `  Cost: ${stats.totalCost}\n\n`;
 
-    // 工作目录
+    // ===== Token 使用统计 =====
+    const modelUsage = stats.modelUsage;
+    const totalTokens = Object.values(modelUsage).reduce((sum, tokens) => sum + tokens, 0);
+
+    if (totalTokens > 0) {
+      statusText += `Token Usage\n`;
+      statusText += `  Total: ${formatNumber(totalTokens)} tokens\n`;
+
+      // 按模型显示详细信息
+      const sortedModels = Object.entries(modelUsage)
+        .sort(([, a], [, b]) => b - a)
+        .filter(([, tokens]) => tokens > 0);
+
+      if (sortedModels.length > 0) {
+        statusText += `  By Model:\n`;
+        for (const [model, tokens] of sortedModels) {
+          const modelName = getShortModelName(model);
+          const percentage = ((tokens / totalTokens) * 100).toFixed(1);
+          statusText += `    ${modelName}: ${formatNumber(tokens)} (${percentage}%)\n`;
+        }
+      }
+      statusText += '\n';
+    }
+
+    // ===== 权限模式 =====
+    if (config.permissionMode) {
+      statusText += `Permissions\n`;
+      statusText += `  Mode: ${config.permissionMode}\n\n`;
+    }
+
+    // ===== 工作目录 =====
     statusText += `Working Directory\n`;
     statusText += `  ${config.cwd}\n`;
 
@@ -146,6 +228,45 @@ export const statusCommand: SlashCommand = {
     return { success: true };
   },
 };
+
+// 辅助函数：格式化持续时间
+function formatDuration(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+
+  if (hours > 0) {
+    const remainingMinutes = minutes % 60;
+    const remainingSeconds = seconds % 60;
+    return `${hours}h ${remainingMinutes}m ${remainingSeconds}s`;
+  } else if (minutes > 0) {
+    const remainingSeconds = seconds % 60;
+    return `${minutes}m ${remainingSeconds}s`;
+  } else {
+    return `${seconds}s`;
+  }
+}
+
+// 辅助函数：格式化数字（添加千位分隔符）
+function formatNumber(num: number): string {
+  return num.toLocaleString('en-US');
+}
+
+// 辅助函数：获取简短的模型名称
+function getShortModelName(fullModelName: string): string {
+  // 从完整模型名中提取简短名称
+  if (fullModelName.includes('opus')) return 'Opus';
+  if (fullModelName.includes('sonnet')) return 'Sonnet';
+  if (fullModelName.includes('haiku')) return 'Haiku';
+
+  // 如果是版本号格式，提取主要部分
+  const match = fullModelName.match(/claude-(\w+)/);
+  if (match) {
+    return match[1].charAt(0).toUpperCase() + match[1].slice(1);
+  }
+
+  return fullModelName;
+}
 
 // /doctor - 运行诊断 (官方风格)
 export const doctorCommand: SlashCommand = {
