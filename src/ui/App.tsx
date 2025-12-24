@@ -3,19 +3,20 @@
  * 使用 Ink 渲染 CLI 界面 - 仿官方 Claude Code
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Box, Text, useApp, useInput } from 'ink';
 import { Header } from './components/Header.js';
 import { Message } from './components/Message.js';
 import { Input } from './components/Input.js';
 import { ToolCall } from './components/ToolCall.js';
 import { TodoList } from './components/TodoList.js';
-import { StatusBar } from './components/StatusBar.js';
 import { Spinner } from './components/Spinner.js';
 import { WelcomeScreen } from './components/WelcomeScreen.js';
 import { ShortcutHelp } from './components/ShortcutHelp.js';
 import { ConversationLoop } from '../core/loop.js';
+import { initializeCommands, executeCommand } from '../commands/index.js';
 import type { TodoItem } from '../types/index.js';
+import { v4 as uuidv4 } from 'uuid';
 
 const VERSION = '2.0.76-restored';
 
@@ -49,6 +50,15 @@ interface RecentActivity {
   timestamp: Date;
 }
 
+// 默认建议提示
+const DEFAULT_SUGGESTIONS = [
+  'how do I log an error?',
+  'explain this codebase',
+  'find all TODO comments',
+  'what does this function do?',
+  'help me fix this bug',
+];
+
 export const App: React.FC<AppProps> = ({
   model,
   initialPrompt,
@@ -64,15 +74,15 @@ export const App: React.FC<AppProps> = ({
   const [todos, setTodos] = useState<TodoItem[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentResponse, setCurrentResponse] = useState('');
-  const [stats, setStats] = useState({
-    messageCount: 0,
-    duration: 0,
-    tokenCount: 0,
-    cost: '$0.00'
-  });
   const [showWelcome, setShowWelcome] = useState(true);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
+  const [currentSuggestion] = useState(
+    () => DEFAULT_SUGGESTIONS[Math.floor(Math.random() * DEFAULT_SUGGESTIONS.length)]
+  );
+
+  // 会话 ID
+  const sessionId = useRef(uuidv4());
 
   // 模型映射
   const modelMap: Record<string, string> = {
@@ -98,6 +108,11 @@ export const App: React.FC<AppProps> = ({
         systemPrompt,
       })
   );
+
+  // 初始化命令系统
+  useEffect(() => {
+    initializeCommands();
+  }, []);
 
   // 处理键盘输入
   useInput((input, key) => {
@@ -127,6 +142,65 @@ export const App: React.FC<AppProps> = ({
     ]);
   }, []);
 
+  // 添加消息的辅助函数
+  const addMessage = useCallback((role: 'user' | 'assistant', content: string) => {
+    setMessages((prev) => [
+      ...prev,
+      { role, content, timestamp: new Date() },
+    ]);
+  }, []);
+
+  // 处理斜杠命令
+  const handleSlashCommand = useCallback(async (input: string): Promise<boolean> => {
+    const session = loop.getSession();
+    const stats = session.getStats();
+
+    const commandContext = {
+      session: {
+        id: sessionId.current,
+        messageCount: stats.messageCount,
+        duration: stats.duration,
+        totalCost: stats.totalCost,
+        clearMessages: () => {
+          setMessages([]);
+          setToolCalls([]);
+          session.clearMessages();
+        },
+        getStats: () => stats,
+      },
+      config: {
+        model: modelMap[model] || model,
+        modelDisplayName: modelDisplayName[model] || model,
+        apiType,
+        organization,
+        username,
+        cwd: process.cwd(),
+        version: VERSION,
+      },
+      ui: {
+        addMessage,
+        addActivity,
+        setShowWelcome,
+        exit,
+      },
+    };
+
+    try {
+      const result = await executeCommand(input, commandContext);
+
+      if (result.action === 'exit') {
+        exit();
+      } else if (result.action === 'clear') {
+        // 清除已在命令中处理
+      }
+
+      return result.success;
+    } catch (error) {
+      addMessage('assistant', `Command error: ${error}`);
+      return false;
+    }
+  }, [loop, model, apiType, organization, username, addMessage, addActivity, exit]);
+
   // 处理消息
   const handleSubmit = useCallback(
     async (input: string) => {
@@ -135,15 +209,12 @@ export const App: React.FC<AppProps> = ({
 
       // 斜杠命令
       if (input.startsWith('/')) {
-        handleSlashCommand(input);
+        await handleSlashCommand(input);
         return;
       }
 
       // 添加用户消息
-      setMessages((prev) => [
-        ...prev,
-        { role: 'user', content: input, timestamp: new Date() },
-      ]);
+      addMessage('user', input);
 
       setIsProcessing(true);
       setCurrentResponse('');
@@ -181,249 +252,17 @@ export const App: React.FC<AppProps> = ({
         }
 
         // 添加助手消息
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: 'assistant',
-            content: currentResponse,
-            timestamp: new Date(),
-          },
-        ]);
-
+        addMessage('assistant', currentResponse);
         addActivity(`Conversation: ${input.slice(0, 30)}...`);
       } catch (err) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: 'assistant',
-            content: `Error: ${err}`,
-            timestamp: new Date(),
-          },
-        ]);
+        addMessage('assistant', `Error: ${err}`);
         addActivity(`Error occurred`);
       }
 
       setIsProcessing(false);
-      setStats((prev) => ({
-        ...prev,
-        messageCount: prev.messageCount + 2,
-        duration: Date.now() - startTime,
-      }));
     },
-    [loop, currentResponse, showWelcome, addActivity]
+    [loop, currentResponse, showWelcome, addActivity, addMessage, handleSlashCommand]
   );
-
-  // 斜杠命令处理
-  const handleSlashCommand = (input: string) => {
-    const [cmd, ...args] = input.slice(1).split(' ');
-
-    switch (cmd.toLowerCase()) {
-      case 'exit':
-      case 'quit':
-        exit();
-        break;
-
-      case 'clear':
-        setMessages([]);
-        setToolCalls([]);
-        loop.getSession().clearMessages();
-        addActivity('Cleared conversation');
-        break;
-
-      case 'help':
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: 'assistant',
-            content: `📚 Available Commands:
-
-General:
-  /help       - Show this help message
-  /clear      - Clear conversation history
-  /exit       - Exit Claude Code
-  /status     - Show session status
-
-Model:
-  /model      - Show/change current model
-
-Session:
-  /compact    - Compact conversation history
-  /stats      - Show session statistics
-  /resume     - Resume previous session
-
-Tools:
-  /doctor     - Run diagnostics
-  /bug        - Report a bug
-  /init       - Create CLAUDE.md file
-
-Press ? for keyboard shortcuts`,
-            timestamp: new Date(),
-          },
-        ]);
-        break;
-
-      case 'status':
-        const sessionStats = loop.getSession().getStats();
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: 'assistant',
-            content: `📊 Session Status:
-
-Model: ${modelDisplayName[model] || model}
-API: ${apiType}
-${organization ? `Organization: ${organization}` : ''}
-
-Messages: ${sessionStats.messageCount}
-Duration: ${Math.round(sessionStats.duration / 1000)}s
-Working Directory: ${process.cwd()}`,
-            timestamp: new Date(),
-          },
-        ]);
-        break;
-
-      case 'stats':
-        const sStats = loop.getSession().getStats();
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: 'assistant',
-            content: `📈 Session Statistics:
-
-Messages: ${sStats.messageCount}
-Duration: ${Math.round(sStats.duration / 1000)}s
-Cost: ${sStats.totalCost}
-Recent Activities: ${recentActivity.length}`,
-            timestamp: new Date(),
-          },
-        ]);
-        break;
-
-      case 'model':
-        if (args.length === 0) {
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: 'assistant',
-              content: `Current model: ${modelDisplayName[model] || model}
-
-Available models:
-  • opus   - Claude Opus 4 (most capable)
-  • sonnet - Claude Sonnet 4 (balanced)
-  • haiku  - Claude Haiku 3.5 (fastest)
-
-Use: /model <name> to switch`,
-              timestamp: new Date(),
-            },
-          ]);
-        } else {
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: 'assistant',
-              content: `Model switching requires restart. Use: claude -m ${args[0]}`,
-              timestamp: new Date(),
-            },
-          ]);
-        }
-        break;
-
-      case 'doctor':
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: 'assistant',
-            content: `🩺 Running diagnostics...
-
-✅ Node.js: ${process.version}
-✅ Platform: ${process.platform}
-✅ API Connection: OK
-✅ Model: ${modelDisplayName[model] || model}
-✅ Working Directory: ${process.cwd()}
-✅ Memory Usage: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB
-
-All systems operational!`,
-            timestamp: new Date(),
-          },
-        ]);
-        addActivity('Ran diagnostics');
-        break;
-
-      case 'bug':
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: 'assistant',
-            content: `🐛 Report a Bug
-
-Please report issues at:
-https://github.com/anthropics/claude-code/issues
-
-Include:
-• Description of the issue
-• Steps to reproduce
-• Expected vs actual behavior
-• Version: ${VERSION}
-• Model: ${model}
-• Platform: ${process.platform}`,
-            timestamp: new Date(),
-          },
-        ]);
-        break;
-
-      case 'init':
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: 'assistant',
-            content: `📝 Creating CLAUDE.md...
-
-To create a CLAUDE.md file with project instructions:
-
-1. Create a file named CLAUDE.md in your project root
-2. Add project-specific instructions for Claude
-3. Claude will read this file for context
-
-Example content:
-\`\`\`markdown
-# Project Instructions
-
-This is a TypeScript project using...
-\`\`\``,
-            timestamp: new Date(),
-          },
-        ]);
-        addActivity('Showed /init instructions');
-        break;
-
-      case 'compact':
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: 'assistant',
-            content: `🗜️ Compacting conversation history...
-
-This feature summarizes long conversations to save context.
-Current messages: ${messages.length}`,
-            timestamp: new Date(),
-          },
-        ]);
-        addActivity('Compacted conversation');
-        break;
-
-      default:
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: 'assistant',
-            content: `Unknown command: /${cmd}
-
-Type /help for available commands.`,
-            timestamp: new Date(),
-          },
-        ]);
-    }
-  };
 
   // 初始 prompt
   useEffect(() => {
@@ -510,21 +349,22 @@ Type /help for available commands.`,
       {/* Todo List */}
       {todos.length > 0 && <TodoList todos={todos} />}
 
-      {/* Input */}
+      {/* Input with suggestion */}
       <Box marginTop={1}>
-        <Text color="gray" dimColor>
-          {showWelcome ? '> Try "how do I log an error?"' : ''}
-        </Text>
+        <Input
+          onSubmit={handleSubmit}
+          disabled={isProcessing}
+          suggestion={showWelcome ? currentSuggestion : undefined}
+        />
       </Box>
-      <Input onSubmit={handleSubmit} disabled={isProcessing} />
 
-      {/* Status Bar */}
+      {/* Status Bar - 底部状态栏 */}
       <Box justifyContent="space-between" paddingX={1} marginTop={1}>
         <Text color="gray" dimColor>
           ? for shortcuts
         </Text>
         <Text color="gray" dimColor>
-          {isProcessing ? 'Processing...' : 'Ready'}
+          {isProcessing ? 'Processing...' : 'Auto-updating...'}
         </Text>
       </Box>
     </Box>

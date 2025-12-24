@@ -25,24 +25,35 @@ export const Header: React.FC<HeaderProps> = ({
   organization,
   isCompact = false,
 }) => {
-  // 紧凑模式 - 只显示一行
+  // 紧凑模式 - 对话开始后显示的简洁头部
   if (isCompact) {
     return (
-      <Box paddingX={1} marginBottom={1}>
+      <Box marginBottom={1} paddingX={1}>
         <Text color="red" bold>
           Claude Code
         </Text>
-        <Text color="gray"> v{version} · </Text>
-        <Text color="cyan">{model}</Text>
+        <Text color="gray"> v{version}</Text>
         <Text color="gray"> · </Text>
-        <Text color="gray">{cwd}</Text>
+        <Text color="cyan">{model}</Text>
+        {cwd && (
+          <>
+            <Text color="gray"> · </Text>
+            <Text color="gray" dimColor>{cwd}</Text>
+          </>
+        )}
       </Box>
     );
   }
 
-  // 完整模式 - 带边框
+  // 完整模式 - 带边框的头部 (用于没有欢迎屏幕时)
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor="red" paddingX={2} paddingY={1}>
+    <Box
+      flexDirection="column"
+      borderStyle="round"
+      borderColor="red"
+      paddingX={2}
+      paddingY={1}
+    >
       {/* 标题行 */}
       <Box justifyContent="space-between">
         <Box>
@@ -52,28 +63,21 @@ export const Header: React.FC<HeaderProps> = ({
           <Text color="gray"> v{version}</Text>
         </Box>
         {username && (
-          <Text color="gray">
-            {username}
+          <Text bold>
+            Welcome back {username}!
           </Text>
         )}
       </Box>
 
-      {/* 分隔线 */}
-      <Box marginY={1}>
-        <Text color="red">{'─'.repeat(50)}</Text>
-      </Box>
-
       {/* 模型和 API 信息 */}
-      <Box>
-        <Text color="cyan" bold>
-          {model}
-        </Text>
+      <Box marginTop={1}>
+        <Text color="cyan">{model}</Text>
         <Text color="gray"> · </Text>
         <Text color="gray">{apiType}</Text>
         {organization && (
           <>
             <Text color="gray"> · </Text>
-            <Text color="yellow">{organization}</Text>
+            <Text color="gray">{organization}</Text>
           </>
         )}
       </Box>
@@ -81,8 +85,7 @@ export const Header: React.FC<HeaderProps> = ({
       {/* 工作目录 */}
       {cwd && (
         <Box marginTop={1}>
-          <Text color="gray">📁 </Text>
-          <Text color="white">{cwd}</Text>
+          <Text color="gray" dimColor>{cwd}</Text>
         </Box>
       )}
     </Box>
