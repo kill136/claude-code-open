@@ -6,6 +6,7 @@ import type { SlashCommand, CommandContext, CommandResult } from './types.js';
 import { commandRegistry } from './registry.js';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
 
 // /cost - 费用统计 (官方风格)
 export const costCommand: SlashCommand = {
@@ -298,24 +299,85 @@ Fun fact: The mascot's name is "Clawd"!`;
   },
 };
 
-// /skills - 技能列表 (官方风格)
+// /skills - 技能列表 (官方风格 - 扫描实际可用技能)
 export const skillsCommand: SlashCommand = {
   name: 'skills',
   description: 'List available skills',
   category: 'utility',
   execute: (ctx: CommandContext): CommandResult => {
-    const skillsInfo = `Available Skills
+    const { config } = ctx;
 
-Built-in Skills:
-  session-start-hook     Set up SessionStart hooks for projects
-  pdf                    Process and analyze PDF files
-  xlsx                   Work with Excel spreadsheets
-  csv                    Handle CSV data files
+    // 扫描技能目录
+    const globalSkillsDir = path.join(os.homedir(), '.claude', 'skills');
+    const projectSkillsDir = path.join(config.cwd, '.claude', 'commands');
 
-Custom Skills:
-  Location: ~/.claude/skills/ (global)
-  Location: .claude/commands/ (project)
+    const globalSkills: string[] = [];
+    const projectSkills: string[] = [];
 
+    // 扫描全局技能
+    if (fs.existsSync(globalSkillsDir)) {
+      try {
+        const files = fs.readdirSync(globalSkillsDir);
+        for (const file of files) {
+          if (file.endsWith('.md')) {
+            globalSkills.push(file.replace('.md', ''));
+          }
+        }
+      } catch {
+        // 忽略错误
+      }
+    }
+
+    // 扫描项目技能
+    if (fs.existsSync(projectSkillsDir)) {
+      try {
+        const files = fs.readdirSync(projectSkillsDir);
+        for (const file of files) {
+          if (file.endsWith('.md')) {
+            projectSkills.push(file.replace('.md', ''));
+          }
+        }
+      } catch {
+        // 忽略错误
+      }
+    }
+
+    // 内置技能
+    const builtInSkills = [
+      { name: 'session-start-hook', desc: 'Set up SessionStart hooks for projects' },
+    ];
+
+    let skillsInfo = `Available Skills
+
+`;
+
+    // 内置技能
+    skillsInfo += `Built-in Skills:\n`;
+    for (const skill of builtInSkills) {
+      skillsInfo += `  ${skill.name.padEnd(22)} ${skill.desc}\n`;
+    }
+
+    // 全局技能
+    skillsInfo += `\nGlobal Skills (${globalSkillsDir}):\n`;
+    if (globalSkills.length > 0) {
+      for (const skill of globalSkills) {
+        skillsInfo += `  ${skill}\n`;
+      }
+    } else {
+      skillsInfo += `  (none)\n`;
+    }
+
+    // 项目技能
+    skillsInfo += `\nProject Skills (${projectSkillsDir}):\n`;
+    if (projectSkills.length > 0) {
+      for (const skill of projectSkills) {
+        skillsInfo += `  ${skill}\n`;
+      }
+    } else {
+      skillsInfo += `  (none)\n`;
+    }
+
+    skillsInfo += `
 Creating Skills:
   Skills are markdown files that expand into prompts.
 
@@ -327,17 +389,15 @@ Creating Skills:
     When using this skill...
 
 Usage:
-  /skill <name>      - Invoke a skill
-  /skills            - List all skills
-
-Skills provide reusable prompts and workflows.`;
+  Ask Claude to use a skill by name, or invoke with:
+    "use the <skill-name> skill"`;
 
     ctx.ui.addMessage('assistant', skillsInfo);
     return { success: true };
   },
 };
 
-// /stats - 使用统计 (官方风格)
+// /stats - 使用统计 (官方风格 - 显示真实统计数据)
 export const statsCommand: SlashCommand = {
   name: 'stats',
   description: 'Show your Claude Code usage statistics and activity',
@@ -345,89 +405,246 @@ export const statsCommand: SlashCommand = {
   execute: (ctx: CommandContext): CommandResult => {
     const stats = ctx.session.getStats();
     const durationMins = Math.floor(stats.duration / 60000);
+    const durationSecs = Math.floor((stats.duration % 60000) / 1000);
 
-    let statsInfo = `Claude Code Statistics\n\n`;
+    // 尝试获取会话历史统计
+    const sessionsDir = path.join(os.homedir(), '.claude', 'sessions');
+    let totalSessions = 0;
+    let totalMessages = 0;
 
-    // 当前会话
-    statsInfo += `Current Session\n`;
-    statsInfo += `  Messages: ${stats.messageCount}\n`;
-    statsInfo += `  Duration: ${durationMins} minutes\n`;
-    statsInfo += `  Cost: ${stats.totalCost}\n\n`;
+    if (fs.existsSync(sessionsDir)) {
+      try {
+        const files = fs.readdirSync(sessionsDir).filter(f => f.endsWith('.json'));
+        totalSessions = files.length;
 
-    // 使用模式
-    statsInfo += `Usage Patterns\n`;
-    statsInfo += `  Most used tools: Bash, Read, Edit\n`;
-    statsInfo += `  Avg session length: ~30 minutes\n`;
-    statsInfo += `  Peak hours: 9am-5pm\n\n`;
+        // 统计最近几个会话的消息数
+        for (const file of files.slice(-10)) {
+          try {
+            const sessionPath = path.join(sessionsDir, file);
+            const sessionData = JSON.parse(fs.readFileSync(sessionPath, 'utf-8'));
+            totalMessages += sessionData.messages?.length || 0;
+          } catch {
+            // 忽略解析错误
+          }
+        }
+      } catch {
+        // 忽略目录读取错误
+      }
+    }
 
-    // 成就
-    statsInfo += `Achievements\n`;
-    statsInfo += `  ✓ First session completed\n`;
-    statsInfo += `  ✓ Used 5+ tools\n`;
-    statsInfo += `  ○ Complete 100 sessions\n`;
-    statsInfo += `  ○ Use advanced features\n\n`;
+    let statsInfo = `╭─ Claude Code Statistics ────────────────────────────╮
+│                                                     │
+│  Current Session                                    │
+│    Session ID: ${ctx.session.id.substring(0, 8)}...                          │
+│    Messages:   ${String(stats.messageCount).padEnd(36)}│
+│    Duration:   ${durationMins}m ${durationSecs}s${' '.repeat(Math.max(0, 32 - String(durationMins).length - String(durationSecs).length))}│
+│    Est. Cost:  ${stats.totalCost.padEnd(36)}│
+│                                                     │
+│  Token Usage                                        │`;
 
-    statsInfo += `For detailed billing: https://console.anthropic.com/billing`;
+    // 显示模型使用情况
+    const modelUsage = stats.modelUsage || {};
+    if (Object.keys(modelUsage).length > 0) {
+      for (const [model, tokens] of Object.entries(modelUsage)) {
+        const modelName = model.includes('sonnet') ? 'Sonnet' :
+                         model.includes('opus') ? 'Opus' :
+                         model.includes('haiku') ? 'Haiku' : model;
+        statsInfo += `\n│    ${modelName.padEnd(12)} ${String(tokens).toLocaleString().padEnd(27)}│`;
+      }
+    } else {
+      statsInfo += `\n│    (no token data yet)                              │`;
+    }
+
+    statsInfo += `
+│                                                     │
+│  Historical Data                                    │
+│    Total Sessions: ${String(totalSessions).padEnd(32)}│
+│    Recent Messages: ${String(totalMessages).padEnd(31)}│
+│                                                     │
+│  Model: ${ctx.config.modelDisplayName.padEnd(43)}│
+│                                                     │
+╰─────────────────────────────────────────────────────╯
+
+For detailed billing: https://console.anthropic.com/billing`;
 
     ctx.ui.addMessage('assistant', statsInfo);
     return { success: true };
   },
 };
 
-// /think-back - 年度回顾 (官方风格)
+// /think-back - 年度回顾 (官方风格 - 生成真实统计)
 export const thinkBackCommand: SlashCommand = {
   name: 'think-back',
   aliases: ['thinkback', 'year-review'],
   description: 'Your 2025 Claude Code Year in Review',
   category: 'utility',
   execute: (ctx: CommandContext): CommandResult => {
-    const thinkBackInfo = `🎉 Your 2025 Claude Code Year in Review
+    // 收集会话统计
+    const sessionsDir = path.join(os.homedir(), '.claude', 'sessions');
+    let totalSessions = 0;
+    let totalMessages = 0;
+    const toolUsage: Record<string, number> = {};
+    const monthlyActivity: Record<string, number> = {};
 
-Coming Soon!
+    if (fs.existsSync(sessionsDir)) {
+      try {
+        const files = fs.readdirSync(sessionsDir).filter(f => f.endsWith('.json'));
+        totalSessions = files.length;
 
-The Think Back feature will show:
-  • Total sessions this year
-  • Lines of code written together
-  • Most used languages
-  • Favorite tools
-  • Peak productivity hours
-  • Memorable moments
+        for (const file of files) {
+          try {
+            const sessionPath = path.join(sessionsDir, file);
+            const sessionData = JSON.parse(fs.readFileSync(sessionPath, 'utf-8'));
+            const msgCount = sessionData.messages?.length || 0;
+            totalMessages += msgCount;
 
-This feature is available at the end of 2025.
+            // 按月统计
+            const createdAt = sessionData.createdAt || sessionData.created_at;
+            if (createdAt) {
+              const month = new Date(createdAt).toLocaleString('default', { month: 'short' });
+              monthlyActivity[month] = (monthlyActivity[month] || 0) + msgCount;
+            }
 
-Use /thinkback-play to preview the animation!`;
+            // 工具使用统计
+            if (sessionData.messages) {
+              for (const msg of sessionData.messages) {
+                if (msg.toolCalls) {
+                  for (const tool of msg.toolCalls) {
+                    const toolName = tool.name || 'Unknown';
+                    toolUsage[toolName] = (toolUsage[toolName] || 0) + 1;
+                  }
+                }
+              }
+            }
+          } catch {
+            // 忽略解析错误
+          }
+        }
+      } catch {
+        // 忽略目录读取错误
+      }
+    }
+
+    // 排序工具使用
+    const sortedTools = Object.entries(toolUsage)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 5);
+
+    const thinkBackInfo = `╭─────────────────────────────────────────────────────╮
+│                                                     │
+│       🎉 Your 2025 Claude Code Year in Review       │
+│                                                     │
+╰─────────────────────────────────────────────────────╯
+
+📊 Your Stats
+
+  Total Sessions:     ${totalSessions}
+  Total Messages:     ${totalMessages}
+  Avg per Session:    ${totalSessions > 0 ? Math.round(totalMessages / totalSessions) : 0}
+
+🛠️  Most Used Tools
+${sortedTools.length > 0
+  ? sortedTools.map(([name, count], i) => `  ${i + 1}. ${name.padEnd(15)} ${count} uses`).join('\n')
+  : '  (no tool usage recorded)'}
+
+📈 Activity by Month
+${Object.keys(monthlyActivity).length > 0
+  ? Object.entries(monthlyActivity)
+      .slice(-6)
+      .map(([month, count]) => {
+        const bar = '█'.repeat(Math.min(20, Math.ceil(count / 10)));
+        return `  ${month.padEnd(4)} ${bar} ${count}`;
+      })
+      .join('\n')
+  : '  (no monthly data)'}
+
+🏆 Achievements
+  ${totalSessions >= 1 ? '✓' : '○'} First session completed
+  ${totalSessions >= 10 ? '✓' : '○'} 10+ sessions
+  ${totalSessions >= 50 ? '✓' : '○'} Power user (50+ sessions)
+  ${totalMessages >= 100 ? '✓' : '○'} 100+ messages exchanged
+  ${Object.keys(toolUsage).length >= 5 ? '✓' : '○'} Used 5+ different tools
+
+Use /thinkback-play to see an animated version!`;
 
     ctx.ui.addMessage('assistant', thinkBackInfo);
     return { success: true };
   },
 };
 
-// /thinkback-play - 播放年度回顾动画 (官方风格)
+// /thinkback-play - 播放年度回顾动画 (官方风格 - ASCII 动画效果)
 export const thinkbackPlayCommand: SlashCommand = {
   name: 'thinkback-play',
   description: 'Play the thinkback animation',
   category: 'utility',
   execute: (ctx: CommandContext): CommandResult => {
-    const playInfo = `Thinkback Animation Player
+    // 收集统计数据
+    const sessionsDir = path.join(os.homedir(), '.claude', 'sessions');
+    let totalSessions = 0;
+    let totalMessages = 0;
 
-╔════════════════════════════════════╗
-║                                    ║
-║       🎬 CLAUDE CODE 2025         ║
-║                                    ║
-║         Year in Review            ║
-║                                    ║
-║     Loading your memories...      ║
-║                                    ║
-╚════════════════════════════════════╝
+    if (fs.existsSync(sessionsDir)) {
+      try {
+        const files = fs.readdirSync(sessionsDir).filter(f => f.endsWith('.json'));
+        totalSessions = files.length;
+        for (const file of files.slice(-20)) {
+          try {
+            const data = JSON.parse(fs.readFileSync(path.join(sessionsDir, file), 'utf-8'));
+            totalMessages += data.messages?.length || 0;
+          } catch { /* ignore */ }
+        }
+      } catch { /* ignore */ }
+    }
 
-Animation features:
-  • Your coding journey visualization
-  • Stats and milestones
-  • Fun facts about your usage
-  • Shareable summary
+    const currentDate = new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
 
-Note: Full animation requires web interface.
-Visit https://claude.ai/thinkback to watch!`;
+    const playInfo = `
+╔══════════════════════════════════════════════════════╗
+║                                                      ║
+║   ░█████╗░██╗░░░░░░█████╗░██╗░░░██╗██████╗░███████╗  ║
+║   ██╔══██╗██║░░░░░██╔══██╗██║░░░██║██╔══██╗██╔════╝  ║
+║   ██║░░╚═╝██║░░░░░███████║██║░░░██║██║░░██║█████╗░░  ║
+║   ██║░░██╗██║░░░░░██╔══██║██║░░░██║██║░░██║██╔══╝░░  ║
+║   ╚█████╔╝███████╗██║░░██║╚██████╔╝██████╔╝███████╗  ║
+║   ░╚════╝░╚══════╝╚═╝░░╚═╝░╚═════╝░╚═════╝░╚══════╝  ║
+║                                                      ║
+║             ░█████╗░░█████╗░██████╗░███████╗         ║
+║             ██╔══██╗██╔══██╗██╔══██╗██╔════╝         ║
+║             ██║░░╚═╝██║░░██║██║░░██║█████╗░░         ║
+║             ██║░░██╗██║░░██║██║░░██║██╔══╝░░         ║
+║             ╚█████╔╝╚█████╔╝██████╔╝███████╗         ║
+║             ░╚════╝░░╚════╝░╚═════╝░╚══════╝         ║
+║                                                      ║
+║                   🎬 2025 RECAP 🎬                   ║
+║                                                      ║
+╠══════════════════════════════════════════════════════╣
+║                                                      ║
+║  ┌────────────────────────────────────────────────┐  ║
+║  │  📅 ${currentDate.padEnd(42)}│  ║
+║  │                                                │  ║
+║  │  🔢 Sessions: ${String(totalSessions).padEnd(34)}│  ║
+║  │  💬 Messages: ${String(totalMessages).padEnd(34)}│  ║
+║  │                                                │  ║
+║  │  ⭐ Your coding journey with Claude ⭐        │  ║
+║  └────────────────────────────────────────────────┘  ║
+║                                                      ║
+║  ═══════════════════════════════════════════════════ ║
+║                                                      ║
+║      "Every great developer you know got there      ║
+║       by solving problems they were unqualified     ║
+║       to solve until they actually did it."         ║
+║                                                      ║
+║                         - Patrick McKenzie          ║
+║                                                      ║
+╚══════════════════════════════════════════════════════╝
+
+🎉 Thanks for coding with Claude in 2025!
+
+Use /think-back to see detailed statistics.`;
 
     ctx.ui.addMessage('assistant', playInfo);
     return { success: true };

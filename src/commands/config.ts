@@ -12,46 +12,74 @@ import * as os from 'os';
 const getConfigDir = () => path.join(os.homedir(), '.claude');
 const getConfigFile = () => path.join(getConfigDir(), 'settings.json');
 
-// /config - 配置管理
+// 确保配置目录存在
+const ensureConfigDir = () => {
+  const dir = getConfigDir();
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+};
+
+// 读取配置
+const readConfig = (): Record<string, any> => {
+  const configFile = getConfigFile();
+  if (fs.existsSync(configFile)) {
+    try {
+      return JSON.parse(fs.readFileSync(configFile, 'utf-8'));
+    } catch {
+      return {};
+    }
+  }
+  return {};
+};
+
+// 写入配置
+const writeConfig = (config: Record<string, any>): boolean => {
+  try {
+    ensureConfigDir();
+    fs.writeFileSync(getConfigFile(), JSON.stringify(config, null, 2));
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+// /config - 配置管理 (官方风格 - 打开配置面板)
 export const configCommand: SlashCommand = {
   name: 'config',
   aliases: ['settings'],
-  description: 'View or modify configuration settings',
+  description: 'Open config panel',
   usage: '/config [key] [value]',
   category: 'config',
   execute: (ctx: CommandContext): CommandResult => {
     const { args } = ctx;
     const configFile = getConfigFile();
+    let config = readConfig();
 
-    let config: Record<string, any> = {};
-    if (fs.existsSync(configFile)) {
-      try {
-        config = JSON.parse(fs.readFileSync(configFile, 'utf-8'));
-      } catch {
-        config = {};
-      }
-    }
-
+    // 无参数时显示交互式配置面板信息
     if (args.length === 0) {
-      // 显示所有配置
-      const configInfo = `Configuration Settings:
-
-Location: ${configFile}
-
-Current Settings:
-${Object.entries(config).map(([k, v]) => `  ${k}: ${JSON.stringify(v)}`).join('\n') || '  (no custom settings)'}
-
-Available Settings:
-  model          - Default model (sonnet, opus, haiku)
-  theme          - Color theme
-  verbose        - Enable verbose output
-  autoCompact    - Auto-compact when context is full
-  permissions    - Default permission mode
-
-Usage:
-  /config <key>           - View a specific setting
-  /config <key> <value>   - Set a value
-  /config reset           - Reset to defaults`;
+      const configInfo = `╭─ Configuration ─────────────────────────────────────╮
+│                                                     │
+│  Settings Location: ${configFile.length > 30 ? '~/.claude/settings.json' : configFile}
+│                                                     │
+│  Current Settings:                                  │
+│    model             ${config.model || 'sonnet'}
+│    theme             ${config.theme || 'dark'}
+│    verbose           ${config.verbose ?? false}
+│    autoCompact       ${config.autoCompact ?? true}
+│    defaultPermission ${config.defaultPermissionMode || 'default'}
+│                                                     │
+│  Commands:                                          │
+│    /config <key>          View a setting            │
+│    /config <key> <value>  Set a value               │
+│    /config reset          Reset to defaults         │
+│                                                     │
+│  Interactive Settings:                              │
+│    /theme      Change color theme                   │
+│    /model      Switch AI model                      │
+│    /vim        Toggle Vim mode                      │
+│                                                     │
+╰─────────────────────────────────────────────────────╯`;
 
       ctx.ui.addMessage('assistant', configInfo);
       return { success: true };
@@ -59,27 +87,65 @@ Usage:
 
     const key = args[0];
 
+    // 重置配置
     if (key === 'reset') {
-      ctx.ui.addMessage('assistant', 'Configuration reset to defaults.\n\nRestart Claude Code to apply changes.');
-      return { success: true };
+      if (writeConfig({})) {
+        ctx.ui.addMessage('assistant', `Configuration reset to defaults.
+
+Settings file cleared: ${configFile}
+
+Restart Claude Code to apply all changes.`);
+        ctx.ui.addActivity('Configuration reset');
+        return { success: true };
+      } else {
+        ctx.ui.addMessage('assistant', 'Failed to reset configuration.');
+        return { success: false };
+      }
     }
 
+    // 查看特定配置
     if (args.length === 1) {
-      // 显示特定配置
       const value = config[key];
       if (value !== undefined) {
-        ctx.ui.addMessage('assistant', `${key}: ${JSON.stringify(value)}`);
+        ctx.ui.addMessage('assistant', `${key}: ${JSON.stringify(value, null, 2)}`);
       } else {
-        ctx.ui.addMessage('assistant', `Setting '${key}' is not set.`);
+        ctx.ui.addMessage('assistant', `Setting '${key}' is not set.
+
+Available settings:
+  model, theme, verbose, autoCompact, defaultPermissionMode,
+  mcpServers, hooks, allowedTools, disallowedTools`);
       }
       return { success: true };
     }
 
     // 设置配置值
-    const value = args.slice(1).join(' ');
-    ctx.ui.addMessage('assistant', `Set ${key} = ${value}\n\nNote: Some settings require restart to take effect.`);
-    ctx.ui.addActivity(`Updated config: ${key}`);
-    return { success: true };
+    let value: any = args.slice(1).join(' ');
+
+    // 尝试解析 JSON 值
+    try {
+      if (value === 'true') value = true;
+      else if (value === 'false') value = false;
+      else if (!isNaN(Number(value))) value = Number(value);
+      else if (value.startsWith('{') || value.startsWith('[')) {
+        value = JSON.parse(value);
+      }
+    } catch {
+      // 保持为字符串
+    }
+
+    config[key] = value;
+
+    if (writeConfig(config)) {
+      ctx.ui.addMessage('assistant', `✓ Set ${key} = ${JSON.stringify(value)}
+
+Configuration saved to: ${configFile}
+Some settings may require restart to take effect.`);
+      ctx.ui.addActivity(`Updated config: ${key}`);
+      return { success: true };
+    } else {
+      ctx.ui.addMessage('assistant', `Failed to save configuration.`);
+      return { success: false };
+    }
   },
 };
 

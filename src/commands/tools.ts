@@ -242,44 +242,62 @@ Documentation:
   },
 };
 
-// /chrome - Chrome 集成 (官方风格)
+// /chrome - Chrome 集成 (官方风格 - 检查实际状态)
 export const chromeCommand: SlashCommand = {
   name: 'chrome',
   description: 'Claude in Chrome (Beta) settings',
   category: 'tools',
   execute: (ctx: CommandContext): CommandResult => {
-    const chromeInfo = `Claude in Chrome (Beta)
+    // 检查 Chrome 扩展配置
+    const configFile = path.join(os.homedir(), '.claude', 'settings.json');
+    let chromeEnabled = false;
+    let chromeConfig: any = null;
 
-Status: Not connected
+    if (fs.existsSync(configFile)) {
+      try {
+        const config = JSON.parse(fs.readFileSync(configFile, 'utf-8'));
+        chromeEnabled = config.chrome?.enabled || false;
+        chromeConfig = config.chrome || null;
+      } catch {
+        // 忽略解析错误
+      }
+    }
 
-Claude in Chrome allows you to:
-  • Use Claude directly in your browser
-  • Interact with web pages
-  • Automate browser tasks
-  • Take screenshots and analyze content
+    const statusIcon = chromeEnabled ? '✓' : '○';
+    const statusText = chromeEnabled ? 'Enabled' : 'Not connected';
 
-Setup:
-  1. Install the Claude Chrome extension
-  2. Sign in with your Claude account
-  3. Enable browser automation in settings
+    const chromeInfo = `╭─ Claude in Chrome (Beta) ───────────────────────────╮
+│                                                     │
+│  Status: ${statusIcon} ${statusText.padEnd(40)}│
+│                                                     │
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│  Claude in Chrome allows you to:                    │
+│    • Use Claude directly in your browser            │
+│    • Interact with web pages                        │
+│    • Automate browser tasks                         │
+│    • Take screenshots and analyze content           │
+│                                                     │
+│  Setup:                                             │
+│    1. Install the Claude Chrome extension           │
+│       https://chrome.google.com/webstore            │
+│    2. Sign in with your Claude account              │
+│    3. Run: /config chrome.enabled true              │
+│                                                     │
+│  Available Commands (when connected):               │
+│    navigate <url>      Go to a URL                  │
+│    click <selector>    Click an element             │
+│    type <text>         Enter text                   │
+│    screenshot          Capture the page             │
+│                                                     │
+│  Configuration:                                     │
+│    /config chrome.enabled true                      │
+│    /config chrome.headless false                    │
+│                                                     │
+╰─────────────────────────────────────────────────────╯
 
-Features:
-  • Page interaction
-  • Form filling
-  • Screenshot capture
-  • DOM analysis
-  • Tab management
-
-Browser Automation Commands:
-  navigate       - Go to a URL
-  click          - Click elements
-  type           - Enter text
-  screenshot     - Capture page
-
-Note: This feature is in Beta.
-Some functionality may be limited.
-
-Documentation: https://claude.ai/chrome`;
+Note: This feature is in Beta. Some functionality may be limited.
+Documentation: https://docs.anthropic.com/claude-code/chrome`;
 
     ctx.ui.addMessage('assistant', chromeInfo);
     return { success: true };
@@ -459,44 +477,66 @@ Use /pr-comments to interact with PR comments.`;
   },
 };
 
-// /install-slack-app - 安装 Slack App (官方风格)
+// /install-slack-app - 安装 Slack App (官方风格 - 检查配置状态)
 export const installSlackAppCommand: SlashCommand = {
   name: 'install-slack-app',
   description: 'Install the Claude Slack app',
   category: 'tools',
   execute: (ctx: CommandContext): CommandResult => {
-    const slackAppInfo = `Claude Slack App
+    // 检查 Slack 配置
+    const configFile = path.join(os.homedir(), '.claude', 'settings.json');
+    let slackConfigured = false;
+    let webhookUrl = '';
 
-Get notified in Slack when Claude Code needs attention.
-
-Features:
-  • Receive notifications for long-running tasks
-  • Get alerts when Claude needs input
-  • Share session summaries
-  • Team collaboration
-
-Installation:
-  1. Visit: https://slack.com/apps/claude-code
-  2. Click "Add to Slack"
-  3. Select your workspace
-  4. Authorize the app
-  5. Link with Claude Code: /config slack-webhook <url>
-
-Configuration:
-  After installation, configure in settings:
-  {
-    "slack": {
-      "webhook": "https://hooks.slack.com/...",
-      "notifications": {
-        "taskComplete": true,
-        "needsInput": true,
-        "errors": true
+    if (fs.existsSync(configFile)) {
+      try {
+        const config = JSON.parse(fs.readFileSync(configFile, 'utf-8'));
+        if (config.slack?.webhook) {
+          slackConfigured = true;
+          webhookUrl = config.slack.webhook.substring(0, 30) + '...';
+        }
+      } catch {
+        // 忽略解析错误
       }
     }
-  }
 
-Usage:
-  Once configured, you'll receive Slack messages when:
+    const statusIcon = slackConfigured ? '✓' : '○';
+    const statusText = slackConfigured ? 'Configured' : 'Not configured';
+
+    const slackAppInfo = `╭─ Claude Slack App ──────────────────────────────────╮
+│                                                     │
+│  Status: ${statusIcon} ${statusText.padEnd(40)}│
+${slackConfigured ? `│  Webhook: ${webhookUrl.padEnd(40)}│\n` : ''}│                                                     │
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│  Get notified in Slack when Claude Code needs       │
+│  attention.                                         │
+│                                                     │
+│  Features:                                          │
+│    • Receive notifications for long-running tasks   │
+│    • Get alerts when Claude needs input             │
+│    • Share session summaries                        │
+│    • Team collaboration                             │
+│                                                     │
+│  Installation:                                      │
+│    1. Create a Slack Incoming Webhook               │
+│       https://api.slack.com/messaging/webhooks      │
+│    2. Configure the webhook URL:                    │
+│       /config slack.webhook <your-webhook-url>      │
+│    3. Enable notifications:                         │
+│       /config slack.notifications.taskComplete true │
+│       /config slack.notifications.needsInput true   │
+│       /config slack.notifications.errors true       │
+│                                                     │
+│  Test your configuration:                           │
+│    /config slack.test true                          │
+│                                                     │
+╰─────────────────────────────────────────────────────╯
+
+Example Configuration:
+  /config slack.webhook https://hooks.slack.com/services/XXX/YYY/ZZZ
+
+Once configured, you'll receive Slack messages when:
   • Long-running commands complete
   • Claude needs your approval
   • Errors occur during execution`;
