@@ -242,46 +242,46 @@ Documentation:
   },
 };
 
-// /vim - Vim 模式
-export const vimCommand: SlashCommand = {
-  name: 'vim',
-  description: 'Toggle Vim keybindings mode',
-  usage: '/vim [on|off|status]',
+// /chrome - Chrome 集成 (官方风格)
+export const chromeCommand: SlashCommand = {
+  name: 'chrome',
+  description: 'Claude in Chrome (Beta) settings',
   category: 'tools',
   execute: (ctx: CommandContext): CommandResult => {
-    const { args } = ctx;
-    const action = args[0] || 'status';
+    const chromeInfo = `Claude in Chrome (Beta)
 
-    const vimInfo = `Vim Mode:
+Status: Not connected
 
-Status: ${action === 'on' ? 'Enabled' : action === 'off' ? 'Disabled' : 'Check settings'}
+Claude in Chrome allows you to:
+  • Use Claude directly in your browser
+  • Interact with web pages
+  • Automate browser tasks
+  • Take screenshots and analyze content
 
-Vim mode provides vi-style keybindings for the input area.
+Setup:
+  1. Install the Claude Chrome extension
+  2. Sign in with your Claude account
+  3. Enable browser automation in settings
 
-Commands:
-  /vim on      - Enable vim mode
-  /vim off     - Disable vim mode
-  /vim status  - Show current status
+Features:
+  • Page interaction
+  • Form filling
+  • Screenshot capture
+  • DOM analysis
+  • Tab management
 
-When enabled:
-  - Normal mode: Navigation and commands
-  - Insert mode: Text input (press i)
-  - Visual mode: Selection (press v)
+Browser Automation Commands:
+  navigate       - Go to a URL
+  click          - Click elements
+  type           - Enter text
+  screenshot     - Capture page
 
-Common Vim Commands:
-  i     - Enter insert mode
-  Esc   - Exit to normal mode
-  dd    - Delete line
-  yy    - Yank (copy) line
-  p     - Paste
-  :w    - Submit message
-  :q    - Exit
+Note: This feature is in Beta.
+Some functionality may be limited.
 
-Configuration:
-  Add to ~/.claude/settings.json:
-  { "vim": true }`;
+Documentation: https://claude.ai/chrome`;
 
-    ctx.ui.addMessage('assistant', vimInfo);
+    ctx.ui.addMessage('assistant', chromeInfo);
     return { success: true };
   },
 };
@@ -459,13 +459,61 @@ Use /pr-comments to interact with PR comments.`;
   },
 };
 
+// /install-slack-app - 安装 Slack App (官方风格)
+export const installSlackAppCommand: SlashCommand = {
+  name: 'install-slack-app',
+  description: 'Install the Claude Slack app',
+  category: 'tools',
+  execute: (ctx: CommandContext): CommandResult => {
+    const slackAppInfo = `Claude Slack App
+
+Get notified in Slack when Claude Code needs attention.
+
+Features:
+  • Receive notifications for long-running tasks
+  • Get alerts when Claude needs input
+  • Share session summaries
+  • Team collaboration
+
+Installation:
+  1. Visit: https://slack.com/apps/claude-code
+  2. Click "Add to Slack"
+  3. Select your workspace
+  4. Authorize the app
+  5. Link with Claude Code: /config slack-webhook <url>
+
+Configuration:
+  After installation, configure in settings:
+  {
+    "slack": {
+      "webhook": "https://hooks.slack.com/...",
+      "notifications": {
+        "taskComplete": true,
+        "needsInput": true,
+        "errors": true
+      }
+    }
+  }
+
+Usage:
+  Once configured, you'll receive Slack messages when:
+  • Long-running commands complete
+  • Claude needs your approval
+  • Errors occur during execution`;
+
+    ctx.ui.addMessage('assistant', slackAppInfo);
+    return { success: true };
+  },
+};
+
 // 注册所有工具命令
 export function registerToolsCommands(): void {
   commandRegistry.register(mcpCommand);
   commandRegistry.register(agentsCommand);
   commandRegistry.register(ideCommand);
-  commandRegistry.register(vimCommand);
+  commandRegistry.register(chromeCommand);
   commandRegistry.register(pluginCommand);
   commandRegistry.register(installCommand);
   commandRegistry.register(installGithubAppCommand);
+  commandRegistry.register(installSlackAppCommand);
 }
