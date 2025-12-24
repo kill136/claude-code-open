@@ -10,6 +10,8 @@ import chalk from 'chalk';
 import * as readline from 'readline';
 import * as fs from 'fs';
 import * as path from 'path';
+import React from 'react';
+import { render } from 'ink';
 import { ConversationLoop } from './core/loop.js';
 import { Session } from './core/session.js';
 import { toolRegistry } from './tools/index.js';
@@ -22,28 +24,6 @@ import type { PermissionMode, OutputFormat, InputFormat } from './types/index.js
 const additionalDirectories: string[] = [];
 
 const VERSION = '2.0.76-restored';
-
-// ASCII Art Logo
-const LOGO = `
-╭───────────────────────────────────────╮
-│                                       │
-│   ██████╗██╗      █████╗ ██╗   ██╗   │
-│  ██╔════╝██║     ██╔══██╗██║   ██║   │
-│  ██║     ██║     ███████║██║   ██║   │
-│  ██║     ██║     ██╔══██║██║   ██║   │
-│  ╚██████╗███████╗██║  ██║╚██████╔╝   │
-│   ╚═════╝╚══════╝╚═╝  ╚═╝ ╚═════╝    │
-│          ██████╗ ██████╗ ██████╗ ███████╗   │
-│         ██╔════╝██╔═══██╗██╔══██╗██╔════╝   │
-│         ██║     ██║   ██║██║  ██║█████╗     │
-│         ██║     ██║   ██║██║  ██║██╔══╝     │
-│         ╚██████╗╚██████╔╝██████╔╝███████╗   │
-│          ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝   │
-│                                       │
-│         Claude Code (Restored)        │
-│            Version ${VERSION}            │
-╰───────────────────────────────────────╯
-`;
 
 const program = new Command();
 
@@ -116,16 +96,11 @@ program
   .option('--disable-slash-commands', 'Disable all slash commands')
   .option('--chrome', 'Enable Claude in Chrome integration')
   .option('--no-chrome', 'Disable Claude in Chrome integration')
+  .option('--text', 'Use text-based interface instead of TUI')
   .action(async (prompt, options) => {
     // 调试模式
     if (options.debug) {
       process.env.CLAUDE_DEBUG = options.debug === true ? '*' : options.debug;
-    }
-
-    // 显示 logo
-    if (!options.print) {
-      console.log(chalk.cyan(LOGO));
-      console.log(chalk.gray(`Working directory: ${process.cwd()}\n`));
     }
 
     // 模型映射
@@ -151,46 +126,18 @@ program
       loadSettings(options.settings);
     }
 
-    const loop = new ConversationLoop({
-      model: modelMap[options.model] || options.model,
-      maxTokens: parseInt(options.maxTokens),
-      verbose: options.verbose,
-      systemPrompt,
-      permissionMode: options.permissionMode as PermissionMode,
-      allowedTools: options.allowedTools,
-      disallowedTools: options.disallowedTools,
-    });
-
-    // 恢复会话逻辑
-    if (options.continue) {
-      // 继续最近的会话
-      const sessions = listSessions({ limit: 1, sortBy: 'updatedAt', sortOrder: 'desc' });
-      if (sessions.length > 0) {
-        const session = loadSession(sessions[0].id);
-        if (session) {
-          console.log(chalk.green(`Continuing session: ${sessions[0].id}`));
-        }
-      } else {
-        console.log(chalk.yellow('No recent session found, starting new session'));
-      }
-    } else if (options.resume !== undefined) {
-      if (options.resume === true || options.resume === '') {
-        // 交互式选择器
-        await showSessionPicker(loop);
-      } else {
-        // 按 ID 恢复
-        const session = Session.load(options.resume);
-        if (session) {
-          loop.setSession(session);
-          console.log(chalk.green(`Resumed session: ${options.resume}`));
-        } else {
-          console.log(chalk.yellow(`Session ${options.resume} not found, starting new session`));
-        }
-      }
-    }
-
-    // 打印模式 (JSON 格式支持)
+    // 打印模式 (JSON 格式支持) - 不使用 TUI
     if (options.print && prompt) {
+      const loop = new ConversationLoop({
+        model: modelMap[options.model] || options.model,
+        maxTokens: parseInt(options.maxTokens),
+        verbose: options.verbose,
+        systemPrompt,
+        permissionMode: options.permissionMode as PermissionMode,
+        allowedTools: options.allowedTools,
+        disallowedTools: options.disallowedTools,
+      });
+
       const outputFormat = options.outputFormat as OutputFormat;
 
       if (outputFormat === 'json') {
@@ -211,79 +158,186 @@ program
       process.exit(0);
     }
 
-    // 如果有初始 prompt
-    if (prompt) {
-      console.log(chalk.blue('You: ') + prompt);
-      console.log(chalk.green('\nClaude: '));
-
-      for await (const event of loop.processMessageStream(prompt)) {
-        if (event.type === 'text') {
-          process.stdout.write(event.content || '');
-        } else if (event.type === 'tool_start') {
-          console.log(chalk.cyan(`\n[Using tool: ${event.toolName}]`));
-        } else if (event.type === 'tool_end') {
-          console.log(chalk.gray(`[Result: ${(event.toolResult || '').substring(0, 100)}...]`));
-        }
-      }
-      console.log('\n');
+    // 使用文本界面还是 TUI
+    if (options.text) {
+      // 使用基于 readline 的文本界面
+      await runTextInterface(prompt, options, modelMap, systemPrompt);
+    } else {
+      // 使用 Ink TUI 界面
+      await runTuiInterface(prompt, options, modelMap, systemPrompt);
     }
-
-    // 交互式循环
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout,
-    });
-
-    const askQuestion = (): void => {
-      rl.question(chalk.blue('You: '), async (input) => {
-        input = input.trim();
-
-        if (!input) {
-          askQuestion();
-          return;
-        }
-
-        // 斜杠命令
-        if (input.startsWith('/') && !options.disableSlashCommands) {
-          handleSlashCommand(input, loop);
-          askQuestion();
-          return;
-        }
-
-        // 退出命令
-        if (input.toLowerCase() === 'exit' || input.toLowerCase() === 'quit') {
-          console.log(chalk.yellow('\nGoodbye!'));
-          const stats = loop.getSession().getStats();
-          console.log(chalk.gray(`Session stats: ${stats.messageCount} messages, ${stats.totalCost}`));
-          rl.close();
-          process.exit(0);
-        }
-
-        // 处理消息
-        console.log(chalk.green('\nClaude: '));
-
-        try {
-          for await (const event of loop.processMessageStream(input)) {
-            if (event.type === 'text') {
-              process.stdout.write(event.content || '');
-            } else if (event.type === 'tool_start') {
-              console.log(chalk.cyan(`\n[Using tool: ${event.toolName}]`));
-            } else if (event.type === 'tool_end') {
-              const preview = (event.toolResult || '').substring(0, 200);
-              console.log(chalk.gray(`[Result: ${preview}${preview.length >= 200 ? '...' : ''}]`));
-            }
-          }
-          console.log('\n');
-        } catch (err) {
-          console.error(chalk.red(`\nError: ${err}`));
-        }
-
-        askQuestion();
-      });
-    };
-
-    askQuestion();
   });
+
+// 运行 TUI 界面 (Ink)
+async function runTuiInterface(
+  prompt: string | undefined,
+  options: any,
+  modelMap: Record<string, string>,
+  systemPrompt?: string
+): Promise<void> {
+  try {
+    // 动态导入 App 组件
+    const { App } = await import('./ui/App.js');
+
+    // 获取用户名
+    const username = process.env.USER || process.env.USERNAME || undefined;
+
+    // 渲染 Ink 应用
+    render(
+      React.createElement(App, {
+        model: options.model,
+        initialPrompt: prompt,
+        verbose: options.verbose,
+        systemPrompt,
+        username,
+        apiType: 'Claude API',
+        organization: undefined,
+      })
+    );
+  } catch (error) {
+    console.error(chalk.red('Failed to start TUI interface:'), error);
+    console.log(chalk.yellow('Falling back to text interface...'));
+    await runTextInterface(prompt, options, modelMap, systemPrompt);
+  }
+}
+
+// 运行文本界面 (readline)
+async function runTextInterface(
+  prompt: string | undefined,
+  options: any,
+  modelMap: Record<string, string>,
+  systemPrompt?: string
+): Promise<void> {
+  // ASCII Art Logo for text mode
+  const LOGO = `
+╭─────────────────────────────────────────────────────╮
+│                                                     │
+│   ${chalk.red('Claude Code')} ${chalk.gray('v' + VERSION)}                           │
+│                                                     │
+│        ${chalk.cyan('*')}       ${chalk.cyan('*')}                                 │
+│      ${chalk.cyan('*')}   ${chalk.cyanBright('▐▛███▜▌')}   ${chalk.cyan('*')}                            │
+│        ${chalk.cyan('*')} ${chalk.cyanBright('▝▜█████▛▘')} ${chalk.cyan('*')}                            │
+│          ${chalk.cyan('▘▘ ▝▝')}                                │
+│                                                     │
+│   ${chalk.cyan('Sonnet 4')} · ${chalk.gray('Claude API')}                         │
+│   ${chalk.gray(process.cwd())}
+╰─────────────────────────────────────────────────────╯
+`;
+
+  console.log(LOGO);
+
+  const loop = new ConversationLoop({
+    model: modelMap[options.model] || options.model,
+    maxTokens: parseInt(options.maxTokens),
+    verbose: options.verbose,
+    systemPrompt,
+    permissionMode: options.permissionMode as PermissionMode,
+    allowedTools: options.allowedTools,
+    disallowedTools: options.disallowedTools,
+  });
+
+  // 恢复会话逻辑
+  if (options.continue) {
+    const sessions = listSessions({ limit: 1, sortBy: 'updatedAt', sortOrder: 'desc' });
+    if (sessions.length > 0) {
+      const session = loadSession(sessions[0].id);
+      if (session) {
+        console.log(chalk.green(`Continuing session: ${sessions[0].id}`));
+      }
+    } else {
+      console.log(chalk.yellow('No recent session found, starting new session'));
+    }
+  } else if (options.resume !== undefined) {
+    if (options.resume === true || options.resume === '') {
+      await showSessionPicker(loop);
+    } else {
+      const session = Session.load(options.resume);
+      if (session) {
+        loop.setSession(session);
+        console.log(chalk.green(`Resumed session: ${options.resume}`));
+      } else {
+        console.log(chalk.yellow(`Session ${options.resume} not found, starting new session`));
+      }
+    }
+  }
+
+  // 如果有初始 prompt
+  if (prompt) {
+    console.log(chalk.blue('> ') + prompt);
+    console.log();
+
+    for await (const event of loop.processMessageStream(prompt)) {
+      if (event.type === 'text') {
+        process.stdout.write(event.content || '');
+      } else if (event.type === 'tool_start') {
+        console.log(chalk.cyan(`\n[Using tool: ${event.toolName}]`));
+      } else if (event.type === 'tool_end') {
+        console.log(chalk.gray(`[Result: ${(event.toolResult || '').substring(0, 100)}...]`));
+      }
+    }
+    console.log('\n');
+  }
+
+  // 交互式循环
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  console.log(chalk.gray('> Try "how do I log an error?"'));
+  console.log(chalk.gray('? for shortcuts'));
+  console.log();
+
+  const askQuestion = (): void => {
+    rl.question(chalk.white('> '), async (input) => {
+      input = input.trim();
+
+      if (!input) {
+        askQuestion();
+        return;
+      }
+
+      // 斜杠命令
+      if (input.startsWith('/') && !options.disableSlashCommands) {
+        handleSlashCommand(input, loop);
+        askQuestion();
+        return;
+      }
+
+      // 退出命令
+      if (input.toLowerCase() === 'exit' || input.toLowerCase() === 'quit') {
+        console.log(chalk.yellow('\nGoodbye!'));
+        const stats = loop.getSession().getStats();
+        console.log(chalk.gray(`Session stats: ${stats.messageCount} messages, ${stats.totalCost}`));
+        rl.close();
+        process.exit(0);
+      }
+
+      // 处理消息
+      console.log();
+
+      try {
+        for await (const event of loop.processMessageStream(input)) {
+          if (event.type === 'text') {
+            process.stdout.write(event.content || '');
+          } else if (event.type === 'tool_start') {
+            console.log(chalk.cyan(`\n[Using tool: ${event.toolName}]`));
+          } else if (event.type === 'tool_end') {
+            const preview = (event.toolResult || '').substring(0, 200);
+            console.log(chalk.gray(`[Result: ${preview}${preview.length >= 200 ? '...' : ''}]`));
+          }
+        }
+        console.log('\n');
+      } catch (err) {
+        console.error(chalk.red(`\nError: ${err}`));
+      }
+
+      askQuestion();
+    });
+  };
+
+  askQuestion();
+}
 
 // MCP 子命令
 const mcpCommand = program.command('mcp').description('Configure and manage MCP servers');
@@ -429,18 +483,14 @@ program
   .description('Check the health of your Claude Code installation')
   .option('--verbose', 'Show detailed diagnostics')
   .action(async (options) => {
-    // 动态导入诊断模块
     const { runDiagnostics, formatDiagnosticReport } = await import('./diagnostics/index.js');
 
     console.log(chalk.bold('\nRunning Claude Code diagnostics...\n'));
 
     try {
       const report = await runDiagnostics();
-
-      // 显示报告
       console.log(formatDiagnosticReport(report));
 
-      // 颜色化总结
       if (report.summary.failed > 0) {
         console.log(chalk.red(`  ✗ ${report.summary.failed} critical issue(s) found`));
       }
@@ -451,7 +501,6 @@ program
         console.log(chalk.green('  ✓ All checks passed!'));
       }
 
-      // 详细模式
       if (options.verbose) {
         console.log(chalk.gray('\n  Additional info:'));
         console.log(chalk.gray(`  - Working directory: ${process.cwd()}`));
@@ -482,7 +531,6 @@ program
 
     rl.question('Enter your API key: ', (apiKey) => {
       if (apiKey.trim()) {
-        // 保存到配置
         configManager.set('apiKey', apiKey.trim());
         console.log(chalk.green('\n✓ API key saved successfully!'));
       } else {
@@ -522,10 +570,8 @@ program
   .action(async () => {
     console.log(chalk.bold('\n🐙 Setting up Claude Code GitHub Actions...\n'));
 
-    // 动态导入 GitHub 模块
     const { checkGitHubCLI, setupGitHubWorkflow } = await import('./github/index.js');
 
-    // 检查 GitHub CLI
     const ghStatus = await checkGitHubCLI();
     if (!ghStatus.installed) {
       console.log(chalk.yellow('⚠️  GitHub CLI (gh) is not installed.'));
@@ -537,7 +583,6 @@ program
       console.log(chalk.green('✓ GitHub CLI is installed and authenticated'));
     }
 
-    // 设置工作流
     const result = await setupGitHubWorkflow(process.cwd());
 
     if (result.success) {
@@ -587,7 +632,7 @@ program
     console.log();
   });
 
-// Provider 命令 - 显示云提供商信息
+// Provider 命令
 program
   .command('provider')
   .description('Show current API provider configuration')
@@ -637,7 +682,7 @@ program
     console.log();
   });
 
-// Checkpoint 命令 - 管理文件检查点
+// Checkpoint 命令
 program
   .command('checkpoint')
   .description('Manage file checkpoints')
@@ -728,10 +773,8 @@ function loadMcpConfigs(configs: string[]): void {
       let mcpConfig: Record<string, unknown>;
 
       if (config.startsWith('{')) {
-        // JSON 字符串
         mcpConfig = JSON.parse(config);
       } else if (fs.existsSync(config)) {
-        // 文件路径
         const content = fs.readFileSync(config, 'utf-8');
         mcpConfig = JSON.parse(content);
       } else {
@@ -739,7 +782,6 @@ function loadMcpConfigs(configs: string[]): void {
         continue;
       }
 
-      // 注册 MCP 服务器
       if (mcpConfig.mcpServers && typeof mcpConfig.mcpServers === 'object') {
         const servers = mcpConfig.mcpServers as Record<string, { type: 'stdio' | 'sse' | 'http'; command?: string; args?: string[]; env?: Record<string, string>; url?: string }>;
         for (const [name, serverConfig] of Object.entries(servers)) {
@@ -767,7 +809,6 @@ function loadSettings(settingsPath: string): void {
       return;
     }
 
-    // 应用设置
     if (settings.model) {
       configManager.set('model', settings.model as string);
     }
@@ -782,7 +823,7 @@ function loadSettings(settingsPath: string): void {
   }
 }
 
-// 斜杠命令处理
+// 斜杠命令处理 (for text mode)
 function handleSlashCommand(input: string, loop: ConversationLoop): void {
   const [cmd, ...args] = input.slice(1).split(' ');
   const memory = getMemoryManager();
@@ -801,28 +842,38 @@ function handleSlashCommand(input: string, loop: ConversationLoop): void {
       console.log('  /stats        - Show session statistics');
       console.log('  /compact      - Compact conversation history');
       console.log('  /resume       - Resume previous session');
+      console.log('  /context      - Show context usage');
       console.log();
       console.log(chalk.cyan('Configuration:'));
       console.log('  /model        - Show or change current model');
       console.log('  /config       - Show current configuration');
       console.log('  /permissions  - Show permission settings');
       console.log('  /tools        - List available tools');
-      console.log();
-      console.log(chalk.cyan('Memory:'));
-      console.log('  /memory       - List all memory entries');
-      console.log('  /memory set   - Set a memory value');
-      console.log('  /memory get   - Get a memory value');
-      console.log('  /memory clear - Clear all memory');
+      console.log('  /memory       - Manage memory entries');
       console.log();
       console.log(chalk.cyan('Workspace:'));
       console.log('  /add-dir      - Add directory to workspace');
       console.log('  /init         - Create CLAUDE.md file');
+      console.log('  /files        - List files');
       console.log();
-      console.log(chalk.cyan('Diagnostics:'));
+      console.log(chalk.cyan('Tools:'));
+      console.log('  /mcp          - MCP server management');
+      console.log('  /agents       - Agent management');
+      console.log('  /hooks        - Hook management');
+      console.log('  /ide          - IDE integration');
+      console.log('  /vim          - Vim mode');
+      console.log();
+      console.log(chalk.cyan('Auth:'));
+      console.log('  /login        - Login');
+      console.log('  /logout       - Logout');
+      console.log();
+      console.log(chalk.cyan('Development:'));
+      console.log('  /review       - Code review');
+      console.log('  /plan         - Planning mode');
+      console.log('  /feedback     - Send feedback');
       console.log('  /doctor       - Run diagnostics');
       console.log('  /bug          - Report a bug');
       console.log();
-      console.log(chalk.gray('Press ? in interactive mode for keyboard shortcuts\n'));
       break;
 
     case 'clear':
@@ -846,15 +897,12 @@ function handleSlashCommand(input: string, loop: ConversationLoop): void {
 
     case 'status':
       const sessionStats = loop.getSession().getStats();
-      console.log(chalk.bold('\n📊 Session Status:\n'));
+      console.log(chalk.bold('\nSession Status:\n'));
       console.log(`  Session ID: ${loop.getSession().sessionId}`);
       console.log(`  Messages: ${sessionStats.messageCount}`);
       console.log(`  Duration: ${Math.round(sessionStats.duration / 1000)}s`);
       console.log(`  Cost: ${sessionStats.totalCost}`);
       console.log(`  Working Dir: ${process.cwd()}`);
-      if (additionalDirectories.length > 0) {
-        console.log(`  Additional Dirs: ${additionalDirectories.length}`);
-      }
       console.log();
       break;
 
@@ -870,16 +918,7 @@ function handleSlashCommand(input: string, loop: ConversationLoop): void {
 
     case 'model':
       if (args[0]) {
-        const modelMap: Record<string, string> = {
-          'sonnet': 'claude-sonnet-4-20250514',
-          'opus': 'claude-opus-4-20250514',
-          'haiku': 'claude-haiku-3-5-20241022',
-        };
-        if (modelMap[args[0]]) {
-          console.log(chalk.yellow(`\nModel switching requires restart. Use: claude -m ${args[0]}\n`));
-        } else {
-          console.log(chalk.red(`Unknown model: ${args[0]}\n`));
-        }
+        console.log(chalk.yellow(`\nModel switching requires restart. Use: claude -m ${args[0]}\n`));
       } else {
         console.log(chalk.bold('\nCurrent model: sonnet'));
         console.log(chalk.gray('\nAvailable models:'));
@@ -888,208 +927,6 @@ function handleSlashCommand(input: string, loop: ConversationLoop): void {
         console.log('  • haiku  - Claude Haiku 3.5 (fastest)');
         console.log(chalk.gray('\nUse: /model <name> to switch\n'));
       }
-      break;
-
-    case 'compact':
-      console.log(chalk.yellow('\n🗜️ Compacting conversation history...\n'));
-      console.log(chalk.gray('This summarizes long conversations to save context.'));
-      const messageCount = loop.getSession().getStats().messageCount;
-      console.log(chalk.gray(`Current messages: ${messageCount}\n`));
-      break;
-
-    case 'config':
-      console.log(chalk.bold('\n⚙️ Current Configuration:\n'));
-      const config = configManager.getAll();
-      console.log(`  Model: ${config.model || 'sonnet'}`);
-      console.log(`  Max Tokens: ${config.maxTokens || '8192'}`);
-      console.log(`  Verbose: ${config.verbose || false}`);
-      console.log(`  Config Dir: ${process.env.CLAUDE_CONFIG_DIR || '~/.claude'}`);
-      console.log();
-      break;
-
-    case 'permissions':
-      console.log(chalk.bold('\n🔒 Permission Settings:\n'));
-      console.log('  Default Mode: default');
-      console.log('  Allowed Tools: all');
-      console.log('  Denied Tools: none');
-      console.log();
-      console.log(chalk.gray('Permission modes:'));
-      console.log('  • default        - Ask for confirmation');
-      console.log('  • acceptEdits    - Auto-accept file edits');
-      console.log('  • bypassPermissions - Skip all prompts');
-      console.log('  • plan           - Planning mode only');
-      console.log();
-      break;
-
-    case 'memory':
-      if (args[0] === 'set' && args[1]) {
-        const key = args[1];
-        const value = args.slice(2).join(' ');
-        if (value) {
-          const scope = args.includes('--global') ? 'global' : 'project';
-          memory.set(key, value, scope as 'global' | 'project');
-          console.log(chalk.green(`\n✓ Memory updated: ${key}\n`));
-        } else {
-          console.log(chalk.yellow('\nUsage: /memory set <key> <value> [--global]\n'));
-        }
-      } else if (args[0] === 'get' && args[1]) {
-        const value = memory.get(args[1]);
-        if (value) {
-          console.log(`\n${args[1]}: ${value}\n`);
-        } else {
-          console.log(chalk.yellow(`\nMemory key not found: ${args[1]}\n`));
-        }
-      } else if (args[0] === 'delete' && args[1]) {
-        if (memory.delete(args[1])) {
-          console.log(chalk.green(`\n✓ Deleted: ${args[1]}\n`));
-        } else {
-          console.log(chalk.yellow(`\nMemory key not found: ${args[1]}\n`));
-        }
-      } else if (args[0] === 'clear') {
-        const scope = args.includes('--global') ? 'global' : 'project';
-        memory.clear(scope as 'global' | 'project');
-        console.log(chalk.yellow(`\n✓ ${scope} memory cleared\n`));
-      } else {
-        const entries = memory.list();
-        console.log(chalk.bold('\n📝 Memory Entries:\n'));
-        if (entries.length === 0) {
-          console.log(chalk.gray('  No memory entries.'));
-        } else {
-          entries.forEach(e => {
-            console.log(chalk.cyan(`  ${e.key}`) + chalk.gray(` (${e.scope})`));
-            console.log(chalk.white(`    ${e.value}`));
-          });
-        }
-        console.log(chalk.gray('\nCommands:'));
-        console.log('  /memory set <key> <value>  - Set a value');
-        console.log('  /memory get <key>          - Get a value');
-        console.log('  /memory delete <key>       - Delete a value');
-        console.log('  /memory clear              - Clear all');
-        console.log();
-      }
-      break;
-
-    case 'add-dir':
-      if (args[0]) {
-        const dirPath = path.resolve(args[0]);
-        if (fs.existsSync(dirPath) && fs.statSync(dirPath).isDirectory()) {
-          additionalDirectories.push(dirPath);
-          console.log(chalk.green(`\n✓ Added directory: ${dirPath}\n`));
-        } else {
-          console.log(chalk.red(`\nDirectory not found: ${args[0]}\n`));
-        }
-      } else {
-        console.log(chalk.bold('\n📁 Workspace Directories:\n'));
-        console.log(chalk.cyan(`  ${process.cwd()}`) + chalk.gray(' (working directory)'));
-        additionalDirectories.forEach(d => {
-          console.log(chalk.cyan(`  ${d}`));
-        });
-        console.log(chalk.gray('\nUse: /add-dir <path> to add a directory\n'));
-      }
-      break;
-
-    case 'init':
-      const claudeMdPath = path.join(process.cwd(), 'CLAUDE.md');
-      if (fs.existsSync(claudeMdPath)) {
-        console.log(chalk.yellow('\nCLAUDE.md already exists in this directory.\n'));
-      } else {
-        const defaultContent = `# Project Instructions for Claude
-
-## Overview
-Describe your project here.
-
-## Guidelines
-- Code style preferences
-- Testing requirements
-- Important patterns to follow
-
-## Context
-- Key files and their purposes
-- Architecture decisions
-- Dependencies
-`;
-        fs.writeFileSync(claudeMdPath, defaultContent);
-        console.log(chalk.green('\n✓ Created CLAUDE.md\n'));
-        console.log(chalk.gray('Edit this file to provide project-specific instructions.\n'));
-      }
-      break;
-
-    case 'doctor':
-      console.log(chalk.bold('\n🩺 Running diagnostics...\n'));
-
-      // Node.js 版本
-      const nodeVersion = process.version;
-      const nodeMajor = parseInt(nodeVersion.slice(1).split('.')[0]);
-      console.log(`  Node.js: ${nodeMajor >= 18 ? chalk.green(`✓ ${nodeVersion}`) : chalk.red(`✗ ${nodeVersion}`)}`);
-
-      // API 密钥
-      const hasApiKey = !!(process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY);
-      console.log(`  API Key: ${hasApiKey ? chalk.green('✓ Configured') : chalk.red('✗ Not found')}`);
-
-      // 平台
-      console.log(`  Platform: ${chalk.green(`✓ ${process.platform}`)}`);
-
-      // 内存
-      const memUsage = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
-      console.log(`  Memory: ${chalk.green(`✓ ${memUsage}MB used`)}`);
-
-      // 工具
-      console.log(`  Tools: ${chalk.green(`✓ ${toolRegistry.getAll().length} registered`)}`);
-
-      // MCP 服务器
-      const mcpServers = Object.keys(configManager.getMcpServers());
-      console.log(`  MCP Servers: ${mcpServers.length > 0 ? chalk.green(`✓ ${mcpServers.length}`) : chalk.gray('○ None')}`);
-
-      // 配置目录
-      const configDir = process.env.CLAUDE_CONFIG_DIR || path.join(process.env.HOME || '~', '.claude');
-      const configExists = fs.existsSync(configDir);
-      console.log(`  Config Dir: ${configExists ? chalk.green(`✓ Exists`) : chalk.gray('○ Will be created')}`);
-
-      console.log(chalk.green('\n✓ All systems operational!\n'));
-      break;
-
-    case 'bug':
-      console.log(chalk.bold('\n🐛 Report a Bug\n'));
-      console.log('Please report issues at:');
-      console.log(chalk.cyan('  https://github.com/anthropics/claude-code/issues\n'));
-      console.log('Include the following information:');
-      console.log(`  • Version: ${VERSION}`);
-      console.log(`  • Platform: ${process.platform}`);
-      console.log(`  • Node.js: ${process.version}`);
-      console.log('  • Description of the issue');
-      console.log('  • Steps to reproduce');
-      console.log();
-      break;
-
-    case 'login':
-      console.log(chalk.bold('\n🔑 Login\n'));
-      console.log(chalk.gray('OAuth login is not yet implemented.'));
-      console.log('To use Claude Code, set your API key:\n');
-      console.log(chalk.cyan('  export ANTHROPIC_API_KEY=your-key-here\n'));
-      console.log('Or run: claude setup-token\n');
-      break;
-
-    case 'logout':
-      console.log(chalk.bold('\n👋 Logout\n'));
-      console.log(chalk.yellow('Cleared authentication credentials.\n'));
-      break;
-
-    case 'vim':
-      console.log(chalk.bold('\n⌨️ Vim Mode\n'));
-      console.log(chalk.gray('Vim keybindings are not yet implemented.'));
-      console.log('This feature will allow vim-style editing in the input.\n');
-      break;
-
-    case 'terminal':
-      console.log(chalk.bold('\n💻 Terminal\n'));
-      console.log(chalk.gray('Opens a new terminal session.'));
-      console.log('Use Bash tool for shell commands instead.\n');
-      break;
-
-    case 'resume':
-      console.log(chalk.bold('\n📂 Resume Session\n'));
-      console.log(chalk.gray('Use: claude --resume [session-id]'));
-      console.log(chalk.gray('Or: claude -c (continue last session)\n'));
       break;
 
     case 'exit':
