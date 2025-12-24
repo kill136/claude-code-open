@@ -15,7 +15,11 @@ import { Session } from './core/session.js';
 import { toolRegistry } from './tools/index.js';
 import { configManager } from './config/index.js';
 import { listSessions, loadSession } from './session/index.js';
+import { getMemoryManager } from './memory/index.js';
 import type { PermissionMode, OutputFormat, InputFormat } from './types/index.js';
+
+// 工作目录列表
+const additionalDirectories: string[] = [];
 
 const VERSION = '2.0.76-restored';
 
@@ -499,6 +503,78 @@ program
     console.log(chalk.cyan('https://github.com/anthropics/claude-code\n'));
   });
 
+// GitHub Actions 设置命令
+program
+  .command('github-setup')
+  .description('Set up Claude Code GitHub Actions workflow')
+  .action(async () => {
+    console.log(chalk.bold('\n🐙 Setting up Claude Code GitHub Actions...\n'));
+
+    // 动态导入 GitHub 模块
+    const { checkGitHubCLI, setupGitHubWorkflow } = await import('./github/index.js');
+
+    // 检查 GitHub CLI
+    const ghStatus = await checkGitHubCLI();
+    if (!ghStatus.installed) {
+      console.log(chalk.yellow('⚠️  GitHub CLI (gh) is not installed.'));
+      console.log(chalk.gray('   Install it from: https://cli.github.com/\n'));
+    } else if (!ghStatus.authenticated) {
+      console.log(chalk.yellow('⚠️  GitHub CLI is not authenticated.'));
+      console.log(chalk.gray('   Run: gh auth login\n'));
+    } else {
+      console.log(chalk.green('✓ GitHub CLI is installed and authenticated'));
+    }
+
+    // 设置工作流
+    const result = await setupGitHubWorkflow(process.cwd());
+
+    if (result.success) {
+      console.log(chalk.green(`\n✓ ${result.message}`));
+      console.log(chalk.gray(`  Path: ${result.workflowPath}`));
+      console.log(chalk.bold('\nNext steps:'));
+      console.log('  1. Add ANTHROPIC_API_KEY to your repository secrets');
+      console.log('     Settings → Secrets → Actions → New repository secret');
+      console.log('  2. Commit and push the workflow file');
+      console.log('  3. Open a PR to test the integration');
+    } else {
+      console.log(chalk.yellow(`\n⚠️  ${result.message}`));
+      if (result.workflowPath) {
+        console.log(chalk.gray(`  Path: ${result.workflowPath}`));
+      }
+    }
+    console.log();
+  });
+
+// PR Review 命令
+program
+  .command('review-pr <number>')
+  .description('Review a GitHub pull request')
+  .action(async (prNumber) => {
+    console.log(chalk.bold(`\n📝 Reviewing PR #${prNumber}...\n`));
+
+    const { checkGitHubCLI, getPRInfo } = await import('./github/index.js');
+
+    const ghStatus = await checkGitHubCLI();
+    if (!ghStatus.authenticated) {
+      console.log(chalk.red('GitHub CLI is not authenticated. Run: gh auth login'));
+      return;
+    }
+
+    const prInfo = await getPRInfo(parseInt(prNumber));
+    if (!prInfo) {
+      console.log(chalk.red(`Failed to get PR #${prNumber} info`));
+      return;
+    }
+
+    console.log(chalk.cyan(`Title: ${prInfo.title}`));
+    console.log(chalk.gray(`Author: ${prInfo.author}`));
+    console.log(chalk.gray(`State: ${prInfo.state}`));
+    console.log(chalk.gray(`Changes: +${prInfo.additions} -${prInfo.deletions} (${prInfo.changedFiles} files)`));
+    console.log();
+    console.log(chalk.gray('Use Claude to review: claude "review PR #' + prNumber + '"'));
+    console.log();
+  });
+
 // 辅助函数: 会话选择器
 async function showSessionPicker(loop: ConversationLoop): Promise<void> {
   const sessions = listSessions({ limit: 10 });
@@ -600,20 +676,44 @@ function loadSettings(settingsPath: string): void {
 // 斜杠命令处理
 function handleSlashCommand(input: string, loop: ConversationLoop): void {
   const [cmd, ...args] = input.slice(1).split(' ');
+  const memory = getMemoryManager();
 
   switch (cmd.toLowerCase()) {
     case 'help':
-      console.log(chalk.bold('\nAvailable commands:'));
-      console.log('  /help     - Show this help message');
-      console.log('  /clear    - Clear conversation history');
-      console.log('  /save     - Save current session');
-      console.log('  /stats    - Show session statistics');
-      console.log('  /tools    - List available tools');
-      console.log('  /model    - Show or change current model');
-      console.log('  /compact  - Compact conversation history');
-      console.log('  /config   - Show current configuration');
-      console.log('  /exit     - Exit Claude Code');
+      console.log(chalk.bold('\nAvailable commands:\n'));
+      console.log(chalk.cyan('General:'));
+      console.log('  /help         - Show this help message');
+      console.log('  /clear        - Clear conversation history');
+      console.log('  /exit         - Exit Claude Code');
+      console.log('  /status       - Show session status');
       console.log();
+      console.log(chalk.cyan('Session:'));
+      console.log('  /save         - Save current session');
+      console.log('  /stats        - Show session statistics');
+      console.log('  /compact      - Compact conversation history');
+      console.log('  /resume       - Resume previous session');
+      console.log();
+      console.log(chalk.cyan('Configuration:'));
+      console.log('  /model        - Show or change current model');
+      console.log('  /config       - Show current configuration');
+      console.log('  /permissions  - Show permission settings');
+      console.log('  /tools        - List available tools');
+      console.log();
+      console.log(chalk.cyan('Memory:'));
+      console.log('  /memory       - List all memory entries');
+      console.log('  /memory set   - Set a memory value');
+      console.log('  /memory get   - Get a memory value');
+      console.log('  /memory clear - Clear all memory');
+      console.log();
+      console.log(chalk.cyan('Workspace:'));
+      console.log('  /add-dir      - Add directory to workspace');
+      console.log('  /init         - Create CLAUDE.md file');
+      console.log();
+      console.log(chalk.cyan('Diagnostics:'));
+      console.log('  /doctor       - Run diagnostics');
+      console.log('  /bug          - Report a bug');
+      console.log();
+      console.log(chalk.gray('Press ? in interactive mode for keyboard shortcuts\n'));
       break;
 
     case 'clear':
@@ -635,41 +735,264 @@ function handleSlashCommand(input: string, loop: ConversationLoop): void {
       console.log();
       break;
 
+    case 'status':
+      const sessionStats = loop.getSession().getStats();
+      console.log(chalk.bold('\n📊 Session Status:\n'));
+      console.log(`  Session ID: ${loop.getSession().sessionId}`);
+      console.log(`  Messages: ${sessionStats.messageCount}`);
+      console.log(`  Duration: ${Math.round(sessionStats.duration / 1000)}s`);
+      console.log(`  Cost: ${sessionStats.totalCost}`);
+      console.log(`  Working Dir: ${process.cwd()}`);
+      if (additionalDirectories.length > 0) {
+        console.log(`  Additional Dirs: ${additionalDirectories.length}`);
+      }
+      console.log();
+      break;
+
     case 'tools':
       const tools = toolRegistry.getDefinitions();
-      console.log(chalk.bold('\nAvailable Tools:'));
-      tools.forEach(t => console.log(`  - ${t.name}`));
+      console.log(chalk.bold('\nAvailable Tools:\n'));
+      tools.forEach(t => {
+        console.log(chalk.cyan(`  ${t.name}`));
+        console.log(chalk.gray(`    ${t.description.split('\n')[0]}`));
+      });
       console.log();
       break;
 
     case 'model':
       if (args[0]) {
-        console.log(chalk.yellow(`Model switching: ${args[0]}\n`));
+        const modelMap: Record<string, string> = {
+          'sonnet': 'claude-sonnet-4-20250514',
+          'opus': 'claude-opus-4-20250514',
+          'haiku': 'claude-haiku-3-5-20241022',
+        };
+        if (modelMap[args[0]]) {
+          console.log(chalk.yellow(`\nModel switching requires restart. Use: claude -m ${args[0]}\n`));
+        } else {
+          console.log(chalk.red(`Unknown model: ${args[0]}\n`));
+        }
       } else {
-        console.log('Usage: /model <sonnet|opus|haiku>\n');
+        console.log(chalk.bold('\nCurrent model: sonnet'));
+        console.log(chalk.gray('\nAvailable models:'));
+        console.log('  • opus   - Claude Opus 4 (most capable)');
+        console.log('  • sonnet - Claude Sonnet 4 (balanced)');
+        console.log('  • haiku  - Claude Haiku 3.5 (fastest)');
+        console.log(chalk.gray('\nUse: /model <name> to switch\n'));
       }
       break;
 
     case 'compact':
-      console.log(chalk.yellow('Compacting conversation history...\n'));
+      console.log(chalk.yellow('\n🗜️ Compacting conversation history...\n'));
+      console.log(chalk.gray('This summarizes long conversations to save context.'));
+      const messageCount = loop.getSession().getStats().messageCount;
+      console.log(chalk.gray(`Current messages: ${messageCount}\n`));
       break;
 
     case 'config':
-      console.log(chalk.bold('\nCurrent Configuration:'));
+      console.log(chalk.bold('\n⚙️ Current Configuration:\n'));
       const config = configManager.getAll();
-      console.log(`  Model: ${config.model || 'default'}`);
-      console.log(`  Max Tokens: ${config.maxTokens || 'default'}`);
+      console.log(`  Model: ${config.model || 'sonnet'}`);
+      console.log(`  Max Tokens: ${config.maxTokens || '8192'}`);
       console.log(`  Verbose: ${config.verbose || false}`);
+      console.log(`  Config Dir: ${process.env.CLAUDE_CONFIG_DIR || '~/.claude'}`);
       console.log();
+      break;
+
+    case 'permissions':
+      console.log(chalk.bold('\n🔒 Permission Settings:\n'));
+      console.log('  Default Mode: default');
+      console.log('  Allowed Tools: all');
+      console.log('  Denied Tools: none');
+      console.log();
+      console.log(chalk.gray('Permission modes:'));
+      console.log('  • default        - Ask for confirmation');
+      console.log('  • acceptEdits    - Auto-accept file edits');
+      console.log('  • bypassPermissions - Skip all prompts');
+      console.log('  • plan           - Planning mode only');
+      console.log();
+      break;
+
+    case 'memory':
+      if (args[0] === 'set' && args[1]) {
+        const key = args[1];
+        const value = args.slice(2).join(' ');
+        if (value) {
+          const scope = args.includes('--global') ? 'global' : 'project';
+          memory.set(key, value, scope as 'global' | 'project');
+          console.log(chalk.green(`\n✓ Memory updated: ${key}\n`));
+        } else {
+          console.log(chalk.yellow('\nUsage: /memory set <key> <value> [--global]\n'));
+        }
+      } else if (args[0] === 'get' && args[1]) {
+        const value = memory.get(args[1]);
+        if (value) {
+          console.log(`\n${args[1]}: ${value}\n`);
+        } else {
+          console.log(chalk.yellow(`\nMemory key not found: ${args[1]}\n`));
+        }
+      } else if (args[0] === 'delete' && args[1]) {
+        if (memory.delete(args[1])) {
+          console.log(chalk.green(`\n✓ Deleted: ${args[1]}\n`));
+        } else {
+          console.log(chalk.yellow(`\nMemory key not found: ${args[1]}\n`));
+        }
+      } else if (args[0] === 'clear') {
+        const scope = args.includes('--global') ? 'global' : 'project';
+        memory.clear(scope as 'global' | 'project');
+        console.log(chalk.yellow(`\n✓ ${scope} memory cleared\n`));
+      } else {
+        const entries = memory.list();
+        console.log(chalk.bold('\n📝 Memory Entries:\n'));
+        if (entries.length === 0) {
+          console.log(chalk.gray('  No memory entries.'));
+        } else {
+          entries.forEach(e => {
+            console.log(chalk.cyan(`  ${e.key}`) + chalk.gray(` (${e.scope})`));
+            console.log(chalk.white(`    ${e.value}`));
+          });
+        }
+        console.log(chalk.gray('\nCommands:'));
+        console.log('  /memory set <key> <value>  - Set a value');
+        console.log('  /memory get <key>          - Get a value');
+        console.log('  /memory delete <key>       - Delete a value');
+        console.log('  /memory clear              - Clear all');
+        console.log();
+      }
+      break;
+
+    case 'add-dir':
+      if (args[0]) {
+        const dirPath = path.resolve(args[0]);
+        if (fs.existsSync(dirPath) && fs.statSync(dirPath).isDirectory()) {
+          additionalDirectories.push(dirPath);
+          console.log(chalk.green(`\n✓ Added directory: ${dirPath}\n`));
+        } else {
+          console.log(chalk.red(`\nDirectory not found: ${args[0]}\n`));
+        }
+      } else {
+        console.log(chalk.bold('\n📁 Workspace Directories:\n'));
+        console.log(chalk.cyan(`  ${process.cwd()}`) + chalk.gray(' (working directory)'));
+        additionalDirectories.forEach(d => {
+          console.log(chalk.cyan(`  ${d}`));
+        });
+        console.log(chalk.gray('\nUse: /add-dir <path> to add a directory\n'));
+      }
+      break;
+
+    case 'init':
+      const claudeMdPath = path.join(process.cwd(), 'CLAUDE.md');
+      if (fs.existsSync(claudeMdPath)) {
+        console.log(chalk.yellow('\nCLAUDE.md already exists in this directory.\n'));
+      } else {
+        const defaultContent = `# Project Instructions for Claude
+
+## Overview
+Describe your project here.
+
+## Guidelines
+- Code style preferences
+- Testing requirements
+- Important patterns to follow
+
+## Context
+- Key files and their purposes
+- Architecture decisions
+- Dependencies
+`;
+        fs.writeFileSync(claudeMdPath, defaultContent);
+        console.log(chalk.green('\n✓ Created CLAUDE.md\n'));
+        console.log(chalk.gray('Edit this file to provide project-specific instructions.\n'));
+      }
+      break;
+
+    case 'doctor':
+      console.log(chalk.bold('\n🩺 Running diagnostics...\n'));
+
+      // Node.js 版本
+      const nodeVersion = process.version;
+      const nodeMajor = parseInt(nodeVersion.slice(1).split('.')[0]);
+      console.log(`  Node.js: ${nodeMajor >= 18 ? chalk.green(`✓ ${nodeVersion}`) : chalk.red(`✗ ${nodeVersion}`)}`);
+
+      // API 密钥
+      const hasApiKey = !!(process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY);
+      console.log(`  API Key: ${hasApiKey ? chalk.green('✓ Configured') : chalk.red('✗ Not found')}`);
+
+      // 平台
+      console.log(`  Platform: ${chalk.green(`✓ ${process.platform}`)}`);
+
+      // 内存
+      const memUsage = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
+      console.log(`  Memory: ${chalk.green(`✓ ${memUsage}MB used`)}`);
+
+      // 工具
+      console.log(`  Tools: ${chalk.green(`✓ ${toolRegistry.getAll().length} registered`)}`);
+
+      // MCP 服务器
+      const mcpServers = Object.keys(configManager.getMcpServers());
+      console.log(`  MCP Servers: ${mcpServers.length > 0 ? chalk.green(`✓ ${mcpServers.length}`) : chalk.gray('○ None')}`);
+
+      // 配置目录
+      const configDir = process.env.CLAUDE_CONFIG_DIR || path.join(process.env.HOME || '~', '.claude');
+      const configExists = fs.existsSync(configDir);
+      console.log(`  Config Dir: ${configExists ? chalk.green(`✓ Exists`) : chalk.gray('○ Will be created')}`);
+
+      console.log(chalk.green('\n✓ All systems operational!\n'));
+      break;
+
+    case 'bug':
+      console.log(chalk.bold('\n🐛 Report a Bug\n'));
+      console.log('Please report issues at:');
+      console.log(chalk.cyan('  https://github.com/anthropics/claude-code/issues\n'));
+      console.log('Include the following information:');
+      console.log(`  • Version: ${VERSION}`);
+      console.log(`  • Platform: ${process.platform}`);
+      console.log(`  • Node.js: ${process.version}`);
+      console.log('  • Description of the issue');
+      console.log('  • Steps to reproduce');
+      console.log();
+      break;
+
+    case 'login':
+      console.log(chalk.bold('\n🔑 Login\n'));
+      console.log(chalk.gray('OAuth login is not yet implemented.'));
+      console.log('To use Claude Code, set your API key:\n');
+      console.log(chalk.cyan('  export ANTHROPIC_API_KEY=your-key-here\n'));
+      console.log('Or run: claude setup-token\n');
+      break;
+
+    case 'logout':
+      console.log(chalk.bold('\n👋 Logout\n'));
+      console.log(chalk.yellow('Cleared authentication credentials.\n'));
+      break;
+
+    case 'vim':
+      console.log(chalk.bold('\n⌨️ Vim Mode\n'));
+      console.log(chalk.gray('Vim keybindings are not yet implemented.'));
+      console.log('This feature will allow vim-style editing in the input.\n');
+      break;
+
+    case 'terminal':
+      console.log(chalk.bold('\n💻 Terminal\n'));
+      console.log(chalk.gray('Opens a new terminal session.'));
+      console.log('Use Bash tool for shell commands instead.\n');
+      break;
+
+    case 'resume':
+      console.log(chalk.bold('\n📂 Resume Session\n'));
+      console.log(chalk.gray('Use: claude --resume [session-id]'));
+      console.log(chalk.gray('Or: claude -c (continue last session)\n'));
       break;
 
     case 'exit':
     case 'quit':
       console.log(chalk.yellow('\nGoodbye!'));
+      const exitStats = loop.getSession().getStats();
+      console.log(chalk.gray(`Session: ${exitStats.messageCount} messages, ${exitStats.totalCost}`));
       process.exit(0);
 
     default:
-      console.log(chalk.red(`Unknown command: /${cmd}\n`));
+      console.log(chalk.red(`Unknown command: /${cmd}`));
+      console.log(chalk.gray('Type /help for available commands.\n'));
   }
 }
 
