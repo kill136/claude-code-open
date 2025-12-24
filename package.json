@@ -1,19 +1,39 @@
 {
-  "name": "claude-code-restored",
+  "name": "claude-code-open",
   "version": "2.0.76",
-  "description": "Restored Claude Code CLI - Educational Purpose Only",
+  "description": "Open source Claude Code CLI - Educational Purpose Only",
   "type": "module",
   "bin": {
-    "claude": "./dist/cli.js"
+    "claude": "./dist/cli.js",
+    "claude-code-open": "./dist/cli.js"
   },
   "engines": {
     "node": ">=18.0.0"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
     "start": "node dist/cli.js",
-    "dev": "tsx src/cli.ts"
+    "dev": "tsx src/cli.ts",
+    "prepublishOnly": "npm run build"
   },
+  "keywords": [
+    "claude",
+    "cli",
+    "ai",
+    "anthropic",
+    "code-assistant"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kill136/claude-code-open"
+  },
+  "author": "",
+  "license": "MIT",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.0",
     "@resvg/resvg-js": "^2.6.2",
