@@ -11,14 +11,34 @@ import * as os from 'os';
 // 获取会话目录
 const getSessionsDir = () => path.join(os.homedir(), '.claude', 'sessions');
 
-// 读取会话文件并解析
+// 格式化时间差 (官方风格: "2h ago", "3d ago")
+function getTimeAgo(date: Date): string {
+  const now = Date.now();
+  const diff = now - date.getTime();
+
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7) return `${days}d ago`;
+  if (days < 30) return `${Math.floor(days / 7)}w ago`;
+  return date.toLocaleDateString();
+}
+
+// 读取会话文件并解析 (匹配官方格式)
 interface SessionFileData {
   id: string;
   modified: Date;
+  created: Date;
   messageCount: number;
-  cwd: string;
-  summary: string;
-  firstUserMessage?: string;
+  projectPath: string;
+  gitBranch?: string;
+  customTitle?: string;
+  firstPrompt?: string;
+  summary: string;  // 显示用: customTitle || summary || firstPrompt
 }
 
 function parseSessionFile(filePath: string): SessionFileData | null {
@@ -27,23 +47,36 @@ function parseSessionFile(filePath: string): SessionFileData | null {
     const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
     const fileName = path.basename(filePath, '.json');
 
-    // 支持两种格式: { state, messages } 或 { messages, cwd, ... }
+    // 支持多种格式
     const messages = data.messages || [];
-    const cwd = data.state?.cwd || data.cwd || 'Unknown';
+    const metadata = data.metadata || {};
 
-    // 获取第一条用户消息作为摘要
+    // 从不同位置获取数据
+    const projectPath = metadata.projectPath || data.state?.cwd || data.cwd || 'Unknown';
+    const gitBranch = metadata.gitBranch;
+    const customTitle = metadata.customTitle;
+    const messageCount = metadata.messageCount || messages.length;
+    const created = new Date(metadata.created || data.state?.startTime || stat.birthtime);
+    const modified = new Date(metadata.modified || stat.mtime);
+
+    // 获取第一条用户消息
     const firstUserMsg = messages.find((m: any) => m.role === 'user');
-    const summary = data.summary ||
-      (firstUserMsg?.content?.slice(0, 60)) ||
-      'No messages';
+    const firstPrompt = metadata.firstPrompt ||
+      (typeof firstUserMsg?.content === 'string' ? firstUserMsg.content : null);
+
+    // 官方风格: customTitle || summary || firstPrompt
+    const summary = customTitle || firstPrompt?.slice(0, 60) || 'No messages';
 
     return {
       id: data.state?.sessionId || fileName,
-      modified: stat.mtime,
-      messageCount: messages.length,
-      cwd,
+      modified,
+      created,
+      messageCount,
+      projectPath,
+      gitBranch,
+      customTitle,
+      firstPrompt,
       summary,
-      firstUserMessage: firstUserMsg?.content,
     };
   } catch {
     return null;
@@ -92,19 +125,17 @@ export const resumeCommand: SlashCommand = {
 
         if (session) {
           // 显示会话信息，提示用户使用命令行恢复
-          const info = `Session found: ${session.id.slice(0, 8)}
-
-Working directory: ${session.cwd}
-Messages: ${session.messageCount}
-Last modified: ${session.modified.toLocaleString()}
-
-To resume this session, restart Claude Code with:
-
-  claude --resume ${session.id}
-
-Or use the short form:
-
-  claude -r ${session.id.slice(0, 8)}`;
+          let info = `Session found: ${session.id.slice(0, 8)}\n\n`;
+          info += `  Project: ${session.projectPath}\n`;
+          if (session.gitBranch) {
+            info += `  Branch:  ${session.gitBranch}\n`;
+          }
+          info += `  Messages: ${session.messageCount}\n`;
+          info += `  Modified: ${session.modified.toLocaleString()}\n`;
+          info += `\nTo resume this session, restart Claude Code with:\n\n`;
+          info += `  claude --resume ${session.id}\n\n`;
+          info += `Or use the short form:\n\n`;
+          info += `  claude -r ${session.id.slice(0, 8)}`;
 
           ctx.ui.addMessage('assistant', info);
           return { success: true };
@@ -114,22 +145,20 @@ Or use the short form:
         }
       }
 
-      // 列出所有会话
-      let sessionList = `📋 Recent Sessions (${sessions.length})\n\n`;
-      sessionList += '─'.repeat(60) + '\n';
+      // 列出所有会话 (官方风格)
+      let sessionList = `Recent Sessions\n\n`;
 
       for (const session of sessions) {
-        const date = session.modified.toLocaleDateString();
-        const time = session.modified.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const timeAgo = getTimeAgo(session.modified);
         const shortId = session.id.slice(0, 8);
+        const branchInfo = session.gitBranch ? ` (${session.gitBranch})` : '';
 
-        sessionList += `\n  ${shortId}  │  ${date} ${time}  │  ${session.messageCount} msgs\n`;
-        sessionList += `  ${session.summary.slice(0, 55)}${session.summary.length > 55 ? '...' : ''}\n`;
+        sessionList += `  ${shortId}  ${timeAgo}  ${session.messageCount} msgs${branchInfo}\n`;
+        sessionList += `  ${session.summary.slice(0, 55)}${session.summary.length > 55 ? '...' : ''}\n\n`;
       }
 
-      sessionList += '\n' + '─'.repeat(60) + '\n';
-      sessionList += '\nUsage: /resume <session-id>\n';
-      sessionList += 'Example: /resume ' + sessions[0].id.slice(0, 8);
+      sessionList += `Use /resume <id> to resume a session\n`;
+      sessionList += `Example: /resume ${sessions[0].id.slice(0, 8)}`;
 
       ctx.ui.addMessage('assistant', sessionList);
       return { success: true };

@@ -6,15 +6,32 @@
 import { v4 as uuidv4 } from 'uuid';
 import * as fs from 'fs';
 import * as path from 'path';
+import { execSync } from 'child_process';
 import type { Message, SessionState, TodoItem } from '../types/index.js';
+
+// 获取当前 git 分支
+function getGitBranch(cwd: string): string | undefined {
+  try {
+    return execSync('git rev-parse --abbrev-ref HEAD', {
+      cwd,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+  } catch {
+    return undefined;
+  }
+}
 
 export class Session {
   private state: SessionState;
   private messages: Message[] = [];
   private configDir: string;
+  private gitBranch?: string;
+  private customTitle?: string;
 
   constructor(cwd: string = process.cwd()) {
     this.configDir = path.join(process.env.HOME || '~', '.claude');
+    this.gitBranch = getGitBranch(cwd);
     this.state = {
       sessionId: uuidv4(),
       cwd,
@@ -84,6 +101,20 @@ export class Session {
     };
   }
 
+  // 设置自定义标题
+  setCustomTitle(title: string): void {
+    this.customTitle = title;
+  }
+
+  // 获取第一条用户消息作为摘要
+  getFirstPrompt(): string | undefined {
+    const firstUserMessage = this.messages.find(m => m.role === 'user');
+    if (firstUserMessage && typeof firstUserMessage.content === 'string') {
+      return firstUserMessage.content.slice(0, 100);
+    }
+    return undefined;
+  }
+
   // 保存会话到文件
   save(): string {
     const sessionFile = path.join(this.configDir, 'sessions', `${this.state.sessionId}.json`);
@@ -93,9 +124,20 @@ export class Session {
       fs.mkdirSync(sessionDir, { recursive: true });
     }
 
+    // 匹配官方格式，添加更多元数据
     const data = {
       state: this.state,
       messages: this.messages,
+      // 额外元数据 (官方风格)
+      metadata: {
+        gitBranch: this.gitBranch,
+        customTitle: this.customTitle,
+        firstPrompt: this.getFirstPrompt(),
+        projectPath: this.state.cwd,
+        created: this.state.startTime,
+        modified: Date.now(),
+        messageCount: this.messages.length,
+      },
     };
 
     fs.writeFileSync(sessionFile, JSON.stringify(data, null, 2));
