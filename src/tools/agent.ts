@@ -28,11 +28,50 @@ export const AGENT_TYPES = {
 };
 
 // 后台代理管理
-const backgroundAgents: Map<string, {
+export interface BackgroundAgent {
   id: string;
+  agentType: string;
+  description: string;
   status: 'running' | 'completed' | 'failed';
+  startTime: Date;
+  endTime?: Date;
   result?: ToolResult;
-}> = new Map();
+  error?: string;
+}
+
+const backgroundAgents: Map<string, BackgroundAgent> = new Map();
+
+// 导出代理管理函数
+export function getBackgroundAgents(): BackgroundAgent[] {
+  return Array.from(backgroundAgents.values());
+}
+
+export function getBackgroundAgent(id: string): BackgroundAgent | undefined {
+  return backgroundAgents.get(id);
+}
+
+export function killBackgroundAgent(id: string): boolean {
+  const agent = backgroundAgents.get(id);
+  if (!agent) return false;
+
+  if (agent.status === 'running') {
+    agent.status = 'failed';
+    agent.error = 'Killed by user';
+    agent.endTime = new Date();
+  }
+  return true;
+}
+
+export function clearCompletedAgents(): number {
+  let cleared = 0;
+  for (const [id, agent] of backgroundAgents.entries()) {
+    if (agent.status === 'completed' || agent.status === 'failed') {
+      backgroundAgents.delete(id);
+      cleared++;
+    }
+  }
+  return cleared;
+}
 
 export class AgentTool extends BaseTool<AgentInput, ToolResult> {
   name = 'Task';
@@ -100,7 +139,10 @@ Usage notes:
     if (run_in_background) {
       backgroundAgents.set(agentId, {
         id: agentId,
+        agentType: subagent_type,
+        description,
         status: 'running',
+        startTime: new Date(),
       });
 
       // 模拟后台执行
@@ -108,6 +150,7 @@ Usage notes:
         const agent = backgroundAgents.get(agentId);
         if (agent) {
           agent.status = 'completed';
+          agent.endTime = new Date();
           agent.result = {
             success: true,
             output: `Agent ${subagent_type} completed task: ${description}`,

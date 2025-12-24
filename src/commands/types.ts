@@ -16,6 +16,23 @@ export interface CommandContext {
       totalCost: string;
       modelUsage: Record<string, number>;
     };
+    setCustomTitle?: (title: string) => void;
+    getAdditionalDirectories?: () => string[];
+    addDirectory?: (dir: string) => void;
+    removeDirectory?: (dir: string) => void;
+    // Todo 列表管理 (官方实现 - 用于 /todos 命令和 TodoWrite 工具)
+    getTodos: () => Array<{
+      content: string;
+      status: 'pending' | 'in_progress' | 'completed';
+      activeForm: string;
+    }>;
+    setTodos: (todos: Array<{
+      content: string;
+      status: 'pending' | 'in_progress' | 'completed';
+      activeForm: string;
+    }>) => void;
+    // 文件状态跟踪 (官方实现 - 用于 /files 命令)
+    readFileState?: Map<string, any> | Record<string, any> | string[];
   };
 
   // 配置相关
@@ -27,6 +44,7 @@ export interface CommandContext {
     username?: string;
     cwd: string;
     version: string;
+    permissionMode?: string;
   };
 
   // UI 相关

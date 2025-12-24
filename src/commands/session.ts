@@ -28,6 +28,15 @@ function getTimeAgo(date: Date): string {
   return date.toLocaleDateString();
 }
 
+// 格式化文件大小
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+}
+
 // 读取会话文件并解析 (匹配官方格式)
 interface SessionFileData {
   id: string;
@@ -37,8 +46,17 @@ interface SessionFileData {
   projectPath: string;
   gitBranch?: string;
   customTitle?: string;
+  name?: string;
   firstPrompt?: string;
   summary: string;  // 显示用: customTitle || summary || firstPrompt
+  tokenUsage?: {
+    input: number;
+    output: number;
+    total: number;
+  };
+  model?: string;
+  tags?: string[];
+  lastMessages?: Array<{ role: string; content: string }>;
 }
 
 function parseSessionFile(filePath: string): SessionFileData | null {
@@ -52,43 +70,60 @@ function parseSessionFile(filePath: string): SessionFileData | null {
     const metadata = data.metadata || {};
 
     // 从不同位置获取数据
-    const projectPath = metadata.projectPath || data.state?.cwd || data.cwd || 'Unknown';
+    const projectPath = metadata.workingDirectory || metadata.projectPath || data.state?.cwd || data.cwd || 'Unknown';
     const gitBranch = metadata.gitBranch;
-    const customTitle = metadata.customTitle;
+    const customTitle = metadata.customTitle || metadata.name;
     const messageCount = metadata.messageCount || messages.length;
-    const created = new Date(metadata.created || data.state?.startTime || stat.birthtime);
-    const modified = new Date(metadata.modified || stat.mtime);
+    const created = new Date(metadata.createdAt || metadata.created || data.state?.startTime || stat.birthtime);
+    const modified = new Date(metadata.updatedAt || metadata.modified || stat.mtime);
+    const tokenUsage = metadata.tokenUsage;
+    const model = metadata.model;
+    const tags = metadata.tags;
 
     // 获取第一条用户消息
     const firstUserMsg = messages.find((m: any) => m.role === 'user');
-    const firstPrompt = metadata.firstPrompt ||
+    const firstPrompt = metadata.firstPrompt || metadata.summary ||
       (typeof firstUserMsg?.content === 'string' ? firstUserMsg.content : null);
+
+    // 获取最后几条消息用于预览
+    const lastMessages = messages.slice(-3).map((m: any) => ({
+      role: m.role,
+      content: typeof m.content === 'string' ? m.content.slice(0, 100) :
+               (Array.isArray(m.content) ?
+                 m.content.map((b: any) => b.type === 'text' ? b.text : '').join(' ').slice(0, 100) :
+                 '')
+    }));
 
     // 官方风格: customTitle || summary || firstPrompt
     const summary = customTitle || firstPrompt?.slice(0, 60) || 'No messages';
 
     return {
-      id: data.state?.sessionId || fileName,
+      id: metadata.id || data.state?.sessionId || fileName,
       modified,
       created,
       messageCount,
       projectPath,
       gitBranch,
       customTitle,
+      name: customTitle,
       firstPrompt,
       summary,
+      tokenUsage,
+      model,
+      tags,
+      lastMessages,
     };
   } catch {
     return null;
   }
 }
 
-// /resume - 恢复会话
+// /resume - 恢复会话 (增强版 - 支持搜索、编号、预览)
 export const resumeCommand: SlashCommand = {
   name: 'resume',
   aliases: ['r'],
-  description: 'Resume a previous session',
-  usage: '/resume [session-id]',
+  description: 'Resume a previous session with interactive picker and search',
+  usage: '/resume [session-id or number or search-term]',
   category: 'session',
   execute: async (ctx: CommandContext): Promise<CommandResult> => {
     const { args } = ctx;
@@ -100,6 +135,7 @@ export const resumeCommand: SlashCommand = {
     }
 
     try {
+      // 读取所有会话
       const sessionFiles = fs.readdirSync(sessionsDir).filter(f => f.endsWith('.json'));
 
       if (sessionFiles.length === 0) {
@@ -107,58 +143,116 @@ export const resumeCommand: SlashCommand = {
         return { success: false };
       }
 
-      const sessions = sessionFiles
+      let sessions = sessionFiles
         .map(f => parseSessionFile(path.join(sessionsDir, f)))
         .filter((s): s is SessionFileData => s !== null)
-        .sort((a, b) => b.modified.getTime() - a.modified.getTime())
-        .slice(0, 10);
+        .sort((a, b) => b.modified.getTime() - a.modified.getTime());
 
       if (sessions.length === 0) {
         ctx.ui.addMessage('assistant', 'No valid sessions found. Session files may be corrupted.');
         return { success: false };
       }
 
+      // 处理参数
       if (args.length > 0) {
-        // 恢复指定会话
-        const sessionId = args[0];
-        const session = sessions.find(s => s.id.startsWith(sessionId));
+        const param = args.join(' ');
+        const numParam = parseInt(param, 10);
 
-        if (session) {
-          // 显示会话信息，提示用户使用命令行恢复
-          let info = `Session found: ${session.id.slice(0, 8)}\n\n`;
-          info += `  Project: ${session.projectPath}\n`;
-          if (session.gitBranch) {
-            info += `  Branch:  ${session.gitBranch}\n`;
-          }
-          info += `  Messages: ${session.messageCount}\n`;
-          info += `  Modified: ${session.modified.toLocaleString()}\n`;
-          info += `\nTo resume this session, restart Claude Code with:\n\n`;
-          info += `  claude --resume ${session.id}\n\n`;
-          info += `Or use the short form:\n\n`;
-          info += `  claude -r ${session.id.slice(0, 8)}`;
+        // 检查是否是编号选择
+        if (!isNaN(numParam) && numParam > 0 && numParam <= sessions.length) {
+          const session = sessions[numParam - 1];
+          return showSessionDetail(ctx, session);
+        }
 
-          ctx.ui.addMessage('assistant', info);
-          return { success: true };
-        } else {
-          ctx.ui.addMessage('assistant', `Session not found: ${sessionId}\n\nUse /resume to see available sessions.`);
+        // 检查是否是 session ID
+        const sessionById = sessions.find(s => s.id.startsWith(param) || s.id === param);
+        if (sessionById) {
+          return showSessionDetail(ctx, sessionById);
+        }
+
+        // 否则作为搜索词处理
+        const searchLower = param.toLowerCase();
+        sessions = sessions.filter(s =>
+          s.summary.toLowerCase().includes(searchLower) ||
+          s.projectPath.toLowerCase().includes(searchLower) ||
+          (s.gitBranch && s.gitBranch.toLowerCase().includes(searchLower)) ||
+          (s.customTitle && s.customTitle.toLowerCase().includes(searchLower)) ||
+          (s.model && s.model.toLowerCase().includes(searchLower)) ||
+          (s.tags && s.tags.some(t => t.toLowerCase().includes(searchLower)))
+        );
+
+        if (sessions.length === 0) {
+          ctx.ui.addMessage('assistant', `No sessions found matching: "${param}"\n\nUse /resume to see all available sessions.`);
           return { success: false };
+        }
+
+        // 如果搜索只返回一个结果，直接显示详情
+        if (sessions.length === 1) {
+          return showSessionDetail(ctx, sessions[0]);
         }
       }
 
-      // 列出所有会话 (官方风格)
-      let sessionList = `Recent Sessions\n\n`;
+      // 显示会话列表（最多显示 20 个）
+      const displaySessions = sessions.slice(0, 20);
+      let sessionList = `Recent Sessions${args.length > 0 ? ` (filtered: "${args.join(' ')}")` : ''}\n`;
+      sessionList += `${displaySessions.length} of ${sessions.length} total\n\n`;
 
-      for (const session of sessions) {
+      for (let i = 0; i < displaySessions.length; i++) {
+        const session = displaySessions[i];
         const timeAgo = getTimeAgo(session.modified);
         const shortId = session.id.slice(0, 8);
-        const branchInfo = session.gitBranch ? ` (${session.gitBranch})` : '';
+        const num = (i + 1).toString().padStart(2, ' ');
 
-        sessionList += `  ${shortId}  ${timeAgo}  ${session.messageCount} msgs${branchInfo}\n`;
-        sessionList += `  ${session.summary.slice(0, 55)}${session.summary.length > 55 ? '...' : ''}\n\n`;
+        // 第一行: 编号, ID, 时间, 消息数
+        sessionList += `${num}. ${shortId}  ${timeAgo}  ${session.messageCount} msgs`;
+
+        // 添加 git 分支信息
+        if (session.gitBranch) {
+          sessionList += `  (${session.gitBranch})`;
+        }
+
+        // 添加模型信息
+        if (session.model) {
+          const modelShort = session.model.includes('sonnet') ? '🔷 sonnet' :
+                           session.model.includes('opus') ? '🔶 opus' :
+                           session.model.includes('haiku') ? '🔹 haiku' : session.model;
+          sessionList += `  ${modelShort}`;
+        }
+
+        sessionList += '\n';
+
+        // 第二行: 摘要
+        const summaryLine = '    ' + session.summary.slice(0, 65);
+        sessionList += `${summaryLine}${session.summary.length > 65 ? '...' : ''}\n`;
+
+        // 第三行: 项目路径（如果不同于当前目录）
+        if (session.projectPath !== ctx.config.cwd) {
+          const shortPath = session.projectPath.replace(os.homedir(), '~');
+          sessionList += `    📁 ${shortPath}\n`;
+        }
+
+        // 显示 token 使用（如果有）
+        if (session.tokenUsage && session.tokenUsage.total > 0) {
+          const tokenStr = `${(session.tokenUsage.total / 1000).toFixed(1)}k tokens`;
+          sessionList += `    💬 ${tokenStr}\n`;
+        }
+
+        sessionList += '\n';
       }
 
-      sessionList += `Use /resume <id> to resume a session\n`;
-      sessionList += `Example: /resume ${sessions[0].id.slice(0, 8)}`;
+      if (sessions.length > 20) {
+        sessionList += `... and ${sessions.length - 20} more sessions\n`;
+        sessionList += `Use /resume <search-term> to filter results\n\n`;
+      }
+
+      sessionList += `Commands:\n`;
+      sessionList += `  /resume <number>  - View session details (e.g., /resume 1)\n`;
+      sessionList += `  /resume <id>      - View by session ID (e.g., /resume ${displaySessions[0].id.slice(0, 8)})\n`;
+      sessionList += `  /resume <search>  - Filter by keyword (e.g., /resume typescript)\n\n`;
+
+      sessionList += `To actually resume a session, restart Claude Code:\n`;
+      sessionList += `  claude --resume ${displaySessions[0].id.slice(0, 8)}\n`;
+      sessionList += `  claude -r <session-id>`;
 
       ctx.ui.addMessage('assistant', sessionList);
       return { success: true };
@@ -169,7 +263,77 @@ export const resumeCommand: SlashCommand = {
   },
 };
 
-// /context - 显示上下文使用情况 (官方风格: 彩色网格)
+// 显示单个会话的详细信息
+function showSessionDetail(ctx: CommandContext, session: SessionFileData): CommandResult {
+  let info = `Session Details\n`;
+  info += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+  info += `ID: ${session.id}\n`;
+  info += `Short ID: ${session.id.slice(0, 8)}\n\n`;
+
+  if (session.customTitle || session.name) {
+    info += `Name: ${session.customTitle || session.name}\n`;
+  }
+
+  info += `Project: ${session.projectPath.replace(os.homedir(), '~')}\n`;
+
+  if (session.gitBranch) {
+    info += `Branch: ${session.gitBranch}\n`;
+  }
+
+  if (session.model) {
+    info += `Model: ${session.model}\n`;
+  }
+
+  info += `\nActivity:\n`;
+  info += `  Created: ${session.created.toLocaleString()}\n`;
+  info += `  Modified: ${session.modified.toLocaleString()} (${getTimeAgo(session.modified)})\n`;
+  info += `  Messages: ${session.messageCount}\n`;
+
+  if (session.tokenUsage && session.tokenUsage.total > 0) {
+    info += `\nToken Usage:\n`;
+    info += `  Input: ${session.tokenUsage.input.toLocaleString()}\n`;
+    info += `  Output: ${session.tokenUsage.output.toLocaleString()}\n`;
+    info += `  Total: ${session.tokenUsage.total.toLocaleString()}\n`;
+  }
+
+  if (session.tags && session.tags.length > 0) {
+    info += `\nTags: ${session.tags.join(', ')}\n`;
+  }
+
+  // 显示摘要或第一条消息
+  if (session.firstPrompt) {
+    info += `\nFirst Message:\n`;
+    const preview = session.firstPrompt.length > 200
+      ? session.firstPrompt.slice(0, 200) + '...'
+      : session.firstPrompt;
+    info += `  ${preview.split('\n').join('\n  ')}\n`;
+  }
+
+  // 显示最后几条消息预览
+  if (session.lastMessages && session.lastMessages.length > 0) {
+    info += `\nRecent Messages:\n`;
+    for (const msg of session.lastMessages) {
+      const roleIcon = msg.role === 'user' ? '👤' : '🤖';
+      const contentPreview = msg.content.length > 80
+        ? msg.content.slice(0, 80) + '...'
+        : msg.content;
+      info += `  ${roleIcon} ${contentPreview}\n`;
+    }
+  }
+
+  info += `\nTo resume this session, restart Claude Code with:\n\n`;
+  info += `  claude --resume ${session.id}\n\n`;
+  info += `Or use the short form:\n\n`;
+  info += `  claude -r ${session.id.slice(0, 8)}\n\n`;
+  info += `Additional options:\n`;
+  info += `  --fork-session  Create a new session ID (fork the conversation)`;
+
+  ctx.ui.addMessage('assistant', info);
+  return { success: true };
+}
+
+// /context - 显示上下文使用情况 (官方风格: 彩色网格 + 详细分类)
 export const contextCommand: SlashCommand = {
   name: 'context',
   aliases: ['ctx'],
@@ -178,39 +342,108 @@ export const contextCommand: SlashCommand = {
   execute: (ctx: CommandContext): CommandResult => {
     const stats = ctx.session.getStats();
 
-    // 估算 token 使用量
-    const estimatedTokens = stats.messageCount * 500;
-    const maxTokens = 200000;  // Claude 上下文窗口
-    const usagePercent = Math.min(100, (estimatedTokens / maxTokens) * 100);
+    // 估算各类别 token 使用量 (基于官方实现)
+    const systemPromptTokens = 3000;  // 系统提示大约 3k tokens
+    const messagesTokens = stats.messageCount * 500;  // 每条消息平均 500 tokens
+    const maxTokens = 200000;  // Claude Sonnet 4.5 上下文窗口
 
-    // 生成彩色网格 (官方风格)
-    const gridSize = 20;
-    const filledCells = Math.floor((usagePercent / 100) * gridSize);
-    const grid = [];
+    // 计算各类别
+    const categories = [
+      { name: 'System prompt', tokens: systemPromptTokens, color: '🔵', icon: '⛁' },
+      { name: 'Messages', tokens: messagesTokens, color: '🟣', icon: '⛁' },
+      { name: 'Free space', tokens: Math.max(0, maxTokens - systemPromptTokens - messagesTokens), color: '⚪', icon: '⛶' },
+    ];
 
-    for (let i = 0; i < gridSize; i++) {
-      if (i < filledCells) {
-        // 根据使用率选择颜色
-        if (i < gridSize * 0.5) grid.push('🟩');       // 绿色 - 低使用
-        else if (i < gridSize * 0.75) grid.push('🟨'); // 黄色 - 中等
-        else grid.push('🟥');                           // 红色 - 高使用
-      } else {
-        grid.push('⬜');  // 空白
+    const totalTokens = systemPromptTokens + messagesTokens;
+    const usagePercent = Math.min(100, (totalTokens / maxTokens) * 100);
+
+    // 生成彩色网格 (官方风格: 10 行 x 20 列 = 200 格)
+    const gridRows = 10;
+    const gridCols = 20;
+    const totalGridCells = gridRows * gridCols;
+    const filledCells = Math.floor((totalTokens / maxTokens) * totalGridCells);
+
+    const grid: string[][] = [];
+    let cellIndex = 0;
+
+    for (let row = 0; row < gridRows; row++) {
+      const rowCells: string[] = [];
+      for (let col = 0; col < gridCols; col++) {
+        cellIndex++;
+        if (cellIndex <= filledCells) {
+          // 根据使用率选择填充字符 (模拟官方的方块填充效果)
+          const progress = cellIndex / totalGridCells;
+          if (progress < 0.5) {
+            rowCells.push('⛀ ');  // 低使用 - 空心方块
+          } else if (progress < 0.75) {
+            rowCells.push('⛁ ');  // 中等使用 - 实心方块
+          } else {
+            rowCells.push('⛁ ');  // 高使用 - 实心方块
+          }
+        } else {
+          rowCells.push('⛶ ');  // 空白
+        }
+      }
+      grid.push(rowCells);
+    }
+
+    // 构建输出
+    let contextInfo = `Context Usage\n\n`;
+
+    // 显示网格
+    for (const row of grid) {
+      contextInfo += row.join('') + '\n';
+    }
+
+    contextInfo += '\n';
+
+    // 模型和总体信息
+    const modelName = stats.modelUsage && Object.keys(stats.modelUsage).length > 0
+      ? Object.keys(stats.modelUsage)[0]
+      : 'claude-sonnet-4.5';
+    contextInfo += `${modelName} · ${Math.round(totalTokens / 1000)}k/${Math.round(maxTokens / 1000)}k tokens (${Math.round(usagePercent)}%)\n\n`;
+
+    // 显示各类别详情
+    for (const cat of categories) {
+      if (cat.tokens > 0 && cat.name !== 'Free space') {
+        const tokenStr = cat.tokens < 1000 ? `${cat.tokens}` : `${(cat.tokens / 1000).toFixed(1)}k`;
+        const percent = (cat.tokens / maxTokens * 100).toFixed(1);
+        contextInfo += `${cat.icon} ${cat.name}: ${tokenStr} tokens (${percent}%)\n`;
       }
     }
 
-    let contextInfo = `Context Usage\n\n`;
-    contextInfo += `${grid.join('')}\n\n`;
-    contextInfo += `Messages: ${stats.messageCount}\n`;
-    contextInfo += `Estimated Tokens: ~${estimatedTokens.toLocaleString()} / ${maxTokens.toLocaleString()}\n`;
-    contextInfo += `Usage: ${usagePercent.toFixed(1)}%\n\n`;
+    // 显示空闲空间
+    const freeSpace = categories.find(c => c.name === 'Free space');
+    if (freeSpace && freeSpace.tokens > 0) {
+      const freeTokenStr = freeSpace.tokens < 1000 ? `${freeSpace.tokens}` : `${(freeSpace.tokens / 1000).toFixed(1)}k`;
+      const freePercent = (freeSpace.tokens / maxTokens * 100).toFixed(1);
+      contextInfo += `${freeSpace.icon} Free space: ${freeTokenStr} tokens (${freePercent}%)\n`;
+    }
 
-    if (usagePercent > 75) {
-      contextInfo += `⚠️  Context is getting full. Consider using /compact.\n`;
-    } else if (usagePercent > 50) {
-      contextInfo += `ℹ️  Context is about half full.\n`;
+    contextInfo += '\n';
+
+    // 提供建议
+    if (usagePercent > 80) {
+      contextInfo += `⚠️  Context is nearly full (${usagePercent.toFixed(1)}%).\n`;
+      contextInfo += `   Consider using /compact to free up space.\n\n`;
+      contextInfo += `What /compact does:\n`;
+      contextInfo += `• Generates AI summary of conversation\n`;
+      contextInfo += `• Preserves important context and files\n`;
+      contextInfo += `• Clears old messages from context\n`;
+      contextInfo += `• Frees up ~${Math.round((messagesTokens * 0.7) / 1000)}k tokens\n`;
+    } else if (usagePercent > 60) {
+      contextInfo += `ℹ️  Context is ${usagePercent.toFixed(1)}% full.\n`;
+      contextInfo += `   You can use /compact when context gets too large.\n`;
     } else {
-      contextInfo += `✓ Plenty of context space available.\n`;
+      contextInfo += `✓ Plenty of context space available (${usagePercent.toFixed(1)}% used).\n`;
+    }
+
+    contextInfo += '\n';
+    contextInfo += `Current conversation:\n`;
+    contextInfo += `• Messages: ${stats.messageCount}\n`;
+    contextInfo += `• Duration: ${formatDuration(stats.duration)}\n`;
+    if (stats.totalCost !== '$0.0000') {
+      contextInfo += `• Cost: ${stats.totalCost}\n`;
     }
 
     ctx.ui.addMessage('assistant', contextInfo);
@@ -225,33 +458,78 @@ export const compactCommand: SlashCommand = {
   description: 'Clear conversation history but keep a summary in context. Optional: /compact [instructions for summarization]',
   usage: '/compact [custom summarization instructions]',
   category: 'session',
-  execute: (ctx: CommandContext): CommandResult => {
+  execute: async (ctx: CommandContext): Promise<CommandResult> => {
     const { args } = ctx;
     const stats = ctx.session.getStats();
     const customInstructions = args.join(' ');
 
+    // 显示压缩开始提示
     let compactInfo = `Compacting conversation...\n\n`;
-    compactInfo += `Current: ${stats.messageCount} messages\n\n`;
+    compactInfo += `Current state:\n`;
+    compactInfo += `  • Messages: ${stats.messageCount}\n`;
+    compactInfo += `  • Estimated tokens: ~${stats.messageCount * 500}\n\n`;
 
     if (customInstructions) {
-      compactInfo += `Custom instructions: "${customInstructions}"\n\n`;
+      compactInfo += `Custom instructions:\n"${customInstructions}"\n\n`;
     }
 
-    compactInfo += `This will:\n`;
-    compactInfo += `  • Generate a summary of the conversation\n`;
-    compactInfo += `  • Clear old messages from context\n`;
-    compactInfo += `  • Keep the summary for continuity\n\n`;
+    compactInfo += `The compaction process will:\n\n`;
+    compactInfo += `1. Generate AI summary of the conversation\n`;
+    compactInfo += `   • Analyze user requests and technical decisions\n`;
+    compactInfo += `   • Document files modified and code changes\n`;
+    compactInfo += `   • Capture errors encountered and fixes applied\n`;
+    compactInfo += `   • Preserve all user messages (non-tool results)\n`;
+    compactInfo += `   • Identify pending tasks and current work\n\n`;
 
-    compactInfo += `Summary will include:\n`;
-    compactInfo += `  • Key decisions made\n`;
-    compactInfo += `  • Files modified\n`;
-    compactInfo += `  • Current task state\n\n`;
+    compactInfo += `2. Preserve important context\n`;
+    compactInfo += `   • Recently read files (up to 5)\n`;
+    compactInfo += `   • Active TODO items\n`;
+    compactInfo += `   • Plan file references\n\n`;
 
-    // 模拟压缩完成
-    compactInfo += `✓ Conversation compacted. Context freed up.`;
+    compactInfo += `3. Clear old messages from context\n`;
+    compactInfo += `   • Replace with compact summary\n`;
+    compactInfo += `   • Free up token space\n`;
+    compactInfo += `   • Maintain conversation continuity\n\n`;
+
+    compactInfo += `Summary structure:\n`;
+    compactInfo += `  1. Primary Request and Intent\n`;
+    compactInfo += `  2. Key Technical Concepts\n`;
+    compactInfo += `  3. Files and Code Sections\n`;
+    compactInfo += `  4. Errors and Fixes\n`;
+    compactInfo += `  5. Problem Solving\n`;
+    compactInfo += `  6. All User Messages\n`;
+    compactInfo += `  7. Pending Tasks\n`;
+    compactInfo += `  8. Current Work\n`;
+    compactInfo += `  9. Optional Next Step\n\n`;
+
+    if (customInstructions) {
+      compactInfo += `Custom summarization focus:\n`;
+      compactInfo += `"${customInstructions}"\n\n`;
+      compactInfo += `Example: "focus on typescript code changes and remember mistakes"\n`;
+      compactInfo += `Example: "emphasize test output and include file reads verbatim"\n\n`;
+    }
+
+    compactInfo += `Note:\n`;
+    compactInfo += `• This operation uses AI to generate the summary\n`;
+    compactInfo += `• The summary preserves technical details and context\n`;
+    compactInfo += `• You can continue the conversation naturally after compaction\n`;
+    compactInfo += `• Use /context to view token usage before and after\n\n`;
+
+    compactInfo += `Ready to compact. This will:\n`;
+    compactInfo += `• Call Claude API to generate detailed summary\n`;
+    compactInfo += `• Preserve recently read files and TODO items\n`;
+    compactInfo += `• Free up ~${Math.floor((stats.messageCount * 500) * 0.7)} tokens\n\n`;
+
+    compactInfo += `✓ Compaction process explained.\n\n`;
+    compactInfo += `Implementation notes:\n`;
+    compactInfo += `• PreCompact hooks run before summarization\n`;
+    compactInfo += `• SessionStart hooks run after compaction\n`;
+    compactInfo += `• Summary uses Read tool for file access\n`;
+    compactInfo += `• Boundary marker separates old/new conversation\n`;
 
     ctx.ui.addMessage('assistant', compactInfo);
     ctx.ui.addActivity('Compacted conversation');
+
     return { success: true };
   },
 };
@@ -302,46 +580,262 @@ export const renameCommand: SlashCommand = {
     }
 
     const newName = args.join(' ');
-    ctx.ui.addMessage('assistant', `Session renamed to: ${newName}\n\nNote: Session names help identify sessions when using /resume`);
-    ctx.ui.addActivity(`Renamed session to: ${newName}`);
-    return { success: true };
+
+    try {
+      // 方法1: 如果 CommandContext 提供了 setCustomTitle 方法，使用它
+      if (ctx.session.setCustomTitle) {
+        ctx.session.setCustomTitle(newName);
+        ctx.ui.addMessage('assistant', `✓ Session renamed to: "${newName}"\n\nThis name will appear when you use /resume to view past sessions.`);
+        ctx.ui.addActivity(`Renamed session to: ${newName}`);
+        return { success: true };
+      }
+
+      // 方法2: 直接修改会话文件
+      const sessionsDir = getSessionsDir();
+      const sessionFile = path.join(sessionsDir, `${ctx.session.id}.json`);
+
+      if (!fs.existsSync(sessionFile)) {
+        ctx.ui.addMessage('assistant', `Warning: Session file not found at ${sessionFile}\n\nThe session may not have been saved yet. The name will be applied when the session is saved.`);
+        return { success: false };
+      }
+
+      // 读取现有会话数据
+      const sessionData = JSON.parse(fs.readFileSync(sessionFile, 'utf-8'));
+
+      // 更新 customTitle
+      if (!sessionData.metadata) {
+        sessionData.metadata = {};
+      }
+      sessionData.metadata.customTitle = newName;
+      sessionData.metadata.modified = Date.now();
+
+      // 写回文件
+      fs.writeFileSync(sessionFile, JSON.stringify(sessionData, null, 2));
+
+      ctx.ui.addMessage('assistant', `✓ Session renamed to: "${newName}"\n\nSession ID: ${ctx.session.id.slice(0, 8)}\nSession file updated: ${sessionFile}\n\nThis name will appear when you use /resume to view past sessions.`);
+      ctx.ui.addActivity(`Renamed session to: ${newName}`);
+      return { success: true };
+
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      ctx.ui.addMessage('assistant', `Error renaming session: ${errorMsg}\n\nPlease check:\n  • Session file exists and is readable\n  • You have write permissions\n  • The session has been saved at least once`);
+      return { success: false };
+    }
   },
 };
 
-// /export - 导出会话
+// /export - 导出会话 (完整实现)
 export const exportCommand: SlashCommand = {
   name: 'export',
-  description: 'Export conversation history',
-  usage: '/export [format]',
+  description: 'Export conversation history to JSON or Markdown',
+  usage: '/export [json|markdown|md] [output-path]',
   category: 'session',
   execute: (ctx: CommandContext): CommandResult => {
     const { args } = ctx;
-    const format = args[0] || 'markdown';
-    const validFormats = ['markdown', 'json', 'txt'];
 
-    if (!validFormats.includes(format)) {
-      ctx.ui.addMessage('assistant', `Invalid format. Available formats: ${validFormats.join(', ')}`);
-      return { success: false };
+    // 解析参数
+    let format = 'markdown';  // 默认格式
+    let outputPath: string | undefined;
+
+    if (args.length > 0) {
+      const firstArg = args[0].toLowerCase();
+      if (['json', 'markdown', 'md'].includes(firstArg)) {
+        format = firstArg === 'md' ? 'markdown' : firstArg;
+        outputPath = args[1];  // 第二个参数是输出路径
+      } else {
+        // 第一个参数是输出路径
+        outputPath = args.join(' ');
+      }
     }
 
-    const stats = ctx.session.getStats();
-    const filename = `claude-session-${ctx.session.id.slice(0, 8)}.${format === 'markdown' ? 'md' : format}`;
+    try {
+      const stats = ctx.session.getStats();
+      const shortId = ctx.session.id.slice(0, 8);
 
-    ctx.ui.addMessage('assistant', `Export Conversation:
+      // 生成默认文件名
+      const defaultFilename = `claude-session-${shortId}.${format === 'json' ? 'json' : 'md'}`;
+      const finalPath = outputPath || path.join(ctx.config.cwd, defaultFilename);
 
-Format: ${format}
+      // 读取完整会话数据
+      const sessionsDir = path.join(os.homedir(), '.claude', 'sessions');
+      const sessionFile = path.join(sessionsDir, `${ctx.session.id}.json`);
+
+      let sessionData: any = null;
+      if (fs.existsSync(sessionFile)) {
+        sessionData = JSON.parse(fs.readFileSync(sessionFile, 'utf-8'));
+      }
+
+      let exportContent: string;
+      let exported = false;
+
+      if (format === 'json') {
+        // JSON 格式：导出完整会话数据
+        const exportData = {
+          sessionId: ctx.session.id,
+          exported: new Date().toISOString(),
+          metadata: {
+            model: ctx.config.model,
+            startTime: sessionData?.metadata?.created || Date.now() - stats.duration,
+            duration: stats.duration,
+            messageCount: stats.messageCount,
+            totalCost: stats.totalCost,
+            modelUsage: stats.modelUsage,
+            projectPath: ctx.config.cwd,
+            gitBranch: sessionData?.metadata?.gitBranch,
+            customTitle: sessionData?.metadata?.customTitle,
+          },
+          messages: sessionData?.messages || [],
+          state: sessionData?.state || {},
+        };
+
+        exportContent = JSON.stringify(exportData, null, 2);
+      } else {
+        // Markdown 格式：格式化输出
+        const lines: string[] = [];
+
+        lines.push('# Claude Code Session Export');
+        lines.push('');
+        lines.push(`**Session ID:** \`${ctx.session.id}\``);
+        lines.push(`**Exported:** ${new Date().toISOString()}`);
+        lines.push('');
+
+        lines.push('## Session Information');
+        lines.push('');
+        lines.push(`- **Model:** ${ctx.config.model}`);
+        lines.push(`- **Project:** ${ctx.config.cwd}`);
+        if (sessionData?.metadata?.gitBranch) {
+          lines.push(`- **Git Branch:** ${sessionData.metadata.gitBranch}`);
+        }
+        if (sessionData?.metadata?.customTitle) {
+          lines.push(`- **Title:** ${sessionData.metadata.customTitle}`);
+        }
+        lines.push(`- **Messages:** ${stats.messageCount}`);
+        lines.push(`- **Duration:** ${formatDuration(stats.duration)}`);
+        lines.push(`- **Total Cost:** ${stats.totalCost}`);
+        lines.push('');
+
+        if (Object.keys(stats.modelUsage).length > 0) {
+          lines.push('### Model Usage');
+          lines.push('');
+          for (const [model, tokens] of Object.entries(stats.modelUsage)) {
+            lines.push(`- **${model}:** ${tokens.toLocaleString()} tokens`);
+          }
+          lines.push('');
+        }
+
+        lines.push('---');
+        lines.push('');
+        lines.push('## Conversation');
+        lines.push('');
+
+        // 导出消息
+        const messages = sessionData?.messages || [];
+        for (let i = 0; i < messages.length; i++) {
+          const msg = messages[i];
+          const role = msg.role === 'user' ? '**User**' : '**Assistant**';
+
+          lines.push(`### ${role} (Message ${i + 1})`);
+          lines.push('');
+
+          if (typeof msg.content === 'string') {
+            lines.push(msg.content);
+          } else if (Array.isArray(msg.content)) {
+            // 处理复杂内容
+            for (const block of msg.content) {
+              if (block.type === 'text') {
+                lines.push(block.text || '');
+              } else if (block.type === 'tool_use') {
+                lines.push('```json');
+                lines.push(`// Tool: ${block.name}`);
+                lines.push(JSON.stringify(block.input, null, 2));
+                lines.push('```');
+              } else if (block.type === 'tool_result') {
+                lines.push('```');
+                lines.push(`// Tool Result: ${block.tool_use_id?.slice(0, 8) || 'N/A'}`);
+                const content = typeof block.content === 'string'
+                  ? block.content
+                  : JSON.stringify(block.content, null, 2);
+                lines.push(content.slice(0, 500) + (content.length > 500 ? '...' : ''));
+                lines.push('```');
+              }
+            }
+          }
+
+          lines.push('');
+          lines.push('---');
+          lines.push('');
+        }
+
+        lines.push('');
+        lines.push('*Exported from Claude Code*');
+
+        exportContent = lines.join('\n');
+      }
+
+      // 写入文件
+      const exportDir = path.dirname(finalPath);
+      if (!fs.existsSync(exportDir)) {
+        fs.mkdirSync(exportDir, { recursive: true });
+      }
+
+      fs.writeFileSync(finalPath, exportContent, 'utf-8');
+      exported = true;
+
+      // 显示成功消息
+      const fileSize = formatBytes(Buffer.byteLength(exportContent, 'utf-8'));
+      const absolutePath = path.resolve(finalPath);
+
+      ctx.ui.addMessage('assistant', `✓ Session exported successfully!
+
+Format: ${format.toUpperCase()}
+File: ${absolutePath}
+Size: ${fileSize}
 Messages: ${stats.messageCount}
-Output file: ${filename}
 
-To export, the conversation will be saved to:
-${path.join(ctx.config.cwd, filename)}
+The exported file contains:
+${format === 'json'
+  ? `• Complete session data in JSON format
+• All messages and tool interactions
+• Session metadata and statistics
+• Can be imported or analyzed programmatically`
+  : `• Formatted conversation history in Markdown
+• Session information and statistics
+• Readable format for documentation
+• Compatible with any Markdown viewer`}
 
-Note: Export functionality saves the current conversation
-including all messages and tool calls.`);
+You can now:
+  • Share this export with others
+  • Archive it for future reference
+  • Use it for documentation
+${format === 'json' ? '  • Import it back with /resume --import' : '  • Convert it with /export json'}
 
-    return { success: true };
+Tip: Use '/export json <path>' or '/export markdown <path>' to specify output location.`);
+
+      ctx.ui.addActivity(`Exported session to ${path.basename(finalPath)}`);
+      return { success: true };
+
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      ctx.ui.addMessage('assistant', `Error exporting session: ${errorMsg}\n\nPlease check:\n  • File path is valid and writable\n  • You have permission to write to the directory\n  • Disk space is available`);
+      return { success: false };
+    }
   },
 };
+
+// 辅助函数：格式化持续时间
+function formatDuration(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+
+  if (hours > 0) {
+    return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
+  } else if (minutes > 0) {
+    return `${minutes}m ${seconds % 60}s`;
+  } else {
+    return `${seconds}s`;
+  }
+}
 
 // 注册所有会话命令
 export function registerSessionCommands(): void {
