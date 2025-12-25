@@ -172,11 +172,21 @@ export type ContentBlock = TextBlock | ToolUseBlock;
 export type ContentBlockParam = TextBlockParam | ImageBlockParam | ToolUseBlockParam | ToolResultBlockParam;
 
 /**
+ * Tool reference block (for file/resource references)
+ * This is an internal type not part of the official API
+ */
+export interface ToolReferenceBlock {
+  type: 'tool_reference';
+  tool_use_id: string;
+  path?: string;
+}
+
+/**
  * Union type of all possible content blocks for internal use.
  * This includes both response blocks and request blocks.
  * Use this for internal message processing and storage.
  */
-export type AnyContentBlock = TextBlock | ToolUseBlock | ImageBlockParam | ToolResultBlockParam;
+export type AnyContentBlock = TextBlock | ToolUseBlock | ImageBlockParam | ToolResultBlockParam | ToolReferenceBlock;
 
 // ============ Message Types ============
 

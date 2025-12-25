@@ -12,7 +12,7 @@
  * 7. 增量压缩支持
  */
 
-import type { Message, ContentBlock } from '../types/index.js';
+import type { Message, ContentBlock, AnyContentBlock } from '../types/index.js';
 
 // Token 估算常量
 const CHARS_PER_TOKEN = 3.5; // 更精确的估算（英文约4，中文约2）
@@ -385,7 +385,7 @@ export function compressMessage(message: Message, config?: ContextConfig): Messa
   }
 
   // 压缩数组内容中的每个块
-  const compressedBlocks: ContentBlock[] = [];
+  const compressedBlocks: AnyContentBlock[] = [];
 
   for (const block of message.content) {
     if (block.type === 'tool_result') {
@@ -904,7 +904,7 @@ export function truncateMessageContent(
   }
 
   // 对于数组内容，裁剪每个块
-  const truncatedBlocks: ContentBlock[] = [];
+  const truncatedBlocks: AnyContentBlock[] = [];
   let remainingTokens = maxTokens;
 
   for (const block of message.content) {
@@ -1091,3 +1091,6 @@ export function extractContextKeyInfo(messages: Message[]): {
 
 // 默认实例
 export const contextManager = new ContextManager();
+
+// ============ 导出增强功能 ============
+export * from './enhanced.js';

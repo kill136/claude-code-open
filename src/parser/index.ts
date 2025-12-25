@@ -32,6 +32,21 @@ export type SymbolKind =
   | 'import'
   | 'export';
 
+// 语法错误
+export interface SyntaxError {
+  message: string;
+  line: number;
+  column: number;
+  severity: 'error' | 'warning';
+}
+
+// 代码折叠区域
+export interface FoldingRange {
+  startLine: number;
+  endLine: number;
+  kind: 'comment' | 'imports' | 'region' | 'block';
+}
+
 // 代码符号
 export interface CodeSymbol {
   name: string;
@@ -59,6 +74,15 @@ export interface LanguageConfig {
 
 // 支持的语言配置
 const LANGUAGE_CONFIGS: Record<string, LanguageConfig> = {
+  bash: {
+    extensions: ['.sh', '.bash', '.zsh', '.fish'],
+    wasmName: 'tree-sitter-bash',
+    symbolPatterns: {
+      function: ['function_definition'],
+      variable: ['variable_assignment', 'declaration_command'],
+      import: ['source_command'],
+    },
+  },
   javascript: {
     extensions: ['.js', '.mjs', '.cjs', '.jsx'],
     wasmName: 'tree-sitter-javascript',
@@ -156,6 +180,14 @@ const LANGUAGE_CONFIGS: Record<string, LanguageConfig> = {
   },
 };
 
+// 解析缓存条目
+interface ParseCacheEntry {
+  tree: any;
+  content: string;
+  timestamp: number;
+  language: string;
+}
+
 // Tree-sitter 解析器（优先使用原生，回退到 WASM）
 export class TreeSitterWasmParser {
   private ParserClass: any = null;
@@ -163,6 +195,10 @@ export class TreeSitterWasmParser {
   private initialized: boolean = false;
   private initPromise: Promise<boolean> | null = null;
   private useNative: boolean = false;
+  // 增量解析缓存（T256）
+  private parseCache: Map<string, ParseCacheEntry> = new Map();
+  private readonly CACHE_MAX_AGE = 5 * 60 * 1000; // 5 分钟
+  private readonly MAX_CACHE_SIZE = 50; // 最多缓存 50 个文件
 
   async initialize(): Promise<boolean> {
     if (this.initialized) return true;
@@ -236,21 +272,31 @@ export class TreeSitterWasmParser {
     const config = LANGUAGE_CONFIGS[languageName];
     if (!config) return null;
 
+    // 优先查找官方包中的 WASM 文件（用于 Bash）
     const possiblePaths = [
+      // 官方包的 WASM 文件（tree-sitter.wasm, tree-sitter-bash.wasm）
+      path.join(__dirname, '../../node_modules/@anthropic-ai/claude-code', `${config.wasmName}.wasm`),
+      path.join(process.cwd(), 'node_modules/@anthropic-ai/claude-code', `${config.wasmName}.wasm`),
+      // tree-sitter-wasms 包中的语言 WASM
       path.join(__dirname, '../../node_modules/tree-sitter-wasms/out', `${config.wasmName}.wasm`),
       path.join(process.cwd(), 'node_modules/tree-sitter-wasms/out', `${config.wasmName}.wasm`),
+      // 本地 vendor 目录（如果有的话）
+      path.join(__dirname, '../../vendor/tree-sitter', `${config.wasmName}.wasm`),
+      path.join(process.cwd(), 'vendor/tree-sitter', `${config.wasmName}.wasm`),
     ];
 
     for (const p of possiblePaths) {
       if (fs.existsSync(p)) {
+        console.log(`Found WASM for ${languageName} at: ${p}`);
         return p;
       }
     }
 
+    console.warn(`WASM not found for language: ${languageName}`);
     return null;
   }
 
-  async parse(content: string, languageName: string): Promise<any | null> {
+  async parse(content: string, languageName: string, filePath?: string): Promise<any | null> {
     if (!this.initialized) {
       const success = await this.initialize();
       if (!success) return null;
@@ -262,11 +308,113 @@ export class TreeSitterWasmParser {
     try {
       const parser = new this.ParserClass();
       parser.setLanguage(language);
-      return parser.parse(content);
+
+      // 增量解析支持（T256）
+      if (filePath && this.parseCache.has(filePath)) {
+        const cached = this.parseCache.get(filePath)!;
+        const now = Date.now();
+
+        // 如果缓存仍然有效且语言相同
+        if (now - cached.timestamp < this.CACHE_MAX_AGE && cached.language === languageName) {
+          // 检测变更
+          if (cached.content === content) {
+            // 内容未变化，返回缓存的树
+            return cached.tree;
+          } else {
+            // 内容有变化，使用增量解析
+            try {
+              const oldTree = cached.tree;
+              const newTree = parser.parse(content, oldTree);
+
+              // 更新缓存
+              this.updateCache(filePath, newTree, content, languageName);
+
+              return newTree;
+            } catch (err) {
+              console.warn('增量解析失败，回退到完整解析:', err);
+            }
+          }
+        }
+      }
+
+      // 完整解析
+      const tree = parser.parse(content);
+
+      // 缓存结果
+      if (filePath) {
+        this.updateCache(filePath, tree, content, languageName);
+      }
+
+      return tree;
     } catch (err) {
       console.warn('解析失败:', err);
       return null;
     }
+  }
+
+  /**
+   * 更新解析缓存
+   */
+  private updateCache(filePath: string, tree: any, content: string, language: string): void {
+    // 如果缓存太大，删除最旧的条目
+    if (this.parseCache.size >= this.MAX_CACHE_SIZE) {
+      let oldestKey: string | null = null;
+      let oldestTime = Infinity;
+
+      for (const [key, entry] of this.parseCache.entries()) {
+        if (entry.timestamp < oldestTime) {
+          oldestTime = entry.timestamp;
+          oldestKey = key;
+        }
+      }
+
+      if (oldestKey) {
+        const oldEntry = this.parseCache.get(oldestKey);
+        if (oldEntry?.tree?.delete) {
+          oldEntry.tree.delete();
+        }
+        this.parseCache.delete(oldestKey);
+      }
+    }
+
+    this.parseCache.set(filePath, {
+      tree,
+      content,
+      timestamp: Date.now(),
+      language,
+    });
+  }
+
+  /**
+   * 清除解析缓存
+   */
+  clearCache(filePath?: string): void {
+    if (filePath) {
+      const entry = this.parseCache.get(filePath);
+      if (entry?.tree?.delete) {
+        entry.tree.delete();
+      }
+      this.parseCache.delete(filePath);
+    } else {
+      // 清除所有缓存
+      for (const entry of this.parseCache.values()) {
+        if (entry.tree?.delete) {
+          entry.tree.delete();
+        }
+      }
+      this.parseCache.clear();
+    }
+  }
+
+  /**
+   * 获取缓存统计
+   */
+  getCacheStats(): { size: number; maxSize: number; entries: string[] } {
+    return {
+      size: this.parseCache.size,
+      maxSize: this.MAX_CACHE_SIZE,
+      entries: Array.from(this.parseCache.keys()),
+    };
   }
 
   isInitialized(): boolean {
@@ -295,12 +443,13 @@ export class CodeParser {
     const language = this.detectLanguage(ext);
     if (!language) return [];
 
-    // 尝试使用 Tree-sitter
+    // 尝试使用 Tree-sitter（支持增量解析）
     if (this.useTreeSitter) {
-      const tree = await this.treeSitter.parse(content, language);
+      const tree = await this.treeSitter.parse(content, language, filePath);
       if (tree) {
         const symbols = this.extractSymbolsFromTree(tree.rootNode, filePath, language);
-        tree.delete();
+        // 注意：不要删除树，因为它被缓存了
+        // tree.delete();
         return symbols;
       }
     }
@@ -426,6 +575,11 @@ export class CodeParser {
     };
 
     const languagePatterns: Record<string, Record<string, RegExp>> = {
+      bash: {
+        function: /^(?:function\s+)?(\w+)\s*\(\s*\)\s*\{?/,
+        variable: /^(?:declare\s+)?(?:local\s+)?(?:export\s+)?(\w+)=/,
+        import: /^(?:source|\.)(?:\s+|=)['"]?([^'"]+)/,
+      },
       python: {
         function: /^(?:async\s+)?def\s+(\w+)/,
         class: /^class\s+(\w+)/,
@@ -535,6 +689,255 @@ export class CodeAnalyzer {
 
   getOutlineSync(filePath: string): CodeSymbol[] {
     return this.analyzeFileSync(filePath);
+  }
+
+  /**
+   * 检测语法错误（T255）
+   */
+  async detectSyntaxErrors(filePath: string): Promise<SyntaxError[]> {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const ext = path.extname(filePath);
+    const language = this.detectLanguage(ext);
+    if (!language) return [];
+
+    const errors: SyntaxError[] = [];
+
+    // 尝试使用 Tree-sitter 解析
+    if (this.initialized) {
+      try {
+        const tree = await (this.parser as any).treeSitter.parse(content, language);
+        if (tree && tree.rootNode) {
+          // 查找所有 ERROR 和 MISSING 节点
+          this.findErrorNodes(tree.rootNode, errors, filePath);
+          tree.delete?.();
+        }
+      } catch (err) {
+        errors.push({
+          message: `Parse error: ${err instanceof Error ? err.message : String(err)}`,
+          line: 1,
+          column: 0,
+          severity: 'error',
+        });
+      }
+    }
+
+    return errors;
+  }
+
+  private findErrorNodes(node: any, errors: SyntaxError[], filePath: string): void {
+    if (node.type === 'ERROR' || node.isMissing) {
+      errors.push({
+        message: node.isMissing ? `Missing ${node.type}` : `Syntax error`,
+        line: node.startPosition.row + 1,
+        column: node.startPosition.column,
+        severity: 'error',
+      });
+    }
+
+    // 递归查找子节点
+    if (node.namedChildren) {
+      for (const child of node.namedChildren) {
+        this.findErrorNodes(child, errors, filePath);
+      }
+    }
+  }
+
+  /**
+   * 识别代码折叠区域（T257）
+   */
+  async detectFoldingRanges(filePath: string): Promise<FoldingRange[]> {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const ext = path.extname(filePath);
+    const language = this.detectLanguage(ext);
+    if (!language) return [];
+
+    const ranges: FoldingRange[] = [];
+
+    // 尝试使用 Tree-sitter 解析
+    if (this.initialized) {
+      try {
+        const tree = await (this.parser as any).treeSitter.parse(content, language);
+        if (tree && tree.rootNode) {
+          this.findFoldingRanges(tree.rootNode, ranges, language);
+          tree.delete?.();
+        }
+      } catch (err) {
+        console.warn('Failed to detect folding ranges:', err);
+      }
+    }
+
+    // 回退：基于缩进检测
+    if (ranges.length === 0) {
+      this.detectFoldingRangesByIndent(content, ranges);
+    }
+
+    return ranges;
+  }
+
+  private findFoldingRanges(node: any, ranges: FoldingRange[], language: string): void {
+    const nodeType = node.type;
+    const startLine = node.startPosition.row + 1;
+    const endLine = node.endPosition.row + 1;
+
+    // 只折叠多行节点
+    if (endLine - startLine < 1) {
+      // 递归子节点
+      if (node.namedChildren) {
+        for (const child of node.namedChildren) {
+          this.findFoldingRanges(child, ranges, language);
+        }
+      }
+      return;
+    }
+
+    // 检测可折叠的节点类型
+    const foldableNodes: Record<string, 'block' | 'comment' | 'imports'> = {
+      // 通用
+      'block': 'block',
+      'statement_block': 'block',
+      'compound_statement': 'block',
+      'object': 'block',
+      'array': 'block',
+      'if_statement': 'block',
+      'for_statement': 'block',
+      'while_statement': 'block',
+      // 注释
+      'comment': 'comment',
+      'block_comment': 'comment',
+      'multiline_comment': 'comment',
+      // 导入
+      'import_statement': 'imports',
+      'import_declaration': 'imports',
+      // JavaScript/TypeScript
+      'class_body': 'block',
+      'function_declaration': 'block',
+      'arrow_function': 'block',
+      'object_type': 'block',
+      'method_definition': 'block',
+      // Python
+      'function_definition': 'block',
+      'class_definition': 'block',
+      // Go
+      'type_declaration': 'block',
+      'method_declaration': 'block',
+      // Rust
+      'impl_item': 'block',
+      'struct_item': 'block',
+      'enum_item': 'block',
+      'trait_item': 'block',
+      // Java/C/C++
+      'class_declaration': 'block',
+      'method_body': 'block',
+    };
+
+    const kind = foldableNodes[nodeType];
+    if (kind) {
+      ranges.push({
+        startLine,
+        endLine,
+        kind,
+      });
+    }
+
+    // 递归子节点
+    if (node.namedChildren) {
+      for (const child of node.namedChildren) {
+        this.findFoldingRanges(child, ranges, language);
+      }
+    }
+  }
+
+  private detectFoldingRangesByIndent(content: string, ranges: FoldingRange[]): void {
+    const lines = content.split('\n');
+    const stack: { line: number; indent: number }[] = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmed = line.trim();
+
+      // 跳过空行和注释
+      if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('#')) {
+        continue;
+      }
+
+      const indent = line.length - line.trimStart().length;
+
+      // 如果缩进减少，创建折叠区域
+      while (stack.length > 0 && stack[stack.length - 1].indent >= indent) {
+        const start = stack.pop()!;
+        if (i - start.line > 1) {
+          ranges.push({
+            startLine: start.line + 1,
+            endLine: i,
+            kind: 'block',
+          });
+        }
+      }
+
+      // 如果这行可能开始一个块，加入栈
+      if (trimmed.endsWith('{') || trimmed.endsWith(':')) {
+        stack.push({ line: i, indent });
+      }
+    }
+
+    // 处理剩余的栈
+    while (stack.length > 0) {
+      const start = stack.pop()!;
+      if (lines.length - start.line > 1) {
+        ranges.push({
+          startLine: start.line + 1,
+          endLine: lines.length,
+          kind: 'block',
+        });
+      }
+    }
+  }
+
+  /**
+   * 查找特定类型的符号（T254）
+   */
+  async findSymbolsByKind(filePath: string, kind: SymbolKind): Promise<CodeSymbol[]> {
+    const symbols = await this.analyzeFile(filePath);
+    return symbols.filter(s => s.kind === kind);
+  }
+
+  /**
+   * 按名称查找符号（T254）
+   */
+  async findSymbolsByName(filePath: string, name: string, exact: boolean = false): Promise<CodeSymbol[]> {
+    const symbols = await this.analyzeFile(filePath);
+    if (exact) {
+      return symbols.filter(s => s.name === name);
+    } else {
+      const lowerName = name.toLowerCase();
+      return symbols.filter(s => s.name.toLowerCase().includes(lowerName));
+    }
+  }
+
+  /**
+   * 查找位置处的符号（T253）
+   */
+  async findSymbolAtPosition(filePath: string, line: number, column: number): Promise<CodeSymbol | null> {
+    const symbols = await this.analyzeFile(filePath);
+
+    for (const symbol of symbols) {
+      const { startLine, startColumn, endLine, endColumn } = symbol.location;
+
+      if (line >= startLine && line <= endLine) {
+        if (line === startLine && column < startColumn) continue;
+        if (line === endLine && column > endColumn) continue;
+        return symbol;
+      }
+    }
+
+    return null;
+  }
+
+  private detectLanguage(ext: string): string | null {
+    for (const [lang, config] of Object.entries(LANGUAGE_CONFIGS)) {
+      if (config.extensions.includes(ext)) return lang;
+    }
+    return null;
   }
 }
 

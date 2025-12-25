@@ -6,6 +6,8 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import type { Message, ContentBlock, ToolDefinition } from '../types/index.js';
+import type { ProxyConfig, ProxyAgentOptions, TimeoutConfig } from '../network/index.js';
+import { createProxyAgent } from '../network/index.js';
 
 export interface ClientConfig {
   apiKey?: string;
@@ -14,6 +16,14 @@ export interface ClientConfig {
   baseUrl?: string;
   maxRetries?: number;
   retryDelay?: number;
+  /** 代理配置 */
+  proxy?: ProxyConfig;
+  /** 代理 Agent 选项 */
+  proxyOptions?: ProxyAgentOptions;
+  /** 超时配置 */
+  timeout?: number | TimeoutConfig;
+  /** 是否启用调试日志 */
+  debug?: boolean;
 }
 
 export interface StreamCallbacks {
@@ -65,11 +75,40 @@ export class ClaudeClient {
   };
 
   constructor(config: ClientConfig = {}) {
-    this.client = new Anthropic({
+    // 准备 Anthropic 客户端配置
+    const anthropicConfig: any = {
       apiKey: config.apiKey || process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY,
       baseURL: config.baseUrl,
       maxRetries: 0, // 我们自己处理重试
-    });
+    };
+
+    // 配置代理（如果需要）
+    const baseUrl = config.baseUrl || 'https://api.anthropic.com';
+    const proxyAgent = createProxyAgent(
+      baseUrl,
+      config.proxy,
+      {
+        ...config.proxyOptions,
+        timeout: typeof config.timeout === 'number' ? config.timeout : config.timeout?.connect,
+      }
+    );
+
+    if (proxyAgent) {
+      anthropicConfig.httpAgent = proxyAgent;
+      if (config.debug) {
+        console.log('[ClaudeClient] Using proxy agent for:', baseUrl);
+      }
+    }
+
+    // 配置超时
+    if (config.timeout) {
+      const timeoutMs = typeof config.timeout === 'number'
+        ? config.timeout
+        : config.timeout.request || 120000;
+      anthropicConfig.timeout = timeoutMs;
+    }
+
+    this.client = new Anthropic(anthropicConfig);
     this.model = config.model || 'claude-sonnet-4-20250514';
     this.maxTokens = config.maxTokens || 8192;
     this.maxRetries = config.maxRetries ?? 4;
