@@ -8,6 +8,13 @@ import { Session } from './session.js';
 import { toolRegistry } from '../tools/index.js';
 import type { Message, ContentBlock, ToolDefinition, PermissionMode } from '../types/index.js';
 import chalk from 'chalk';
+import {
+  SystemPromptBuilder,
+  systemPromptBuilder,
+  type PromptContext,
+  type SystemPromptOptions,
+} from '../prompt/index.js';
+import { modelConfig, type ThinkingConfig } from '../models/index.js';
 
 export interface LoopOptions {
   model?: string;
@@ -15,23 +22,21 @@ export interface LoopOptions {
   systemPrompt?: string;
   verbose?: boolean;
   maxTurns?: number;
-  // 新增选项
+  // 权限模式
   permissionMode?: PermissionMode;
   allowedTools?: string[];
   disallowedTools?: string[];
   dangerouslySkipPermissions?: boolean;
   maxBudgetUSD?: number;
+  // 新增选项
+  workingDir?: string;
+  planMode?: boolean;
+  delegateMode?: boolean;
+  ideType?: 'vscode' | 'cursor' | 'windsurf' | 'zed' | 'terminal';
+  fallbackModel?: string;
+  thinking?: ThinkingConfig;
+  debug?: boolean;
 }
-
-const DEFAULT_SYSTEM_PROMPT = `You are Claude, an AI assistant made by Anthropic. You are an expert software engineer.
-
-You have access to tools to help complete tasks. Use them as needed.
-
-Guidelines:
-- Be concise and direct
-- Use tools to gather information before answering
-- Prefer editing existing files over creating new ones
-- Always verify your work`;
 
 export class ConversationLoop {
   private client: ClaudeClient;
@@ -39,14 +44,38 @@ export class ConversationLoop {
   private options: LoopOptions;
   private tools: ToolDefinition[];
   private totalCostUSD: number = 0;
+  private promptBuilder: SystemPromptBuilder;
+  private promptContext: PromptContext;
 
   constructor(options: LoopOptions = {}) {
+    // 解析模型别名
+    const resolvedModel = modelConfig.resolveAlias(options.model || 'sonnet');
+
     this.client = new ClaudeClient({
-      model: options.model,
+      model: resolvedModel,
       maxTokens: options.maxTokens,
+      fallbackModel: options.fallbackModel,
+      thinking: options.thinking,
+      debug: options.debug,
     });
+
     this.session = new Session();
     this.options = options;
+    this.promptBuilder = systemPromptBuilder;
+
+    // 初始化提示词上下文
+    this.promptContext = {
+      workingDir: options.workingDir || process.cwd(),
+      model: resolvedModel,
+      permissionMode: options.permissionMode,
+      planMode: options.planMode,
+      delegateMode: options.delegateMode,
+      ideType: options.ideType,
+      platform: process.platform,
+      todayDate: new Date().toISOString().split('T')[0],
+      isGitRepo: this.checkIsGitRepo(options.workingDir || process.cwd()),
+      debug: options.debug,
+    };
 
     // 获取并过滤工具
     let tools = toolRegistry.getDefinitions();
@@ -65,6 +94,33 @@ export class ConversationLoop {
     this.tools = tools;
   }
 
+  /**
+   * 检查是否为 Git 仓库
+   */
+  private checkIsGitRepo(dir: string): boolean {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      let currentDir = dir;
+      while (currentDir !== path.dirname(currentDir)) {
+        if (fs.existsSync(path.join(currentDir, '.git'))) {
+          return true;
+        }
+        currentDir = path.dirname(currentDir);
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * 更新提示词上下文
+   */
+  updateContext(updates: Partial<PromptContext>): void {
+    this.promptContext = { ...this.promptContext, ...updates };
+  }
+
   async processMessage(userInput: string): Promise<string> {
     // 添加用户消息
     this.session.addMessage({
@@ -76,13 +132,33 @@ export class ConversationLoop {
     const maxTurns = this.options.maxTurns || 50;
     let finalResponse = '';
 
+    // 构建系统提示词
+    let systemPrompt: string;
+    if (this.options.systemPrompt) {
+      // 如果提供了自定义系统提示词，直接使用
+      systemPrompt = this.options.systemPrompt;
+    } else {
+      // 使用动态构建器生成
+      try {
+        const buildResult = await this.promptBuilder.build(this.promptContext);
+        systemPrompt = buildResult.content;
+
+        if (this.options.verbose) {
+          console.log(chalk.gray(`[SystemPrompt] Built in ${buildResult.buildTimeMs}ms, ${buildResult.hashInfo.estimatedTokens} tokens`));
+        }
+      } catch (error) {
+        console.warn('Failed to build system prompt, using default:', error);
+        systemPrompt = this.getDefaultSystemPrompt();
+      }
+    }
+
     while (turns < maxTurns) {
       turns++;
 
       const response = await this.client.createMessage(
         this.session.getMessages(),
         this.tools,
-        this.options.systemPrompt || DEFAULT_SYSTEM_PROMPT
+        systemPrompt
       );
 
       // 处理响应内容
@@ -142,8 +218,9 @@ export class ConversationLoop {
       }
 
       // 更新使用统计
+      const resolvedModel = modelConfig.resolveAlias(this.options.model || 'sonnet');
       this.session.updateUsage(
-        this.options.model || 'claude-sonnet-4-20250514',
+        resolvedModel,
         {
           inputTokens: response.usage.inputTokens,
           outputTokens: response.usage.outputTokens,
@@ -151,7 +228,10 @@ export class ConversationLoop {
           cacheCreationInputTokens: 0,
           webSearchRequests: 0,
         },
-        0, // 成本计算需要模型价格
+        modelConfig.calculateCost(resolvedModel, {
+          inputTokens: response.usage.inputTokens,
+          outputTokens: response.usage.outputTokens,
+        }),
         0,
         0
       );
@@ -161,6 +241,21 @@ export class ConversationLoop {
     this.autoSave();
 
     return finalResponse;
+  }
+
+  /**
+   * 获取默认系统提示词
+   */
+  private getDefaultSystemPrompt(): string {
+    return `You are Claude, an AI assistant made by Anthropic. You are an expert software engineer.
+
+You have access to tools to help complete tasks. Use them as needed.
+
+Guidelines:
+- Be concise and direct
+- Use tools to gather information before answering
+- Prefer editing existing files over creating new ones
+- Always verify your work`;
   }
 
   // 自动保存会话
@@ -191,6 +286,19 @@ export class ConversationLoop {
     let turns = 0;
     const maxTurns = this.options.maxTurns || 50;
 
+    // 构建系统提示词
+    let systemPrompt: string;
+    if (this.options.systemPrompt) {
+      systemPrompt = this.options.systemPrompt;
+    } else {
+      try {
+        const buildResult = await this.promptBuilder.build(this.promptContext);
+        systemPrompt = buildResult.content;
+      } catch {
+        systemPrompt = this.getDefaultSystemPrompt();
+      }
+    }
+
     while (turns < maxTurns) {
       turns++;
 
@@ -201,7 +309,7 @@ export class ConversationLoop {
       for await (const event of this.client.createMessageStream(
         this.session.getMessages(),
         this.tools,
-        this.options.systemPrompt || DEFAULT_SYSTEM_PROMPT
+        systemPrompt
       )) {
         if (event.type === 'text') {
           yield { type: 'text', content: event.text };

@@ -1,13 +1,21 @@
 /**
  * Claude API 客户端
  * 处理与 Anthropic API 的通信
- * 支持重试逻辑和 token 计数
+ * 支持重试逻辑、token 计数、模型回退、Extended Thinking
  */
 
 import Anthropic from '@anthropic-ai/sdk';
 import type { Message, ContentBlock, ToolDefinition } from '../types/index.js';
 import type { ProxyConfig, ProxyAgentOptions, TimeoutConfig } from '../network/index.js';
 import { createProxyAgent } from '../network/index.js';
+import {
+  modelConfig,
+  modelFallback,
+  modelStats,
+  thinkingManager,
+  type ThinkingConfig,
+  type ThinkingResult,
+} from '../models/index.js';
 
 export interface ClientConfig {
   apiKey?: string;
@@ -24,6 +32,10 @@ export interface ClientConfig {
   timeout?: number | TimeoutConfig;
   /** 是否启用调试日志 */
   debug?: boolean;
+  /** 回退模型 */
+  fallbackModel?: string;
+  /** Extended Thinking 配置 */
+  thinking?: ThinkingConfig;
 }
 
 export interface StreamCallbacks {
@@ -39,6 +51,14 @@ export interface UsageStats {
   outputTokens: number;
   totalTokens: number;
   estimatedCost: number;
+  /** 缓存读取 tokens */
+  cacheReadTokens?: number;
+  /** 缓存创建 tokens */
+  cacheCreationTokens?: number;
+  /** 思考 tokens */
+  thinkingTokens?: number;
+  /** API 调用耗时 */
+  apiDurationMs?: number;
 }
 
 // 模型价格 (per 1M tokens)
@@ -67,11 +87,17 @@ export class ClaudeClient {
   private maxTokens: number;
   private maxRetries: number;
   private retryDelay: number;
+  private fallbackModel?: string;
+  private debug: boolean;
   private totalUsage: UsageStats = {
     inputTokens: 0,
     outputTokens: 0,
     totalTokens: 0,
     estimatedCost: 0,
+    cacheReadTokens: 0,
+    cacheCreationTokens: 0,
+    thinkingTokens: 0,
+    apiDurationMs: 0,
   };
 
   constructor(config: ClientConfig = {}) {
@@ -109,10 +135,44 @@ export class ClaudeClient {
     }
 
     this.client = new Anthropic(anthropicConfig);
-    this.model = config.model || 'claude-sonnet-4-20250514';
-    this.maxTokens = config.maxTokens || 8192;
+    this.debug = config.debug ?? false;
+
+    // 解析模型别名
+    const resolvedModel = modelConfig.resolveAlias(config.model || 'sonnet');
+    this.model = resolvedModel;
+
+    // 根据模型能力设置 maxTokens
+    const capabilities = modelConfig.getCapabilities(this.model);
+    this.maxTokens = config.maxTokens || Math.min(8192, capabilities.maxOutputTokens);
+
     this.maxRetries = config.maxRetries ?? 4;
     this.retryDelay = config.retryDelay ?? 1000;
+
+    // 配置回退模型
+    if (config.fallbackModel) {
+      const resolvedFallback = modelConfig.resolveAlias(config.fallbackModel);
+      if (resolvedFallback === this.model) {
+        console.warn('Fallback model cannot be the same as primary model, ignoring');
+      } else {
+        this.fallbackModel = resolvedFallback;
+        modelFallback.setPrimaryModel(this.model);
+        modelFallback.setFallbackModel(this.fallbackModel);
+      }
+    }
+
+    // 配置 Extended Thinking
+    if (config.thinking) {
+      thinkingManager.configure(config.thinking);
+    }
+
+    if (this.debug) {
+      console.log(`[ClaudeClient] Initialized with model: ${this.model}`);
+      console.log(`[ClaudeClient] Context window: ${capabilities.contextWindow.toLocaleString()} tokens`);
+      console.log(`[ClaudeClient] Supports thinking: ${capabilities.supportsThinking}`);
+      if (this.fallbackModel) {
+        console.log(`[ClaudeClient] Fallback model: ${this.fallbackModel}`);
+      }
+    }
   }
 
   /**
@@ -150,60 +210,158 @@ export class ClaudeClient {
   /**
    * 计算估算成本
    */
-  private calculateCost(inputTokens: number, outputTokens: number): number {
-    const pricing = MODEL_PRICING[this.model] || { input: 3, output: 15 };
-    const inputCost = (inputTokens / 1_000_000) * pricing.input;
-    const outputCost = (outputTokens / 1_000_000) * pricing.output;
-    return inputCost + outputCost;
+  private calculateCost(
+    inputTokens: number,
+    outputTokens: number,
+    cacheReadTokens?: number,
+    cacheCreationTokens?: number,
+    thinkingTokens?: number
+  ): number {
+    return modelConfig.calculateCost(this.model, {
+      inputTokens,
+      outputTokens,
+      cacheReadTokens,
+      cacheCreationTokens,
+      thinkingTokens,
+    });
   }
 
   /**
    * 更新使用统计
    */
-  private updateUsage(inputTokens: number, outputTokens: number): void {
-    this.totalUsage.inputTokens += inputTokens;
-    this.totalUsage.outputTokens += outputTokens;
-    this.totalUsage.totalTokens += inputTokens + outputTokens;
-    this.totalUsage.estimatedCost += this.calculateCost(inputTokens, outputTokens);
+  private updateUsage(usage: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadTokens?: number;
+    cacheCreationTokens?: number;
+    thinkingTokens?: number;
+    apiDurationMs?: number;
+  }): void {
+    this.totalUsage.inputTokens += usage.inputTokens;
+    this.totalUsage.outputTokens += usage.outputTokens;
+    this.totalUsage.totalTokens += usage.inputTokens + usage.outputTokens;
+    this.totalUsage.cacheReadTokens = (this.totalUsage.cacheReadTokens || 0) + (usage.cacheReadTokens || 0);
+    this.totalUsage.cacheCreationTokens = (this.totalUsage.cacheCreationTokens || 0) + (usage.cacheCreationTokens || 0);
+    this.totalUsage.thinkingTokens = (this.totalUsage.thinkingTokens || 0) + (usage.thinkingTokens || 0);
+    this.totalUsage.apiDurationMs = (this.totalUsage.apiDurationMs || 0) + (usage.apiDurationMs || 0);
+    this.totalUsage.estimatedCost += this.calculateCost(
+      usage.inputTokens,
+      usage.outputTokens,
+      usage.cacheReadTokens,
+      usage.cacheCreationTokens,
+      usage.thinkingTokens
+    );
+
+    // 同步到全局模型统计
+    modelStats.record(this.model, usage);
   }
 
   async createMessage(
     messages: Message[],
     tools?: ToolDefinition[],
-    systemPrompt?: string
+    systemPrompt?: string,
+    options?: {
+      enableThinking?: boolean;
+      thinkingBudget?: number;
+    }
   ): Promise<{
     content: ContentBlock[];
     stopReason: string;
     usage: { inputTokens: number; outputTokens: number };
+    thinking?: ThinkingResult;
+    model: string;
   }> {
-    const response = await this.withRetry(async () => {
-      return await this.client.messages.create({
-        model: this.model,
-        max_tokens: this.maxTokens,
-        system: systemPrompt,
-        messages: messages.map((m) => ({
-          role: m.role,
-          content: m.content,
-        })) as any,
-        tools: tools?.map((t) => ({
-          name: t.name,
-          description: t.description,
-          input_schema: t.inputSchema,
-        })) as any,
-      });
-    });
+    const startTime = Date.now();
 
+    // 准备 Extended Thinking 参数
+    const thinkingParams = options?.enableThinking
+      ? thinkingManager.getThinkingParams(this.model)
+      : {};
+
+    // 如果指定了思考预算，覆盖默认值
+    if (options?.thinkingBudget && thinkingParams.thinking) {
+      thinkingParams.thinking.budget_tokens = options.thinkingBudget;
+    }
+
+    // 使用回退机制执行请求
+    const executeRequest = async (currentModel: string) => {
+      return await this.withRetry(async () => {
+        const requestParams: any = {
+          model: currentModel,
+          max_tokens: this.maxTokens,
+          system: systemPrompt,
+          messages: messages.map((m) => ({
+            role: m.role,
+            content: m.content,
+          })),
+          tools: tools?.map((t) => ({
+            name: t.name,
+            description: t.description,
+            input_schema: t.inputSchema,
+          })),
+          ...thinkingParams,
+        };
+
+        return await this.client.messages.create(requestParams);
+      });
+    };
+
+    let response: any;
+    let usedModel = this.model;
+
+    if (this.fallbackModel) {
+      const result = await modelFallback.executeWithFallback(executeRequest, {
+        onRetry: (model, attempt, error) => {
+          if (this.debug) {
+            console.log(`[ClaudeClient] Retry ${attempt} for ${model}: ${error.message}`);
+          }
+        },
+        onFallback: (from, to, error) => {
+          console.warn(`[ClaudeClient] Falling back from ${from} to ${to}: ${error.message}`);
+        },
+      });
+      response = result.result;
+      usedModel = result.model;
+    } else {
+      response = await executeRequest(this.model);
+    }
+
+    const apiDurationMs = Date.now() - startTime;
+
+    // 提取使用统计
     const usage = {
       inputTokens: response.usage.input_tokens,
       outputTokens: response.usage.output_tokens,
+      cacheReadTokens: response.usage.cache_read_input_tokens,
+      cacheCreationTokens: response.usage.cache_creation_input_tokens,
+      thinkingTokens: 0,
+      apiDurationMs,
     };
 
-    this.updateUsage(usage.inputTokens, usage.outputTokens);
+    // 处理 Extended Thinking 响应
+    let thinkingResult: ThinkingResult | undefined;
+    if (response.thinking) {
+      usage.thinkingTokens = response.thinking_tokens || 0;
+      thinkingResult = thinkingManager.processThinkingResponse(
+        {
+          thinking: response.thinking,
+          thinking_tokens: response.thinking_tokens,
+        },
+        startTime
+      ) || undefined;
+    }
+
+    this.updateUsage(usage);
 
     return {
       content: response.content as ContentBlock[],
       stopReason: response.stop_reason || 'end_turn',
-      usage,
+      usage: {
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+      },
+      thinking: thinkingResult,
+      model: usedModel,
     };
   }
 
@@ -262,7 +420,7 @@ export class ClaudeClient {
           inputTokens = msg.usage.input_tokens || 0;
         }
       } else if (event.type === 'message_stop') {
-        this.updateUsage(inputTokens, outputTokens);
+        this.updateUsage({ inputTokens, outputTokens });
         yield {
           type: 'usage',
           usage: { inputTokens, outputTokens },

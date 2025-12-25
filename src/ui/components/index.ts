@@ -39,3 +39,5 @@ export { ProgressBar, MultiProgressBar, CompactProgressBar } from './ProgressBar
 export type { ProgressBarProps, MultiProgressBarProps, CompactProgressBarProps } from './ProgressBar.js';
 export { DiffView } from './DiffView.js';
 export type { DiffViewProps } from './DiffView.js';
+export { ModelSelector } from './ModelSelector.js';
+export type { ModelSelectorProps } from './ModelSelector.js';
