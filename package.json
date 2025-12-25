@@ -63,6 +63,7 @@
     "zod": "^3.22.0"
   },
   "devDependencies": {
+    "@anthropic-ai/claude-code": "^2.0.76",
     "@types/node": "^20.0.0",
     "@types/react": "^18.2.0",
     "@types/uuid": "^9.0.0",
