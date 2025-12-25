@@ -9,9 +9,10 @@ import * as path from 'path';
 import * as fs from 'fs';
 
 /**
- * Hook 事件类型（官方支持的 12 种事件）
+ * Hook 事件类型（官方支持的事件 + CLI 级别事件）
  */
 export type HookEvent =
+  // 工具级别事件
   | 'PreToolUse'           // 工具执行前
   | 'PostToolUse'          // 工具执行后
   | 'PostToolUseFailure'   // 工具执行失败后
@@ -23,7 +24,15 @@ export type HookEvent =
   | 'SubagentStart'        // 子代理开始
   | 'SubagentStop'         // 子代理停止
   | 'PreCompact'           // 压缩前
-  | 'PermissionRequest';   // 权限请求
+  | 'PermissionRequest'    // 权限请求
+  // CLI 级别事件（新增）
+  | 'BeforeSetup'          // 设置前（对应 action_before_setup）
+  | 'AfterSetup'           // 设置后（对应 action_after_setup）
+  | 'CommandsLoaded'       // 命令加载完成（对应 action_commands_loaded）
+  | 'ToolsLoaded'          // 工具加载完成（对应 action_tools_loaded）
+  | 'McpConfigsLoaded'     // MCP 配置加载完成（对应 action_mcp_configs_loaded）
+  | 'PluginsInitialized'   // 插件初始化后（对应 action_after_plugins_init）
+  | 'AfterHooks';          // Hooks 执行后（对应 action_after_hooks）
 
 /**
  * Hook 类型
@@ -184,6 +193,7 @@ export function loadHooksFromFile(configPath: string): void {
  */
 function isValidHookEvent(event: string): boolean {
   const validEvents: HookEvent[] = [
+    // 工具级别事件
     'PreToolUse',
     'PostToolUse',
     'PostToolUseFailure',
@@ -196,6 +206,14 @@ function isValidHookEvent(event: string): boolean {
     'SubagentStop',
     'PreCompact',
     'PermissionRequest',
+    // CLI 级别事件
+    'BeforeSetup',
+    'AfterSetup',
+    'CommandsLoaded',
+    'ToolsLoaded',
+    'McpConfigsLoaded',
+    'PluginsInitialized',
+    'AfterHooks',
   ];
   return validEvents.includes(event as HookEvent);
 }

@@ -18,6 +18,8 @@ import { toolRegistry } from './tools/index.js';
 import { configManager } from './config/index.js';
 import { listSessions, loadSession } from './session/index.js';
 import { getMemoryManager } from './memory/index.js';
+import { emitLifecycleEvent } from './lifecycle/index.js';
+import { runHooks } from './hooks/index.js';
 import type { PermissionMode, OutputFormat, InputFormat } from './types/index.js';
 
 // 工作目录列表
@@ -101,6 +103,9 @@ program
   .option('--no-chrome', 'Disable Claude in Chrome integration')
   .option('--text', 'Use text-based interface instead of TUI')
   .action(async (prompt, options) => {
+    // T504: action_handler_start - Action 处理器开始
+    await emitLifecycleEvent('action_handler_start');
+
     // 调试模式
     if (options.debug) {
       process.env.CLAUDE_DEBUG = options.debug === true ? '*' : options.debug;
@@ -123,6 +128,10 @@ program
       loadMcpConfigs(options.mcpConfig);
     }
 
+    // T507: action_mcp_configs_loaded - MCP 配置加载完成
+    await emitLifecycleEvent('action_mcp_configs_loaded');
+    await runHooks({ event: 'McpConfigsLoaded' });
+
     // 构建系统提示
     let systemPrompt = options.systemPrompt;
     if (options.appendSystemPrompt) {
@@ -139,6 +148,40 @@ program
     if (options.settings) {
       loadSettings(options.settings);
     }
+
+    // T509: action_after_input_prompt - 输入提示处理后
+    await emitLifecycleEvent('action_after_input_prompt', { prompt });
+
+    // T506: action_tools_loaded - 工具加载完成
+    // 注意：工具在 toolRegistry 导入时已加载，这里触发事件
+    await emitLifecycleEvent('action_tools_loaded', { toolCount: toolRegistry.getAll().length });
+    await runHooks({ event: 'ToolsLoaded' });
+
+    // T502: action_before_setup - 设置前
+    await emitLifecycleEvent('action_before_setup');
+    await runHooks({ event: 'BeforeSetup' });
+
+    // 这里进行必要的设置（setup logic）
+    // 在本项目中，设置逻辑较为简单，主要是配置和会话管理
+
+    // T503: action_after_setup - 设置后
+    await emitLifecycleEvent('action_after_setup');
+    await runHooks({ event: 'AfterSetup' });
+
+    // T505: action_commands_loaded - 命令加载完成
+    // 注意：本项目的斜杠命令是内联定义的，这里标记为已加载
+    await emitLifecycleEvent('action_commands_loaded');
+    await runHooks({ event: 'CommandsLoaded' });
+
+    // T508: action_after_plugins_init - 插件初始化后
+    // 注意：本项目的插件系统尚未完全实现，但仍触发事件
+    await emitLifecycleEvent('action_after_plugins_init');
+    await runHooks({ event: 'PluginsInitialized' });
+
+    // T510: action_after_hooks - Hooks 执行后
+    // 注意：Hooks 在需要时执行，这里标记为已准备就绪
+    await emitLifecycleEvent('action_after_hooks');
+    await runHooks({ event: 'AfterHooks' });
 
     // Teleport 模式 - 连接到远程会话
     if (options.teleport) {
@@ -1118,5 +1161,41 @@ process.on('unhandledRejection', (reason) => {
   console.error(chalk.red('Unhandled Rejection:'), reason);
 });
 
-// 运行
-program.parse();
+/**
+ * 主函数 - 包装 CLI 执行以支持生命周期事件
+ * 对应官方的 ZV7 函数和 tK7 函数
+ */
+async function main(): Promise<void> {
+  // CLI 级别生命周期事件
+  await emitLifecycleEvent('cli_entry');
+  await emitLifecycleEvent('cli_imports_loaded');
+
+  // 检查特殊路径（对应官方的 fast path 检查）
+  const args = process.argv.slice(2);
+
+  // 版本快速路径
+  if (args.length === 1 && (args[0] === '--version' || args[0] === '-v')) {
+    await emitLifecycleEvent('cli_version_fast_path');
+    program.parse();
+    return;
+  }
+
+  // 主函数导入前
+  await emitLifecycleEvent('cli_before_main_import');
+
+  // 这里主模块已经导入（在 Node.js ES Module 中，导入是同步的）
+  // 所以我们直接触发导入后事件
+  await emitLifecycleEvent('cli_after_main_import');
+
+  // 运行主程序
+  program.parse();
+
+  // T511: cli_after_main_complete - CLI 完成
+  await emitLifecycleEvent('cli_after_main_complete');
+}
+
+// 运行主函数
+main().catch((error) => {
+  console.error(chalk.red('Fatal error:'), error);
+  process.exit(1);
+});

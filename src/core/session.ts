@@ -6,32 +6,18 @@
 import { v4 as uuidv4 } from 'uuid';
 import * as fs from 'fs';
 import * as path from 'path';
-import { execSync } from 'child_process';
 import type { Message, SessionState, TodoItem } from '../types/index.js';
-
-// 获取当前 git 分支
-function getGitBranch(cwd: string): string | undefined {
-  try {
-    return execSync('git rev-parse --abbrev-ref HEAD', {
-      cwd,
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
-  } catch {
-    return undefined;
-  }
-}
+import { GitUtils, type GitInfo } from '../git/index.js';
 
 export class Session {
   private state: SessionState;
   private messages: Message[] = [];
   private configDir: string;
-  private gitBranch?: string;
+  private gitInfo?: GitInfo;
   private customTitle?: string;
 
   constructor(cwd: string = process.cwd()) {
     this.configDir = path.join(process.env.HOME || '~', '.claude');
-    this.gitBranch = getGitBranch(cwd);
     this.state = {
       sessionId: uuidv4(),
       cwd,
@@ -46,6 +32,43 @@ export class Session {
     if (!fs.existsSync(this.configDir)) {
       fs.mkdirSync(this.configDir, { recursive: true });
     }
+  }
+
+  /**
+   * 异步初始化 Git 信息
+   * 应该在创建 Session 后立即调用
+   */
+  async initializeGitInfo(): Promise<void> {
+    try {
+      this.gitInfo = await GitUtils.getGitInfo(this.state.cwd) || undefined;
+    } catch (error) {
+      // Git 信息获取失败不影响 session 创建
+      this.gitInfo = undefined;
+    }
+  }
+
+  /**
+   * 获取 Git 信息
+   */
+  getGitInfo(): GitInfo | undefined {
+    return this.gitInfo;
+  }
+
+  /**
+   * 获取 Git 分支名 (兼容旧代码)
+   */
+  getGitBranch(): string | undefined {
+    return this.gitInfo?.branchName;
+  }
+
+  /**
+   * 获取格式化的 Git 状态文本
+   */
+  getFormattedGitStatus(): string | undefined {
+    if (!this.gitInfo) {
+      return undefined;
+    }
+    return GitUtils.formatGitStatus(this.gitInfo);
   }
 
   get sessionId(): string {
@@ -130,7 +153,13 @@ export class Session {
       messages: this.messages,
       // 额外元数据 (官方风格)
       metadata: {
-        gitBranch: this.gitBranch,
+        // Git 信息 (完整)
+        gitInfo: this.gitInfo,
+        gitBranch: this.gitInfo?.branchName, // 兼容旧版
+        gitStatus: this.gitInfo?.isClean ? 'clean' : 'dirty',
+        gitDefaultBranch: this.gitInfo?.defaultBranch,
+        gitCommitHash: this.gitInfo?.commitHash,
+        // Session 信息
         customTitle: this.customTitle,
         firstPrompt: this.getFirstPrompt(),
         projectPath: this.state.cwd,

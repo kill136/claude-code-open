@@ -14,6 +14,7 @@ import { EventEmitter } from 'events';
 import { spawn, ChildProcess } from 'child_process';
 import { v4 as uuidv4 } from 'uuid';
 import axios, { AxiosInstance } from 'axios';
+import { WebSocketConnection } from './websocket-connection.js';
 
 // ============ Type Definitions ============
 
@@ -452,6 +453,14 @@ export class McpConnectionManager extends EventEmitter {
         case 'http':
           if (!server.url) throw new Error('URL required for HTTP connection');
           transport = new HttpConnection(server.url, server.headers);
+          break;
+
+        case 'websocket':
+          if (!server.url) throw new Error('URL required for WebSocket connection');
+          transport = new WebSocketConnection(server.url, {
+            headers: server.headers,
+            sessionId: connectionId,
+          });
           break;
 
         default:
