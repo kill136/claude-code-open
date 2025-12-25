@@ -1,65 +1,241 @@
 /**
  * StatusBar 组件
- * 底部状态栏
+ * 底部状态栏 - 增强版
+ *
+ * 显示：模型、Token、费用、会话时长、上下文使用、网络状态、权限模式、Git 分支、工作目录
  */
 
 import React from 'react';
 import { Box, Text } from 'ink';
 
 interface StatusBarProps {
+  // 基础信息
   messageCount: number;
   tokenCount?: number;
+  inputTokens?: number;
+  outputTokens?: number;
   cost?: string;
   duration?: number;
   isProcessing?: boolean;
+
+  // 模型信息
+  model?: string;
+  modelDisplayName?: string;
+
+  // 上下文使用
+  contextUsed?: number;
+  contextMax?: number;
+  contextPercentage?: number;
+
+  // 网络状态
+  networkStatus?: 'online' | 'offline' | 'error';
+  lastApiCall?: number;
+
+  // 权限模式
+  permissionMode?: string;
+
+  // Git 信息
+  gitBranch?: string;
+
+  // 工作目录
+  cwd?: string;
 }
 
 export const StatusBar: React.FC<StatusBarProps> = ({
   messageCount,
   tokenCount,
+  inputTokens,
+  outputTokens,
   cost,
   duration,
   isProcessing,
+  model,
+  modelDisplayName,
+  contextUsed,
+  contextMax,
+  contextPercentage,
+  networkStatus = 'online',
+  lastApiCall,
+  permissionMode,
+  gitBranch,
+  cwd,
 }) => {
+  // 格式化时长
   const formatDuration = (ms: number): string => {
     if (ms < 1000) return `${ms}ms`;
     if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
-    return `${Math.floor(ms / 60000)}m ${Math.floor((ms % 60000) / 1000)}s`;
+    const minutes = Math.floor(ms / 60000);
+    const seconds = Math.floor((ms % 60000) / 1000);
+    if (minutes < 60) return `${minutes}m ${seconds}s`;
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hours}h ${mins}m`;
   };
 
+  // 格式化 Token 数量
+  const formatTokens = (num: number): string => {
+    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
+    if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
+    return num.toString();
+  };
+
+  // 获取网络状态图标和颜色
+  const getNetworkIndicator = (): { icon: string; color: string } => {
+    switch (networkStatus) {
+      case 'online':
+        return { icon: '●', color: 'green' };
+      case 'offline':
+        return { icon: '●', color: 'gray' };
+      case 'error':
+        return { icon: '●', color: 'red' };
+      default:
+        return { icon: '●', color: 'gray' };
+    }
+  };
+
+  // 获取上下文使用颜色
+  const getContextColor = (percentage?: number): string => {
+    if (!percentage) return 'white';
+    if (percentage >= 90) return 'red';
+    if (percentage >= 70) return 'yellow';
+    return 'green';
+  };
+
+  // 格式化模型名称
+  const getModelDisplay = (): string => {
+    if (modelDisplayName) return modelDisplayName;
+    if (!model) return 'claude-sonnet-4.5';
+
+    // 简化模型名称
+    if (model.includes('opus')) return 'opus-4.5';
+    if (model.includes('sonnet')) return 'sonnet-4.5';
+    if (model.includes('haiku')) return 'haiku-4.0';
+    return model;
+  };
+
+  // 格式化工作目录（缩短路径）
+  const formatCwd = (path?: string): string => {
+    if (!path) return '';
+    const home = process.env.HOME || process.env.USERPROFILE || '';
+    if (home && path.startsWith(home)) {
+      return `~${path.slice(home.length)}`;
+    }
+    // 如果路径太长，只显示最后两个部分
+    const parts = path.split(/[/\\]/);
+    if (parts.length > 3) {
+      return `.../${parts.slice(-2).join('/')}`;
+    }
+    return path;
+  };
+
+  const networkIndicator = getNetworkIndicator();
+
   return (
-    <Box
-      borderStyle="single"
-      borderColor="gray"
-      paddingX={1}
-      justifyContent="space-between"
-    >
-      <Box gap={2}>
-        <Text color="gray">
-          Messages: <Text color="white">{messageCount}</Text>
-        </Text>
-        {tokenCount !== undefined && (
-          <Text color="gray">
-            Tokens: <Text color="white">{tokenCount.toLocaleString()}</Text>
+    <Box flexDirection="column">
+      {/* 第一行：主要信息 */}
+      <Box
+        borderStyle="single"
+        borderColor="gray"
+        paddingX={1}
+        justifyContent="space-between"
+      >
+        <Box gap={2}>
+          {/* 模型 */}
+          <Text color="cyan" bold>
+            {getModelDisplay()}
           </Text>
-        )}
-        {cost && (
+
+          {/* 消息数 */}
           <Text color="gray">
-            Cost: <Text color="green">{cost}</Text>
+            <Text color="white">{messageCount}</Text> msgs
           </Text>
-        )}
+
+          {/* Token 详情 */}
+          {(inputTokens !== undefined || outputTokens !== undefined) && (
+            <Text color="gray">
+              <Text color="white">{formatTokens(inputTokens || 0)}</Text>
+              <Text color="gray">/</Text>
+              <Text color="white">{formatTokens(outputTokens || 0)}</Text>
+              <Text color="gray"> tokens</Text>
+            </Text>
+          )}
+
+          {/* Token 总数（兼容旧版） */}
+          {tokenCount !== undefined && inputTokens === undefined && (
+            <Text color="gray">
+              <Text color="white">{formatTokens(tokenCount)}</Text> tokens
+            </Text>
+          )}
+
+          {/* 费用 */}
+          {cost && (
+            <Text color="gray">
+              <Text color="green">{cost}</Text>
+            </Text>
+          )}
+
+          {/* 上下文使用百分比 */}
+          {contextPercentage !== undefined && (
+            <Text color="gray">
+              ctx: <Text color={getContextColor(contextPercentage)}>
+                {contextPercentage.toFixed(0)}%
+              </Text>
+            </Text>
+          )}
+
+          {/* 上下文详情（可选） */}
+          {contextUsed !== undefined && contextMax !== undefined && (
+            <Text color="gray" dimColor>
+              ({formatTokens(contextUsed)}/{formatTokens(contextMax)})
+            </Text>
+          )}
+        </Box>
+
+        <Box gap={2}>
+          {/* 处理状态 */}
+          {isProcessing && (
+            <Text color="yellow">⚙ Processing...</Text>
+          )}
+
+          {/* 会话时长 */}
+          {duration !== undefined && (
+            <Text color="gray">
+              <Text color="white">{formatDuration(duration)}</Text>
+            </Text>
+          )}
+
+          {/* 网络状态 */}
+          <Text color={networkIndicator.color}>
+            {networkIndicator.icon}
+          </Text>
+
+          {/* 权限模式 */}
+          {permissionMode && permissionMode !== 'default' && (
+            <Text color="magenta">
+              [{permissionMode}]
+            </Text>
+          )}
+        </Box>
       </Box>
 
-      <Box gap={2}>
-        {duration !== undefined && (
-          <Text color="gray">
-            Duration: <Text color="white">{formatDuration(duration)}</Text>
-          </Text>
-        )}
-        {isProcessing && (
-          <Text color="yellow">Processing...</Text>
-        )}
-      </Box>
+      {/* 第二行：环境信息（可选） */}
+      {(gitBranch || cwd) && (
+        <Box paddingX={1} gap={2}>
+          {/* Git 分支 */}
+          {gitBranch && (
+            <Text color="gray">
+              <Text color="blue">⎇</Text> {gitBranch}
+            </Text>
+          )}
+
+          {/* 工作目录 */}
+          {cwd && (
+            <Text color="gray">
+              <Text color="cyan">📁</Text> {formatCwd(cwd)}
+            </Text>
+          )}
+        </Box>
+      )}
     </Box>
   );
 };

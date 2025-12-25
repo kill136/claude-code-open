@@ -1,0 +1,45 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "type": "command",
+        "command": "./examples/hooks-scripts/pre-tool-validator.sh",
+        "timeout": 5000,
+        "blocking": true,
+        "matcher": "/Bash|Write|Edit/"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "type": "command",
+        "command": "./examples/hooks-scripts/post-tool-logger.sh",
+        "timeout": 3000,
+        "blocking": false
+      }
+    ],
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "./examples/hooks-scripts/session-manager.sh",
+        "timeout": 5000,
+        "blocking": false
+      }
+    ],
+    "SessionEnd": [
+      {
+        "type": "command",
+        "command": "./examples/hooks-scripts/session-manager.sh",
+        "timeout": 5000,
+        "blocking": false
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "type": "command",
+        "command": "./examples/hooks-scripts/permission-handler.sh",
+        "timeout": 10000,
+        "blocking": true
+      }
+    ]
+  }
+}

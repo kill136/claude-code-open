@@ -1,0 +1,16 @@
+{
+  "version": "2.0.76",
+  "model": "sonnet",
+  "maxTokens": 8192,
+  "temperature": 1,
+  "verbose": false,
+  "enableAutoSave": true,
+  "theme": "auto",
+  "mcpServers": {
+    "filesystem": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+    }
+  }
+}

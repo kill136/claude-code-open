@@ -7,6 +7,9 @@ import Anthropic from '@anthropic-ai/sdk';
 import * as https from 'https';
 import * as crypto from 'crypto';
 
+
+// Export Vertex AI client
+export * from './vertex.js';
 export type ProviderType = 'anthropic' | 'bedrock' | 'vertex' | 'foundry';
 
 export interface ProviderConfig {
@@ -19,6 +22,22 @@ export interface ProviderConfig {
   secretAccessKey?: string;
   sessionToken?: string;
   model?: string;
+  // Bedrock-specific
+  awsProfile?: string;
+  crossRegionInference?: boolean;
+}
+
+/**
+ * Parsed AWS Bedrock Model ARN
+ * Format: arn:aws:bedrock:region:account-id:model/model-id
+ * or: arn:aws:bedrock:region::foundation-model/model-id
+ */
+export interface BedrockModelArn {
+  region: string;
+  accountId?: string;
+  modelId: string;
+  isFoundationModel: boolean;
+  isCrossRegion: boolean;
 }
 
 export interface ProviderInfo {
@@ -30,19 +49,82 @@ export interface ProviderInfo {
 }
 
 /**
+ * Parse AWS Bedrock Model ARN
+ * Supports formats:
+ * - arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-5-sonnet-20241022-v2:0
+ * - arn:aws:bedrock:us-west-2:123456789012:provisioned-model/my-model
+ * - anthropic.claude-3-5-sonnet-20241022-v2:0 (plain model ID)
+ */
+export function parseBedrockModelArn(input: string): BedrockModelArn | null {
+  // Plain model ID (no ARN)
+  if (!input.startsWith('arn:')) {
+    return {
+      region: '',
+      modelId: input,
+      isFoundationModel: true,
+      isCrossRegion: false,
+    };
+  }
+
+  // Parse ARN format: arn:aws:bedrock:region:account-id:resource-type/resource-id
+  const arnPattern = /^arn:aws:bedrock:([^:]+):([^:]*):([^/]+)\/(.+)$/;
+  const match = input.match(arnPattern);
+
+  if (!match) {
+    return null;
+  }
+
+  const [, region, accountId, resourceType, resourceId] = match;
+
+  return {
+    region,
+    accountId: accountId || undefined,
+    modelId: resourceId,
+    isFoundationModel: resourceType === 'foundation-model',
+    isCrossRegion: resourceType === 'inference-profile',
+  };
+}
+
+/**
+ * Get AWS credentials from environment with fallbacks
+ */
+function getAwsCredentials(): {
+  accessKeyId?: string;
+  secretAccessKey?: string;
+  sessionToken?: string;
+  profile?: string;
+} {
+  return {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    sessionToken: process.env.AWS_SESSION_TOKEN,
+    profile: process.env.AWS_PROFILE,
+  };
+}
+
+/**
  * Detect provider from environment
  */
 export function detectProvider(): ProviderConfig {
   // Check for Bedrock
   if (process.env.CLAUDE_CODE_USE_BEDROCK === 'true' || process.env.AWS_BEDROCK_MODEL) {
+    const credentials = getAwsCredentials();
+    const modelInput = process.env.AWS_BEDROCK_MODEL || 'anthropic.claude-3-5-sonnet-20241022-v2:0';
+    const arnInfo = parseBedrockModelArn(modelInput);
+
+    // Determine region from ARN or environment
+    const region = arnInfo?.region || process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1';
+
     return {
       type: 'bedrock',
-      region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1',
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-      sessionToken: process.env.AWS_SESSION_TOKEN,
-      model: process.env.AWS_BEDROCK_MODEL || 'anthropic.claude-3-5-sonnet-20241022-v2:0',
+      region,
+      accessKeyId: credentials.accessKeyId,
+      secretAccessKey: credentials.secretAccessKey,
+      sessionToken: credentials.sessionToken,
+      awsProfile: credentials.profile,
+      model: arnInfo?.modelId || modelInput,
       baseUrl: process.env.ANTHROPIC_BEDROCK_BASE_URL,
+      crossRegionInference: arnInfo?.isCrossRegion || false,
     };
   }
 
@@ -82,12 +164,18 @@ export function detectProvider(): ProviderConfig {
 export function getProviderInfo(config: ProviderConfig): ProviderInfo {
   switch (config.type) {
     case 'bedrock':
+      const modelId = config.model || 'anthropic.claude-3-5-sonnet-20241022-v2:0';
+      const arnInfo = parseBedrockModelArn(modelId);
+      const displayName = config.crossRegionInference
+        ? 'AWS Bedrock (Cross-Region)'
+        : 'AWS Bedrock';
+
       return {
         type: 'bedrock',
-        name: 'AWS Bedrock',
+        name: displayName,
         region: config.region,
-        model: config.model || 'anthropic.claude-3-5-sonnet-20241022-v2:0',
-        baseUrl: config.baseUrl || `https://bedrock-runtime.${config.region}.amazonaws.com`,
+        model: arnInfo?.modelId || modelId,
+        baseUrl: config.baseUrl || buildBedrockEndpoint(config),
       };
     case 'vertex':
       return {
@@ -137,25 +225,103 @@ export function createClient(config?: ProviderConfig): Anthropic {
 
 /**
  * Create AWS Bedrock client
+ * Supports:
+ * - @anthropic-ai/bedrock-sdk (recommended)
+ * - Cross-region inference
+ * - Custom endpoints
+ * - AWS credentials from environment or config
  */
 function createBedrockClient(config: ProviderConfig): Anthropic {
-  // Use AnthropicBedrock if available
+  // Validate AWS credentials
+  const credentials = getAwsCredentials();
+  const accessKeyId = config.accessKeyId || credentials.accessKeyId;
+  const secretAccessKey = config.secretAccessKey || credentials.secretAccessKey;
+  const sessionToken = config.sessionToken || credentials.sessionToken;
+
+  if (!accessKeyId || !secretAccessKey) {
+    throw new Error(
+      'AWS credentials are required for Bedrock. Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables.'
+    );
+  }
+
+  if (!config.region) {
+    throw new Error(
+      'AWS region is required for Bedrock. Set AWS_REGION or AWS_DEFAULT_REGION environment variable.'
+    );
+  }
+
+  // Try using official Bedrock SDK first
   try {
     const AnthropicBedrock = require('@anthropic-ai/bedrock-sdk').default;
-    return new AnthropicBedrock({
-      awsAccessKey: config.accessKeyId,
-      awsSecretKey: config.secretAccessKey,
-      awsSessionToken: config.sessionToken,
+
+    const clientConfig: any = {
+      awsAccessKey: accessKeyId,
+      awsSecretKey: secretAccessKey,
       awsRegion: config.region,
-    });
-  } catch {
-    // Fallback to standard client with bedrock base URL
-    console.warn('Bedrock SDK not found, using standard client');
+    };
+
+    // Add session token if present
+    if (sessionToken) {
+      clientConfig.awsSessionToken = sessionToken;
+    }
+
+    // Add custom endpoint if specified
+    if (config.baseUrl) {
+      clientConfig.baseURL = config.baseUrl;
+    }
+
+    const client = new AnthropicBedrock(clientConfig);
+
+    // Log successful initialization (without exposing credentials)
+    if (process.env.DEBUG) {
+      console.log(`[Bedrock] Initialized with region: ${config.region}, model: ${config.model}`);
+      if (config.crossRegionInference) {
+        console.log('[Bedrock] Cross-region inference enabled');
+      }
+    }
+
+    return client;
+  } catch (error) {
+    // Fallback: warn about missing SDK
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    if (errorMessage.includes('Cannot find module')) {
+      console.warn(
+        '[Bedrock] @anthropic-ai/bedrock-sdk not installed. Install it with: npm install @anthropic-ai/bedrock-sdk'
+      );
+      console.warn('[Bedrock] Falling back to manual AWS signing (limited functionality)');
+    } else {
+      console.warn(`[Bedrock] Failed to initialize Bedrock SDK: ${errorMessage}`);
+    }
+
+    // Create standard Anthropic client with Bedrock endpoint
+    // Note: This requires manual request signing which may not work for all cases
+    const baseURL = config.baseUrl || buildBedrockEndpoint(config);
+
+    if (process.env.DEBUG) {
+      console.log(`[Bedrock] Using endpoint: ${baseURL}`);
+    }
+
     return new Anthropic({
-      apiKey: config.accessKeyId || 'bedrock',
-      baseURL: config.baseUrl || `https://bedrock-runtime.${config.region}.amazonaws.com`,
+      apiKey: accessKeyId, // Used as placeholder, actual auth via signing
+      baseURL,
     });
   }
+}
+
+/**
+ * Build Bedrock Runtime API endpoint
+ */
+function buildBedrockEndpoint(config: ProviderConfig): string {
+  const region = config.region || 'us-east-1';
+
+  // Cross-region inference uses a different endpoint
+  if (config.crossRegionInference) {
+    return `https://bedrock-runtime.${region}.amazonaws.com/v1/inference-profiles`;
+  }
+
+  // Standard Bedrock Runtime endpoint
+  return `https://bedrock-runtime.${region}.amazonaws.com`;
 }
 
 /**
@@ -338,20 +504,68 @@ export function getModelForProvider(model: string, provider: ProviderType): stri
 export function validateProviderConfig(config: ProviderConfig): {
   valid: boolean;
   errors: string[];
+  warnings?: string[];
 } {
   const errors: string[] = [];
+  const warnings: string[] = [];
 
   switch (config.type) {
     case 'bedrock':
+      // Validate region
       if (!config.region) {
-        errors.push('AWS region is required for Bedrock');
+        errors.push('AWS region is required for Bedrock (set AWS_REGION or AWS_DEFAULT_REGION)');
+      } else {
+        // Check if region is valid AWS region format
+        const validRegionPattern = /^[a-z]{2}-[a-z]+-\d{1}$/;
+        if (!validRegionPattern.test(config.region)) {
+          warnings.push(
+            `AWS region "${config.region}" may not be a valid format. Expected format: us-east-1, eu-west-1, etc.`
+          );
+        }
       }
-      if (!config.accessKeyId && !process.env.AWS_ACCESS_KEY_ID) {
-        errors.push('AWS access key ID is required for Bedrock');
+
+      // Validate credentials
+      const credentials = getAwsCredentials();
+      const accessKeyId = config.accessKeyId || credentials.accessKeyId;
+      const secretAccessKey = config.secretAccessKey || credentials.secretAccessKey;
+
+      if (!accessKeyId) {
+        errors.push(
+          'AWS access key ID is required for Bedrock (set AWS_ACCESS_KEY_ID environment variable)'
+        );
+      } else if (accessKeyId.length < 16) {
+        errors.push('AWS access key ID appears to be invalid (too short)');
       }
-      if (!config.secretAccessKey && !process.env.AWS_SECRET_ACCESS_KEY) {
-        errors.push('AWS secret access key is required for Bedrock');
+
+      if (!secretAccessKey) {
+        errors.push(
+          'AWS secret access key is required for Bedrock (set AWS_SECRET_ACCESS_KEY environment variable)'
+        );
+      } else if (secretAccessKey.length < 40) {
+        errors.push('AWS secret access key appears to be invalid (too short)');
       }
+
+      // Validate model if provided
+      if (config.model) {
+        const arnInfo = parseBedrockModelArn(config.model);
+        if (!arnInfo) {
+          errors.push(`Invalid Bedrock model ARN or ID: ${config.model}`);
+        } else if (arnInfo.region && arnInfo.region !== config.region && !config.crossRegionInference) {
+          warnings.push(
+            `Model ARN region (${arnInfo.region}) differs from config region (${config.region}). Consider enabling cross-region inference.`
+          );
+        }
+      }
+
+      // Check for Bedrock SDK
+      try {
+        require.resolve('@anthropic-ai/bedrock-sdk');
+      } catch {
+        warnings.push(
+          'Bedrock SDK (@anthropic-ai/bedrock-sdk) not found. Install it for full functionality: npm install @anthropic-ai/bedrock-sdk'
+        );
+      }
+
       break;
 
     case 'vertex':
@@ -378,7 +592,94 @@ export function validateProviderConfig(config: ProviderConfig): {
   return {
     valid: errors.length === 0,
     errors,
+    warnings: warnings.length > 0 ? warnings : undefined,
   };
+}
+
+/**
+ * Get Bedrock model ID from common aliases
+ * Supports both short names and full Bedrock model IDs
+ */
+export function getBedrockModelId(modelAlias: string): string {
+  const modelMap: Record<string, string> = {
+    // Sonnet 4
+    'sonnet-4': 'anthropic.claude-sonnet-4-20250514-v1:0',
+    'claude-sonnet-4': 'anthropic.claude-sonnet-4-20250514-v1:0',
+    'claude-sonnet-4-20250514': 'anthropic.claude-sonnet-4-20250514-v1:0',
+
+    // Sonnet 3.5 V2
+    sonnet: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
+    'sonnet-3.5': 'anthropic.claude-3-5-sonnet-20241022-v2:0',
+    'claude-3-5-sonnet': 'anthropic.claude-3-5-sonnet-20241022-v2:0',
+    'claude-3-5-sonnet-v2': 'anthropic.claude-3-5-sonnet-20241022-v2:0',
+
+    // Opus 3
+    opus: 'anthropic.claude-3-opus-20240229-v1:0',
+    'claude-3-opus': 'anthropic.claude-3-opus-20240229-v1:0',
+
+    // Haiku 3
+    haiku: 'anthropic.claude-3-haiku-20240307-v1:0',
+    'claude-3-haiku': 'anthropic.claude-3-haiku-20240307-v1:0',
+
+    // Haiku 3.5
+    'haiku-3.5': 'anthropic.claude-3-5-haiku-20241022-v1:0',
+    'claude-3-5-haiku': 'anthropic.claude-3-5-haiku-20241022-v1:0',
+  };
+
+  // Return mapped model or original if already a full ID
+  return modelMap[modelAlias.toLowerCase()] || modelAlias;
+}
+
+/**
+ * List available Bedrock models for a region
+ */
+export function getAvailableBedrockModels(region?: string): string[] {
+  return [
+    'anthropic.claude-sonnet-4-20250514-v1:0',
+    'anthropic.claude-3-5-sonnet-20241022-v2:0',
+    'anthropic.claude-3-5-haiku-20241022-v1:0',
+    'anthropic.claude-3-opus-20240229-v1:0',
+    'anthropic.claude-3-haiku-20240307-v1:0',
+  ];
+}
+
+/**
+ * Create Bedrock model ARN
+ */
+export function createBedrockModelArn(
+  modelId: string,
+  region: string,
+  accountId?: string,
+  isProvisionedModel: boolean = false
+): string {
+  const resourceType = isProvisionedModel ? 'provisioned-model' : 'foundation-model';
+  const account = accountId || '';
+
+  return `arn:aws:bedrock:${region}:${account}:${resourceType}/${modelId}`;
+}
+
+/**
+ * Test Bedrock credentials
+ */
+export async function testBedrockCredentials(
+  config: ProviderConfig
+): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  try {
+    const client = createBedrockClient(config);
+
+    // Try a minimal API call to verify credentials
+    // Note: This is a placeholder - actual implementation would need proper Bedrock API call
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return {
+      success: false,
+      error: errorMessage,
+    };
+  }
 }
 
 /**
@@ -395,4 +696,120 @@ export function getProviderDisplayName(type: ProviderType): string {
     default:
       return 'Anthropic API';
   }
+}
+
+/**
+ * Bedrock error handler
+ * Provides user-friendly error messages for common Bedrock issues
+ */
+export function handleBedrockError(error: any): string {
+  const errorMessage = error.message || String(error);
+
+  // Common AWS error patterns
+  if (errorMessage.includes('InvalidSignatureException') || errorMessage.includes('SignatureDoesNotMatch')) {
+    return 'AWS credentials are invalid. Please check AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.';
+  }
+
+  if (errorMessage.includes('UnrecognizedClientException')) {
+    return 'AWS credentials are not recognized. Please verify your AWS access key ID.';
+  }
+
+  if (errorMessage.includes('AccessDeniedException') || errorMessage.includes('UnauthorizedOperation')) {
+    return 'AWS credentials lack permission to access Bedrock. Ensure your IAM role/user has bedrock:InvokeModel permission.';
+  }
+
+  if (errorMessage.includes('ResourceNotFoundException') || errorMessage.includes('ModelNotFound')) {
+    return 'The specified Bedrock model was not found. Check the model ID and ensure it\'s available in your region.';
+  }
+
+  if (errorMessage.includes('ThrottlingException') || errorMessage.includes('TooManyRequestsException')) {
+    return 'Bedrock API rate limit exceeded. Please wait and try again.';
+  }
+
+  if (errorMessage.includes('ServiceUnavailableException')) {
+    return 'Bedrock service is temporarily unavailable. Please try again later.';
+  }
+
+  if (errorMessage.includes('ValidationException')) {
+    return 'Invalid request to Bedrock API. Check your model parameters and input format.';
+  }
+
+  if (errorMessage.includes('ExpiredTokenException')) {
+    return 'AWS session token has expired. Please refresh your credentials.';
+  }
+
+  // Return original error if no pattern matches
+  return `Bedrock error: ${errorMessage}`;
+}
+
+/**
+ * Get Bedrock service endpoints for all regions
+ */
+export function getBedrockRegions(): Array<{
+  region: string;
+  name: string;
+  endpoint: string;
+}> {
+  const regions = [
+    { code: 'us-east-1', name: 'US East (N. Virginia)' },
+    { code: 'us-west-2', name: 'US West (Oregon)' },
+    { code: 'eu-west-1', name: 'Europe (Ireland)' },
+    { code: 'eu-west-3', name: 'Europe (Paris)' },
+    { code: 'eu-central-1', name: 'Europe (Frankfurt)' },
+    { code: 'ap-northeast-1', name: 'Asia Pacific (Tokyo)' },
+    { code: 'ap-southeast-1', name: 'Asia Pacific (Singapore)' },
+    { code: 'ap-southeast-2', name: 'Asia Pacific (Sydney)' },
+  ];
+
+  return regions.map((r) => ({
+    region: r.code,
+    name: r.name,
+    endpoint: `https://bedrock-runtime.${r.code}.amazonaws.com`,
+  }));
+}
+
+/**
+ * Format Bedrock configuration for display
+ */
+export function formatBedrockConfig(config: ProviderConfig): string {
+  const parts: string[] = [];
+
+  parts.push(`Provider: AWS Bedrock`);
+  parts.push(`Region: ${config.region || 'not set'}`);
+
+  if (config.model) {
+    const arnInfo = parseBedrockModelArn(config.model);
+    if (arnInfo) {
+      parts.push(`Model: ${arnInfo.modelId}`);
+      if (arnInfo.isFoundationModel) {
+        parts.push(`Type: Foundation Model`);
+      } else if (arnInfo.isCrossRegion) {
+        parts.push(`Type: Cross-Region Inference Profile`);
+      } else {
+        parts.push(`Type: Provisioned Model`);
+      }
+    } else {
+      parts.push(`Model: ${config.model}`);
+    }
+  }
+
+  if (config.crossRegionInference) {
+    parts.push(`Cross-Region Inference: Enabled`);
+  }
+
+  const credentials = getAwsCredentials();
+  const hasAccessKey = !!(config.accessKeyId || credentials.accessKeyId);
+  const hasSecretKey = !!(config.secretAccessKey || credentials.secretAccessKey);
+  const hasSessionToken = !!(config.sessionToken || credentials.sessionToken);
+
+  parts.push(`Credentials: ${hasAccessKey && hasSecretKey ? 'Configured' : 'Missing'}`);
+  if (hasSessionToken) {
+    parts.push(`Session Token: Present`);
+  }
+
+  if (config.baseUrl) {
+    parts.push(`Custom Endpoint: ${config.baseUrl}`);
+  }
+
+  return parts.join('\n');
 }

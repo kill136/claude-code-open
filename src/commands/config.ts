@@ -44,12 +44,101 @@ const writeConfig = (config: Record<string, any>): boolean => {
   }
 };
 
+// 定义所有可配置项及其默认值和说明
+interface ConfigItem {
+  key: string;
+  defaultValue: any;
+  description: string;
+  type: string;
+  example?: string;
+}
+
+const CONFIG_ITEMS: ConfigItem[] = [
+  {
+    key: 'model',
+    defaultValue: 'sonnet',
+    description: 'Default AI model to use',
+    type: 'string',
+    example: 'sonnet, opus, haiku'
+  },
+  {
+    key: 'theme',
+    defaultValue: 'dark',
+    description: 'Color theme for the interface',
+    type: 'string',
+    example: 'dark, light'
+  },
+  {
+    key: 'verbose',
+    defaultValue: false,
+    description: 'Enable verbose logging',
+    type: 'boolean',
+    example: 'true, false'
+  },
+  {
+    key: 'maxTokens',
+    defaultValue: 8192,
+    description: 'Maximum output tokens per request',
+    type: 'number',
+    example: '4096, 8192, 16384'
+  },
+  {
+    key: 'autoCompact',
+    defaultValue: true,
+    description: 'Automatically compact context when needed',
+    type: 'boolean',
+    example: 'true, false'
+  },
+  {
+    key: 'defaultPermissionMode',
+    defaultValue: 'default',
+    description: 'Default permission mode for tool execution',
+    type: 'string',
+    example: 'default, acceptEdits, bypassPermissions'
+  },
+  {
+    key: 'outputStyle',
+    defaultValue: 'default',
+    description: 'AI output style preference',
+    type: 'string',
+    example: 'default, concise, detailed, code-first'
+  },
+  {
+    key: 'mcpServers',
+    defaultValue: {},
+    description: 'MCP server configurations',
+    type: 'object',
+    example: '{"server1": {...}}'
+  },
+  {
+    key: 'hooks',
+    defaultValue: {},
+    description: 'Hook configurations for automation',
+    type: 'object',
+    example: '{"PreToolUse": [...]}'
+  },
+  {
+    key: 'allowedTools',
+    defaultValue: [],
+    description: 'List of explicitly allowed tools',
+    type: 'array',
+    example: '["Bash", "Read", "Write"]'
+  },
+  {
+    key: 'disallowedTools',
+    defaultValue: [],
+    description: 'List of explicitly disallowed tools',
+    type: 'array',
+    example: '["WebSearch", "WebFetch"]'
+  }
+];
+
 // /config - 配置管理 (官方风格 - 打开配置面板)
 export const configCommand: SlashCommand = {
   name: 'config',
   aliases: ['settings'],
-  description: 'Open config panel',
-  usage: '/config [key] [value]',
+  description: 'Manage Claude Code configuration settings',
+  usage: '/config [get <key>|set <key> <value>|reset [key]|list]',
   category: 'config',
   execute: (ctx: CommandContext): CommandResult => {
     const { args } = ctx;
@@ -60,24 +149,36 @@ export const configCommand: SlashCommand = {
     if (args.length === 0) {
       const configInfo = `╭─ Configuration ─────────────────────────────────────╮
 │                                                     │
-│  Settings Location: ${configFile.length > 30 ? '~/.claude/settings.json' : configFile}
+│  Settings Location:                                 │
+│    ~/.claude/settings.json                          │
 │                                                     │
 │  Current Settings:                                  │
-│    model             ${config.model || 'sonnet'}
-│    theme             ${config.theme || 'dark'}
-│    verbose           ${config.verbose ?? false}
-│    autoCompact       ${config.autoCompact ?? true}
-│    defaultPermission ${config.defaultPermissionMode || 'default'}
+│    model             ${(config.model || 'sonnet').toString().padEnd(28)} │
+│    theme             ${(config.theme || 'dark').toString().padEnd(28)} │
+│    verbose           ${(config.verbose ?? false).toString().padEnd(28)} │
+│    maxTokens         ${(config.maxTokens || 8192).toString().padEnd(28)} │
+│    autoCompact       ${(config.autoCompact ?? true).toString().padEnd(28)} │
+│    defaultPermission ${(config.defaultPermissionMode || 'default').toString().padEnd(28)} │
+│    outputStyle       ${(config.outputStyle || 'default').toString().padEnd(28)} │
 │                                                     │
 │  Commands:                                          │
-│    /config <key>          View a setting            │
-│    /config <key> <value>  Set a value               │
-│    /config reset          Reset to defaults         │
+│    /config                    Show this panel       │
+│    /config list               List all settings    │
+│    /config get <key>          View a setting        │
+│    /config set <key> <value>  Set a value           │
+│    /config reset              Reset all settings   │
+│    /config reset <key>        Reset one setting    │
 │                                                     │
-│  Interactive Settings:                              │
+│  Quick Settings:                                    │
 │    /theme      Change color theme                   │
 │    /model      Switch AI model                      │
 │    /vim        Toggle Vim mode                      │
+│                                                     │
+│  Examples:                                          │
+│    /config get model                                │
+│    /config set maxTokens 16384                      │
+│    /config set theme light                          │
+│    /config reset model                              │
 │                                                     │
 ╰─────────────────────────────────────────────────────╯`;
 
@@ -85,14 +186,225 @@ export const configCommand: SlashCommand = {
       return { success: true };
     }
 
-    const key = args[0];
+    const action = args[0].toLowerCase();
 
-    // 重置配置
-    if (key === 'reset') {
+    // /config list - 列出所有可配置项
+    if (action === 'list') {
+      let listInfo = `╭─ Available Configuration Settings ─────────────────╮\n`;
+      listInfo += `│                                                    │\n`;
+
+      for (const item of CONFIG_ITEMS) {
+        const currentValue = config[item.key] ?? item.defaultValue;
+        const valueStr = typeof currentValue === 'object'
+          ? JSON.stringify(currentValue).substring(0, 20) + '...'
+          : currentValue.toString();
+
+        listInfo += `│  ${item.key.padEnd(20)} │\n`;
+        listInfo += `│    Type:    ${item.type.padEnd(36)} │\n`;
+        listInfo += `│    Current: ${valueStr.padEnd(36)} │\n`;
+        listInfo += `│    Default: ${item.defaultValue.toString().padEnd(36)} │\n`;
+        listInfo += `│    ${item.description.padEnd(44)} │\n`;
+        if (item.example) {
+          listInfo += `│    Examples: ${item.example.substring(0, 34).padEnd(34)} │\n`;
+        }
+        if (item !== CONFIG_ITEMS[CONFIG_ITEMS.length - 1]) {
+          listInfo += `│                                                    │\n`;
+        }
+      }
+
+      listInfo += `│                                                    │\n`;
+      listInfo += `│  Usage:                                            │\n`;
+      listInfo += `│    /config get <key>          View a setting       │\n`;
+      listInfo += `│    /config set <key> <value>  Set a value          │\n`;
+      listInfo += `│    /config reset <key>        Reset to default     │\n`;
+      listInfo += `│                                                    │\n`;
+      listInfo += `╰────────────────────────────────────────────────────╯`;
+
+      ctx.ui.addMessage('assistant', listInfo);
+      return { success: true };
+    }
+
+    // /config get <key> - 获取特定配置
+    if (action === 'get') {
+      if (args.length < 2) {
+        ctx.ui.addMessage('assistant', `Usage: /config get <key>
+
+Available keys:
+${CONFIG_ITEMS.map(item => `  • ${item.key.padEnd(20)} - ${item.description}`).join('\n')}
+
+Example: /config get model`);
+        return { success: false };
+      }
+
+      const key = args[1];
+      const configItem = CONFIG_ITEMS.find(item => item.key === key);
+      const value = config[key];
+
+      if (value !== undefined) {
+        const formattedValue = typeof value === 'object'
+          ? JSON.stringify(value, null, 2)
+          : value;
+
+        let info = `Configuration: ${key}\n\n`;
+        info += `Current Value:\n${formattedValue}\n\n`;
+
+        if (configItem) {
+          info += `Type: ${configItem.type}\n`;
+          info += `Default: ${configItem.defaultValue}\n`;
+          info += `Description: ${configItem.description}\n`;
+          if (configItem.example) {
+            info += `\nExamples: ${configItem.example}`;
+          }
+        }
+
+        ctx.ui.addMessage('assistant', info);
+      } else {
+        const defaultValue = configItem?.defaultValue;
+        let info = `Setting '${key}' is not set.\n\n`;
+
+        if (configItem) {
+          info += `Default Value: ${defaultValue}\n`;
+          info += `Type: ${configItem.type}\n`;
+          info += `Description: ${configItem.description}\n`;
+          if (configItem.example) {
+            info += `\nExamples: ${configItem.example}\n`;
+          }
+          info += `\nTo set this value:\n  /config set ${key} <value>`;
+        } else {
+          info += `Available settings:\n${CONFIG_ITEMS.map(item => `  • ${item.key}`).join('\n')}`;
+        }
+
+        ctx.ui.addMessage('assistant', info);
+      }
+      return { success: true };
+    }
+
+    // /config set <key> <value> - 设置配置
+    if (action === 'set') {
+      if (args.length < 3) {
+        ctx.ui.addMessage('assistant', `Usage: /config set <key> <value>
+
+Available keys:
+${CONFIG_ITEMS.map(item => `  • ${item.key.padEnd(20)} - ${item.description}`).join('\n')}
+
+Examples:
+  /config set model opus
+  /config set maxTokens 16384
+  /config set verbose true
+  /config set theme light`);
+        return { success: false };
+      }
+
+      const key = args[1];
+      let value: any = args.slice(2).join(' ');
+
+      // 查找配置项定义
+      const configItem = CONFIG_ITEMS.find(item => item.key === key);
+
+      // 尝试解析 JSON 值
+      try {
+        if (value === 'true') value = true;
+        else if (value === 'false') value = false;
+        else if (!isNaN(Number(value)) && configItem?.type === 'number') value = Number(value);
+        else if (value.startsWith('{') || value.startsWith('[')) {
+          value = JSON.parse(value);
+        }
+      } catch {
+        // 保持为字符串
+      }
+
+      // 类型验证
+      if (configItem) {
+        const actualType = Array.isArray(value) ? 'array' : typeof value;
+        if (configItem.type === 'object' && actualType !== 'object') {
+          ctx.ui.addMessage('assistant', `Error: '${key}' expects ${configItem.type}, got ${actualType}
+
+Expected format: JSON object
+Example: /config set ${key} '{"key": "value"}'`);
+          return { success: false };
+        }
+      }
+
+      config[key] = value;
+
+      if (writeConfig(config)) {
+        const formattedValue = typeof value === 'object'
+          ? JSON.stringify(value, null, 2)
+          : value;
+
+        let successMsg = `✓ Configuration updated\n\n`;
+        successMsg += `Setting: ${key}\n`;
+        successMsg += `Value: ${formattedValue}\n\n`;
+
+        if (configItem) {
+          successMsg += `Type: ${configItem.type}\n`;
+          successMsg += `Description: ${configItem.description}\n\n`;
+        }
+
+        successMsg += `Saved to: ${configFile}\n\n`;
+        successMsg += `Note: Some settings may require restart to take effect.`;
+
+        ctx.ui.addMessage('assistant', successMsg);
+        ctx.ui.addActivity(`Updated config: ${key}`);
+        return { success: true };
+      } else {
+        ctx.ui.addMessage('assistant', `Failed to save configuration.`);
+        return { success: false };
+      }
+    }
+
+    // /config reset [key] - 重置配置
+    if (action === 'reset') {
+      // 重置单个配置项
+      if (args.length === 2) {
+        const key = args[1];
+        const configItem = CONFIG_ITEMS.find(item => item.key === key);
+
+        if (!configItem) {
+          ctx.ui.addMessage('assistant', `Unknown setting: ${key}
+
+Available settings:
+${CONFIG_ITEMS.map(item => `  • ${item.key}`).join('\n')}
+
+Use '/config list' to see all settings.`);
+          return { success: false };
+        }
+
+        // 删除配置项（恢复为默认值）
+        if (config[key] !== undefined) {
+          delete config[key];
+
+          if (writeConfig(config)) {
+            ctx.ui.addMessage('assistant', `✓ Reset '${key}' to default value
+
+Setting: ${key}
+Default Value: ${configItem.defaultValue}
+Description: ${configItem.description}
+
+Configuration saved to: ${configFile}
+Restart Claude Code to apply changes.`);
+            ctx.ui.addActivity(`Reset config: ${key}`);
+            return { success: true };
+          } else {
+            ctx.ui.addMessage('assistant', `Failed to reset configuration.`);
+            return { success: false };
+          }
+        } else {
+          ctx.ui.addMessage('assistant', `Setting '${key}' is already at default value.
+
+Current Value: ${configItem.defaultValue}`);
+          return { success: true };
+        }
+      }
+
+      // 重置所有配置
       if (writeConfig({})) {
-        ctx.ui.addMessage('assistant', `Configuration reset to defaults.
+        ctx.ui.addMessage('assistant', `✓ All configuration reset to defaults
 
-Settings file cleared: ${configFile}
+All settings have been cleared and will use default values:
+${CONFIG_ITEMS.map(item => `  • ${item.key.padEnd(20)} = ${item.defaultValue}`).join('\n')}
+
+Settings file: ${configFile}
 
 Restart Claude Code to apply all changes.`);
         ctx.ui.addActivity('Configuration reset');
@@ -103,49 +415,92 @@ Restart Claude Code to apply all changes.`);
       }
     }
 
-    // 查看特定配置
+    // 兼容旧的无 action 格式
+    // /config <key> - 查看配置
     if (args.length === 1) {
+      const key = args[0];
+      const configItem = CONFIG_ITEMS.find(item => item.key === key);
       const value = config[key];
+
       if (value !== undefined) {
-        ctx.ui.addMessage('assistant', `${key}: ${JSON.stringify(value, null, 2)}`);
+        const formattedValue = typeof value === 'object'
+          ? JSON.stringify(value, null, 2)
+          : value;
+
+        let info = `Configuration: ${key}\n\n`;
+        info += `Current Value:\n${formattedValue}\n\n`;
+
+        if (configItem) {
+          info += `Type: ${configItem.type}\n`;
+          info += `Default: ${configItem.defaultValue}\n`;
+          info += `Description: ${configItem.description}`;
+        }
+
+        ctx.ui.addMessage('assistant', info);
       } else {
         ctx.ui.addMessage('assistant', `Setting '${key}' is not set.
 
 Available settings:
-  model, theme, verbose, autoCompact, defaultPermissionMode,
-  mcpServers, hooks, allowedTools, disallowedTools`);
+${CONFIG_ITEMS.map(item => `  • ${item.key.padEnd(20)} - ${item.description}`).join('\n')}
+
+Use '/config get ${key}' to see details or '/config list' for all settings.`);
       }
       return { success: true };
     }
 
-    // 设置配置值
-    let value: any = args.slice(1).join(' ');
+    // /config <key> <value> - 设置配置（兼容旧格式）
+    if (args.length >= 2 && !['get', 'set', 'reset', 'list'].includes(action)) {
+      const key = args[0];
+      let value: any = args.slice(1).join(' ');
 
-    // 尝试解析 JSON 值
-    try {
-      if (value === 'true') value = true;
-      else if (value === 'false') value = false;
-      else if (!isNaN(Number(value))) value = Number(value);
-      else if (value.startsWith('{') || value.startsWith('[')) {
-        value = JSON.parse(value);
+      // 查找配置项定义
+      const configItem = CONFIG_ITEMS.find(item => item.key === key);
+
+      // 尝试解析 JSON 值
+      try {
+        if (value === 'true') value = true;
+        else if (value === 'false') value = false;
+        else if (!isNaN(Number(value)) && configItem?.type === 'number') value = Number(value);
+        else if (value.startsWith('{') || value.startsWith('[')) {
+          value = JSON.parse(value);
+        }
+      } catch {
+        // 保持为字符串
       }
-    } catch {
-      // 保持为字符串
-    }
 
-    config[key] = value;
+      config[key] = value;
 
-    if (writeConfig(config)) {
-      ctx.ui.addMessage('assistant', `✓ Set ${key} = ${JSON.stringify(value)}
+      if (writeConfig(config)) {
+        ctx.ui.addMessage('assistant', `✓ Set ${key} = ${JSON.stringify(value)}
 
 Configuration saved to: ${configFile}
 Some settings may require restart to take effect.`);
-      ctx.ui.addActivity(`Updated config: ${key}`);
-      return { success: true };
-    } else {
-      ctx.ui.addMessage('assistant', `Failed to save configuration.`);
-      return { success: false };
+        ctx.ui.addActivity(`Updated config: ${key}`);
+        return { success: true };
+      } else {
+        ctx.ui.addMessage('assistant', `Failed to save configuration.`);
+        return { success: false };
+      }
     }
+
+    // 未知操作
+    ctx.ui.addMessage('assistant', `Unknown command format.
+
+Usage:
+  /config                    Show configuration panel
+  /config list               List all available settings
+  /config get <key>          View a specific setting
+  /config set <key> <value>  Set a configuration value
+  /config reset              Reset all settings to defaults
+  /config reset <key>        Reset a specific setting to default
+
+Examples:
+  /config get model
+  /config set maxTokens 16384
+  /config reset theme
+
+Use '/config list' to see all available settings.`);
+    return { success: false };
   },
 };
 

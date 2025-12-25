@@ -69,14 +69,17 @@ export class GlobTool extends BaseTool<GlobInput, ToolResult> {
 
 export class GrepTool extends BaseTool<GrepInput, ToolResult> {
   name = 'Grep';
-  description = `A powerful search tool built on ripgrep.
+  description = `A powerful search tool built on ripgrep
 
 Usage:
-- Supports full regex syntax
-- Filter files with glob or type parameter
-- Output modes: "content", "files_with_matches", "count"
-- Use -i for case insensitive search
-- Use -A/-B/-C for context lines`;
+  - ALWAYS use Grep for search tasks. NEVER invoke \`grep\` or \`rg\` as a Bash command. The Grep tool has been optimized for correct permissions and access.
+  - Supports full regex syntax (e.g., "log.*Error", "function\\s+\\w+")
+  - Filter files with glob parameter (e.g., "*.js", "**/*.tsx") or type parameter (e.g., "js", "py", "rust")
+  - Output modes: "content" shows matching lines, "files_with_matches" shows only file paths (default), "count" shows match counts
+  - Use Task tool for open-ended searches requiring multiple rounds
+  - Pattern syntax: Uses ripgrep (not grep) - literal braces need escaping (use \`interface\\{\\}\` to find \`interface{}\` in Go code)
+  - Multiline matching: By default patterns match within single lines only. For cross-line patterns like \`struct \\{[\\s\\S]*?field\`, use \`multiline: true\`
+`;
 
   getInputSchema(): ToolDefinition['inputSchema'] {
     return {
@@ -84,30 +87,57 @@ Usage:
       properties: {
         pattern: {
           type: 'string',
-          description: 'The regular expression pattern to search for',
+          description: 'The regular expression pattern to search for in file contents',
         },
         path: {
           type: 'string',
-          description: 'File or directory to search in',
+          description: 'File or directory to search in (rg PATH). Defaults to current working directory.',
         },
         glob: {
           type: 'string',
-          description: 'Glob pattern to filter files',
+          description: 'Glob pattern to filter files (e.g. "*.js", "*.{ts,tsx}") - maps to rg --glob',
+        },
+        type: {
+          type: 'string',
+          description: 'File type to search (rg --type). Common types: js, py, rust, go, java, etc. More efficient than include for standard file types.',
         },
         output_mode: {
           type: 'string',
           enum: ['content', 'files_with_matches', 'count'],
-          description: 'Output mode',
+          description: 'Output mode: "content" shows matching lines (supports -A/-B/-C context, -n line numbers, head_limit), "files_with_matches" shows file paths (supports head_limit), "count" shows match counts (supports head_limit). Defaults to "files_with_matches".',
         },
-        '-B': { type: 'number', description: 'Lines before match' },
-        '-A': { type: 'number', description: 'Lines after match' },
-        '-C': { type: 'number', description: 'Context lines' },
-        '-n': { type: 'boolean', description: 'Show line numbers' },
-        '-i': { type: 'boolean', description: 'Case insensitive' },
-        type: { type: 'string', description: 'File type filter' },
-        head_limit: { type: 'number', description: 'Limit output lines' },
-        offset: { type: 'number', description: 'Skip first N entries' },
-        multiline: { type: 'boolean', description: 'Enable multiline mode' },
+        '-i': {
+          type: 'boolean',
+          description: 'Case insensitive search (rg -i)',
+        },
+        '-n': {
+          type: 'boolean',
+          description: 'Show line numbers in output (rg -n). Requires output_mode: "content", ignored otherwise. Defaults to true.',
+        },
+        '-B': {
+          type: 'number',
+          description: 'Number of lines to show before each match (rg -B). Requires output_mode: "content", ignored otherwise.',
+        },
+        '-A': {
+          type: 'number',
+          description: 'Number of lines to show after each match (rg -A). Requires output_mode: "content", ignored otherwise.',
+        },
+        '-C': {
+          type: 'number',
+          description: 'Number of lines to show before and after each match (rg -C). Requires output_mode: "content", ignored otherwise.',
+        },
+        multiline: {
+          type: 'boolean',
+          description: 'Enable multiline mode where . matches newlines and patterns can span lines (rg -U --multiline-dotall). Default: false.',
+        },
+        head_limit: {
+          type: 'number',
+          description: 'Limit output to first N lines/entries, equivalent to "| head -N". Works across all output modes: content (limits output lines), files_with_matches (limits file paths), count (limits count entries). Defaults based on "cap" experiment value: 0 (unlimited), 20, or 100.',
+        },
+        offset: {
+          type: 'number',
+          description: 'Skip first N lines/entries before applying head_limit, equivalent to "| tail -n +N | head -N". Works across all output modes. Defaults to 0.',
+        },
       },
       required: ['pattern'],
     };
@@ -131,6 +161,24 @@ Usage:
     } = input;
 
     try {
+      // 验证参数
+      if (offset < 0) {
+        return { success: false, error: 'offset must be non-negative' };
+      }
+      if (head_limit !== undefined && head_limit < 0) {
+        return { success: false, error: 'head_limit must be non-negative' };
+      }
+
+      // 上下文参数只在 content 模式下有效
+      if (output_mode !== 'content') {
+        if (beforeContext !== undefined || afterContext !== undefined || context !== undefined) {
+          return { success: false, error: 'Context options (-A/-B/-C) require output_mode: "content"' };
+        }
+        if (showLineNumbers !== true && showLineNumbers !== undefined) {
+          return { success: false, error: 'Line numbers (-n) require output_mode: "content"' };
+        }
+      }
+
       // 构建 ripgrep 命令
       const args: string[] = [];
 
@@ -144,10 +192,12 @@ Usage:
       // 选项
       if (ignoreCase) args.push('-i');
       if (showLineNumbers && output_mode === 'content') args.push('-n');
-      if (multiline) args.push('-U', '--multiline-dotall');
-      if (beforeContext) args.push('-B', String(beforeContext));
-      if (afterContext) args.push('-A', String(afterContext));
-      if (context) args.push('-C', String(context));
+      if (multiline) {
+        args.push('-U', '--multiline-dotall');
+      }
+      if (beforeContext && output_mode === 'content') args.push('-B', String(beforeContext));
+      if (afterContext && output_mode === 'content') args.push('-A', String(afterContext));
+      if (context && output_mode === 'content') args.push('-C', String(context));
       if (globPattern) args.push('--glob', globPattern);
       if (fileType) args.push('--type', fileType);
 
@@ -160,14 +210,31 @@ Usage:
         encoding: 'utf-8',
       });
 
-      // 应用 offset 和 limit
-      if (offset > 0 || head_limit) {
-        const lines = output.split('\n');
-        const sliced = lines.slice(offset, head_limit ? offset + head_limit : undefined);
-        output = sliced.join('\n');
+      // 应用 offset 和 head_limit
+      // 这些参数在所有 output_mode 下都应该工作
+      if (offset > 0 || head_limit !== undefined) {
+        const lines = output.split('\n').filter(line => line.length > 0);
+
+        // 跳过前 offset 行
+        let processedLines = lines;
+        if (offset > 0) {
+          processedLines = lines.slice(offset);
+        }
+
+        // 限制为前 head_limit 行
+        if (head_limit !== undefined && head_limit >= 0) {
+          processedLines = processedLines.slice(0, head_limit);
+        }
+
+        output = processedLines.join('\n');
       }
 
-      return { success: true, output: output.trim() || 'No matches found.' };
+      const trimmedOutput = output.trim();
+      if (!trimmedOutput) {
+        return { success: true, output: 'No matches found.' };
+      }
+
+      return { success: true, output: trimmedOutput };
     } catch (err) {
       // 如果 rg 不可用，回退到 grep
       return this.fallbackGrep(input);
@@ -175,13 +242,37 @@ Usage:
   }
 
   private fallbackGrep(input: GrepInput): ToolResult {
-    const { pattern, path: searchPath = process.cwd(), '-i': ignoreCase } = input;
+    const {
+      pattern,
+      path: searchPath = process.cwd(),
+      '-i': ignoreCase,
+      head_limit,
+      offset = 0,
+    } = input;
 
     try {
       const flags = ignoreCase ? '-rni' : '-rn';
       const cmd = `grep ${flags} '${pattern}' '${searchPath}' 2>/dev/null || true`;
-      const output = execSync(cmd, { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 });
-      return { success: true, output: output.trim() || 'No matches found.' };
+      let output = execSync(cmd, { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 });
+
+      // 应用 offset 和 head_limit（与主方法保持一致）
+      if (offset > 0 || head_limit !== undefined) {
+        const lines = output.split('\n').filter(line => line.length > 0);
+
+        let processedLines = lines;
+        if (offset > 0) {
+          processedLines = lines.slice(offset);
+        }
+
+        if (head_limit !== undefined && head_limit >= 0) {
+          processedLines = processedLines.slice(0, head_limit);
+        }
+
+        output = processedLines.join('\n');
+      }
+
+      const trimmedOutput = output.trim();
+      return { success: true, output: trimmedOutput || 'No matches found.' };
     } catch (err) {
       return { success: false, error: `Grep error: ${err}` };
     }

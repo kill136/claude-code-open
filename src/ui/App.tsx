@@ -15,6 +15,8 @@ import { WelcomeScreen } from './components/WelcomeScreen.js';
 import { ShortcutHelp } from './components/ShortcutHelp.js';
 import { ConversationLoop } from '../core/loop.js';
 import { initializeCommands, executeCommand } from '../commands/index.js';
+import { isPlanModeActive } from '../tools/planmode.js';
+import { updateManager } from '../updater/index.js';
 import type { TodoItem } from '../types/index.js';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -40,7 +42,9 @@ interface ToolCallItem {
   id: string;
   name: string;
   status: 'running' | 'success' | 'error';
+  input?: Record<string, unknown>;
   result?: string;
+  error?: string;
   duration?: number;
 }
 
@@ -81,6 +85,12 @@ export const App: React.FC<AppProps> = ({
     () => DEFAULT_SUGGESTIONS[Math.floor(Math.random() * DEFAULT_SUGGESTIONS.length)]
   );
 
+  // Header 增强状态
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'connecting' | 'disconnected' | 'error'>('connected');
+  const [hasUpdate, setHasUpdate] = useState(false);
+  const [latestVersion, setLatestVersion] = useState<string | undefined>();
+  const [planMode, setPlanMode] = useState(false);
+
   // 会话 ID
   const sessionId = useRef(uuidv4());
 
@@ -112,6 +122,45 @@ export const App: React.FC<AppProps> = ({
   // 初始化命令系统
   useEffect(() => {
     initializeCommands();
+  }, []);
+
+  // 监听更新通知
+  useEffect(() => {
+    const handleUpdateAvailable = (info: { currentVersion: string; latestVersion: string }) => {
+      setHasUpdate(true);
+      setLatestVersion(info.latestVersion);
+    };
+
+    const handleUpdateNotAvailable = () => {
+      setHasUpdate(false);
+      setLatestVersion(undefined);
+    };
+
+    updateManager.on('update-available', handleUpdateAvailable);
+    updateManager.on('update-not-available', handleUpdateNotAvailable);
+
+    // 静默检查更新（不影响 UI）
+    updateManager.checkForUpdates().catch(() => {});
+
+    return () => {
+      updateManager.off('update-available', handleUpdateAvailable);
+      updateManager.off('update-not-available', handleUpdateNotAvailable);
+    };
+  }, []);
+
+  // 监听 Plan Mode 状态变化（轮询）
+  useEffect(() => {
+    const checkPlanMode = () => {
+      setPlanMode(isPlanModeActive());
+    };
+
+    // 初始检查
+    checkPlanMode();
+
+    // 每秒检查一次
+    const interval = setInterval(checkPlanMode, 1000);
+
+    return () => clearInterval(interval);
   }, []);
 
   // 处理键盘输入
@@ -219,6 +268,7 @@ export const App: React.FC<AppProps> = ({
       setIsProcessing(true);
       setCurrentResponse('');
       setToolCalls([]);
+      setConnectionStatus('connecting');
 
       const startTime = Date.now();
 
@@ -230,7 +280,12 @@ export const App: React.FC<AppProps> = ({
             const id = `tool_${Date.now()}`;
             setToolCalls((prev) => [
               ...prev,
-              { id, name: event.toolName || '', status: 'running' },
+              {
+                id,
+                name: event.toolName || '',
+                status: 'running',
+                input: event.toolInput as Record<string, unknown>,
+              },
             ]);
             addActivity(`Using tool: ${event.toolName}`);
           } else if (event.type === 'tool_end') {
@@ -238,10 +293,10 @@ export const App: React.FC<AppProps> = ({
               const updated = [...prev];
               const last = updated[updated.length - 1];
               if (last) {
-                last.status = event.toolResult?.startsWith('Error')
-                  ? 'error'
-                  : 'success';
-                last.result = event.toolResult;
+                const isError = event.toolResult?.startsWith('Error') || event.toolError;
+                last.status = isError ? 'error' : 'success';
+                last.result = isError ? undefined : event.toolResult;
+                last.error = isError ? (event.toolError || event.toolResult) : undefined;
                 last.duration = Date.now() - startTime;
               }
               return updated;
@@ -254,9 +309,11 @@ export const App: React.FC<AppProps> = ({
         // 添加助手消息
         addMessage('assistant', currentResponse);
         addActivity(`Conversation: ${input.slice(0, 30)}...`);
+        setConnectionStatus('connected');
       } catch (err) {
         addMessage('assistant', `Error: ${err}`);
         addActivity(`Error occurred`);
+        setConnectionStatus('error');
       }
 
       setIsProcessing(false);
@@ -294,6 +351,11 @@ export const App: React.FC<AppProps> = ({
           apiType={apiType}
           organization={organization}
           isCompact={messages.length > 0}
+          isPlanMode={planMode}
+          connectionStatus={connectionStatus}
+          showShortcutHint={true}
+          hasUpdate={hasUpdate}
+          latestVersion={latestVersion}
         />
       )}
 
@@ -331,7 +393,9 @@ export const App: React.FC<AppProps> = ({
                 key={tool.id}
                 name={tool.name}
                 status={tool.status}
+                input={tool.input}
                 result={tool.result}
+                error={tool.error}
                 duration={tool.duration}
               />
             ))}

@@ -84,6 +84,27 @@ export const Input: React.FC<InputProps> = ({
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
 
+  // Vim 模式支持
+  const [vimModeEnabled, setVimModeEnabled] = useState(process.env.CLAUDE_CODE_VIM_MODE === 'true');
+  const [vimNormalMode, setVimNormalMode] = useState(vimModeEnabled);
+  const [undoStack, setUndoStack] = useState<Array<{ value: string; cursor: number }>>([]);
+  const [lastDeletedText, setLastDeletedText] = useState('');
+  const [pendingCommand, setPendingCommand] = useState(''); // For multi-key commands like dd
+
+  // 监听环境变量变化（通过轮询检测）
+  useEffect(() => {
+    const checkVimMode = () => {
+      const newVimMode = process.env.CLAUDE_CODE_VIM_MODE === 'true';
+      if (newVimMode !== vimModeEnabled) {
+        setVimModeEnabled(newVimMode);
+        setVimNormalMode(newVimMode); // 启用时默认进入 Normal 模式
+      }
+    };
+
+    const interval = setInterval(checkVimMode, 500); // 每500ms检查一次
+    return () => clearInterval(interval);
+  }, [vimModeEnabled]);
+
   // 检测是否在输入斜杠命令
   const isTypingCommand = value.startsWith('/');
   const commandQuery = isTypingCommand ? value.slice(1).toLowerCase() : '';
@@ -110,12 +131,56 @@ export const Input: React.FC<InputProps> = ({
     setSelectedCommandIndex(0);
   }, [commandQuery]);
 
+  // Vim 辅助函数
+  const saveToUndoStack = () => {
+    setUndoStack(prev => [...prev, { value, cursor }].slice(-50)); // 保留最近50个状态
+  };
+
+  const undo = () => {
+    if (undoStack.length > 0) {
+      const lastState = undoStack[undoStack.length - 1];
+      setValue(lastState.value);
+      setCursor(lastState.cursor);
+      setUndoStack(prev => prev.slice(0, -1));
+    }
+  };
+
+  // 单词导航辅助函数
+  const findNextWordStart = (text: string, pos: number): number => {
+    let i = pos;
+    // 跳过当前单词
+    while (i < text.length && /\S/.test(text[i])) i++;
+    // 跳过空格
+    while (i < text.length && /\s/.test(text[i])) i++;
+    return Math.min(i, text.length);
+  };
+
+  const findPrevWordStart = (text: string, pos: number): number => {
+    let i = pos - 1;
+    // 跳过空格
+    while (i >= 0 && /\s/.test(text[i])) i--;
+    // 跳过单词
+    while (i >= 0 && /\S/.test(text[i])) i--;
+    return Math.max(0, i + 1);
+  };
+
+  const findWordEnd = (text: string, pos: number): number => {
+    let i = pos;
+    // 如果在空格上，先跳到下一个单词
+    if (i < text.length && /\s/.test(text[i])) {
+      while (i < text.length && /\s/.test(text[i])) i++;
+    }
+    // 跳到单词末尾
+    while (i < text.length && /\S/.test(text[i])) i++;
+    return Math.min(i - 1, text.length - 1);
+  };
+
   useInput(
     (input, key) => {
       if (disabled) return;
 
       // 在命令列表显示时的特殊处理
-      if (showCommandList) {
+      if (showCommandList && !vimNormalMode) {
         if (key.upArrow) {
           setSelectedCommandIndex(prev =>
             prev > 0 ? prev - 1 : filteredCommands.length - 1
@@ -139,6 +204,203 @@ export const Input: React.FC<InputProps> = ({
         }
       }
 
+      // ===== VIM 模式处理 =====
+      if (vimModeEnabled && vimNormalMode) {
+        // Normal 模式键绑定
+
+        // ESC - 保持在 Normal 模式
+        if (key.escape) {
+          setPendingCommand('');
+          return;
+        }
+
+        // 处理多键命令（如 dd）
+        if (pendingCommand === 'd') {
+          if (input === 'd') {
+            // dd - 删除整行
+            saveToUndoStack();
+            setLastDeletedText(value);
+            setValue('');
+            setCursor(0);
+            setPendingCommand('');
+            return;
+          }
+          setPendingCommand('');
+        }
+
+        // 撤销
+        if (input === 'u') {
+          undo();
+          return;
+        }
+
+        // 导航 - h, j, k, l
+        if (input === 'h') {
+          setCursor(prev => Math.max(0, prev - 1));
+          return;
+        }
+        if (input === 'l') {
+          setCursor(prev => Math.min(value.length - 1, prev + 1));
+          return;
+        }
+        if (input === 'j' && !showCommandList) {
+          // j - 历史记录向下
+          if (history.length > 0 && historyIndex < history.length - 1) {
+            const newIndex = historyIndex + 1;
+            setHistoryIndex(newIndex);
+            setValue(history[newIndex]);
+            setCursor(Math.min(cursor, history[newIndex].length - 1));
+          }
+          return;
+        }
+        if (input === 'k' && !showCommandList) {
+          // k - 历史记录向上
+          if (historyIndex > 0) {
+            const newIndex = historyIndex - 1;
+            setHistoryIndex(newIndex);
+            setValue(history[newIndex]);
+            setCursor(Math.min(cursor, history[newIndex].length - 1));
+          } else if (historyIndex === 0) {
+            setHistoryIndex(-1);
+            setValue('');
+            setCursor(0);
+          }
+          return;
+        }
+
+        // 单词导航 - w, b, e
+        if (input === 'w') {
+          setCursor(findNextWordStart(value, cursor));
+          return;
+        }
+        if (input === 'b') {
+          setCursor(findPrevWordStart(value, cursor));
+          return;
+        }
+        if (input === 'e') {
+          setCursor(findWordEnd(value, cursor));
+          return;
+        }
+
+        // 行导航 - 0, $, ^
+        if (input === '0') {
+          setCursor(0);
+          return;
+        }
+        if (input === '$') {
+          setCursor(Math.max(0, value.length - 1));
+          return;
+        }
+        if (input === '^') {
+          // 移动到第一个非空白字符
+          let pos = 0;
+          while (pos < value.length && /\s/.test(value[pos])) pos++;
+          setCursor(pos);
+          return;
+        }
+
+        // 删除操作 - x, d, D
+        if (input === 'x') {
+          // x - 删除当前字符
+          if (value.length > 0 && cursor < value.length) {
+            saveToUndoStack();
+            setLastDeletedText(value[cursor]);
+            setValue(value.slice(0, cursor) + value.slice(cursor + 1));
+            if (cursor >= value.length - 1 && cursor > 0) {
+              setCursor(cursor - 1);
+            }
+          }
+          return;
+        }
+        if (input === 'd') {
+          // d - 开始删除命令（等待第二个按键）
+          setPendingCommand('d');
+          return;
+        }
+        if (input === 'D') {
+          // D - 删除到行尾
+          saveToUndoStack();
+          setLastDeletedText(value.slice(cursor));
+          setValue(value.slice(0, cursor));
+          if (cursor > 0 && cursor >= value.length) {
+            setCursor(cursor - 1);
+          }
+          return;
+        }
+
+        // 插入模式切换 - i, a, I, A, o, O
+        if (input === 'i') {
+          // i - 在光标前插入
+          setVimNormalMode(false);
+          return;
+        }
+        if (input === 'a') {
+          // a - 在光标后插入
+          setCursor(Math.min(value.length, cursor + 1));
+          setVimNormalMode(false);
+          return;
+        }
+        if (input === 'I') {
+          // I - 在行首插入
+          setCursor(0);
+          setVimNormalMode(false);
+          return;
+        }
+        if (input === 'A') {
+          // A - 在行尾插入
+          setCursor(value.length);
+          setVimNormalMode(false);
+          return;
+        }
+        if (input === 'o') {
+          // o - 在下方新建行（对于单行输入，等同于 A）
+          setCursor(value.length);
+          setVimNormalMode(false);
+          return;
+        }
+        if (input === 'O') {
+          // O - 在上方新建行（对于单行输入，等同于 I）
+          setCursor(0);
+          setVimNormalMode(false);
+          return;
+        }
+
+        // Enter - 提交
+        if (key.return) {
+          if (value.trim()) {
+            onSubmit(value.trim());
+            setHistory(prev => [value.trim(), ...prev.slice(0, 99)]);
+            setValue('');
+            setCursor(0);
+            setHistoryIndex(-1);
+            setUndoStack([]);
+          }
+          return;
+        }
+
+        return; // 在 Normal 模式下忽略其他输入
+      }
+
+      // ===== INSERT 模式或非 VIM 模式处理 =====
+
+      // ESC 或 Ctrl+[ - 退出插入模式
+      if (vimModeEnabled && !vimNormalMode) {
+        if (key.escape || (key.ctrl && input === '[')) {
+          setVimNormalMode(true);
+          // Vim 惯例：退出插入模式时光标左移一位
+          if (cursor > 0) {
+            setCursor(cursor - 1);
+          }
+          return;
+        }
+      } else if (!vimModeEnabled && key.escape) {
+        // 非 Vim 模式下 ESC 清除输入
+        setValue('');
+        setCursor(0);
+        setHistoryIndex(-1);
+        return;
+      }
+
       if (key.return) {
         if (value.trim()) {
           onSubmit(value.trim());
@@ -146,9 +408,14 @@ export const Input: React.FC<InputProps> = ({
           setValue('');
           setCursor(0);
           setHistoryIndex(-1);
+          if (vimModeEnabled) {
+            setVimNormalMode(true);
+            setUndoStack([]);
+          }
         }
       } else if (key.backspace || key.delete) {
         if (cursor > 0) {
+          if (vimModeEnabled) saveToUndoStack();
           setValue((prev) => prev.slice(0, cursor - 1) + prev.slice(cursor));
           setCursor((prev) => prev - 1);
         }
@@ -184,17 +451,15 @@ export const Input: React.FC<InputProps> = ({
         setCursor(value.length);
       } else if (key.ctrl && input === 'u') {
         // Ctrl+U: 清除到行首
+        if (vimModeEnabled) saveToUndoStack();
         setValue(value.slice(cursor));
         setCursor(0);
       } else if (key.ctrl && input === 'k') {
         // Ctrl+K: 清除到行尾
+        if (vimModeEnabled) saveToUndoStack();
         setValue(value.slice(0, cursor));
-      } else if (key.escape) {
-        // Escape 清除输入
-        setValue('');
-        setCursor(0);
-        setHistoryIndex(-1);
       } else if (!key.ctrl && !key.meta && input) {
+        if (vimModeEnabled && input.length === 1) saveToUndoStack();
         setValue((prev) => prev.slice(0, cursor) + input + prev.slice(cursor));
         setCursor((prev) => prev + input.length);
       }
@@ -204,6 +469,16 @@ export const Input: React.FC<InputProps> = ({
 
   // 显示建议文本
   const showSuggestion = !value && suggestion && !disabled;
+
+  // Vim 模式指示器
+  const modeIndicator = vimModeEnabled
+    ? vimNormalMode
+      ? '[N] '
+      : '[I] '
+    : '';
+
+  // 显示待处理命令
+  const commandIndicator = pendingCommand ? `[${pendingCommand}] ` : '';
 
   return (
     <Box flexDirection="column">
@@ -233,13 +508,25 @@ export const Input: React.FC<InputProps> = ({
       {showSuggestion && (
         <Box marginBottom={0}>
           <Text dimColor>
-            {prompt}Try "{suggestion}"
+            {modeIndicator}{prompt}Try "{suggestion}"
           </Text>
         </Box>
       )}
 
       {/* 输入行 */}
       <Box>
+        {/* Vim 模式指示器 */}
+        {vimModeEnabled && (
+          <Text color={vimNormalMode ? 'yellow' : 'green'} bold>
+            {modeIndicator}
+          </Text>
+        )}
+        {/* 待处理命令指示器 */}
+        {commandIndicator && (
+          <Text color="cyan" bold>
+            {commandIndicator}
+          </Text>
+        )}
         <Text color="white" bold>
           {prompt}
         </Text>

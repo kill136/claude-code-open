@@ -8,7 +8,84 @@ import * as path from 'path';
 import { EventEmitter } from 'events';
 import type { ToolDefinition, ToolResult } from '../types/index.js';
 
-// 插件元数据
+// ============ 插件上下文 ============
+
+/**
+ * 插件上下文 - 提供给插件的 API 和资源
+ */
+export interface PluginContext {
+  // 插件信息
+  pluginName: string;
+  pluginPath: string;
+
+  // 配置管理
+  config: PluginConfigAPI;
+
+  // 日志API
+  logger: PluginLogger;
+
+  // 文件系统访问（受限）
+  fs: PluginFileSystemAPI;
+
+  // 工具注册
+  tools: PluginToolAPI;
+
+  // 命令注册
+  commands: PluginCommandAPI;
+
+  // 钩子注册
+  hooks: PluginHookAPI;
+
+  // 事件系统
+  events: EventEmitter;
+}
+
+export interface PluginConfigAPI {
+  get<T = unknown>(key: string, defaultValue?: T): T | undefined;
+  set(key: string, value: unknown): Promise<void>;
+  getAll(): Record<string, unknown>;
+  has(key: string): boolean;
+  delete(key: string): Promise<void>;
+}
+
+export interface PluginLogger {
+  debug(message: string, ...args: unknown[]): void;
+  info(message: string, ...args: unknown[]): void;
+  warn(message: string, ...args: unknown[]): void;
+  error(message: string, ...args: unknown[]): void;
+}
+
+export interface PluginFileSystemAPI {
+  // 只允许在插件目录内操作
+  readFile(relativePath: string): Promise<string>;
+  writeFile(relativePath: string, content: string): Promise<void>;
+  exists(relativePath: string): Promise<boolean>;
+  readdir(relativePath?: string): Promise<string[]>;
+}
+
+export interface PluginToolAPI {
+  register(tool: ToolDefinition): void;
+  unregister(toolName: string): void;
+  getRegistered(): ToolDefinition[];
+}
+
+export interface PluginCommandAPI {
+  register(command: CommandDefinition): void;
+  unregister(commandName: string): void;
+  getRegistered(): CommandDefinition[];
+}
+
+export interface PluginHookAPI {
+  on(hookType: PluginHookType, handler: HookHandler): void;
+  off(hookType: PluginHookType, handler: HookHandler): void;
+  getRegistered(): Array<{ type: PluginHookType; handler: HookHandler }>;
+}
+
+// ============ 插件定义 ============
+
+/**
+ * 插件元数据
+ */
 export interface PluginMetadata {
   name: string;
   version: string;
@@ -21,50 +98,213 @@ export interface PluginMetadata {
     node?: string;
     'claude-code'?: string;
   };
+  dependencies?: Record<string, string>; // 依赖的其他插件
+  peerDependencies?: Record<string, string>; // 可选的对等依赖
 }
 
-// 插件钩子类型
-export type HookType =
+/**
+ * 命令定义
+ */
+export interface CommandDefinition {
+  name: string;
+  description: string;
+  usage?: string;
+  examples?: string[];
+  execute: (args: string[], context: PluginContext) => Promise<void>;
+}
+
+/**
+ * 插件钩子类型（Plugin 内部使用）
+ */
+export type PluginHookType =
   | 'beforeMessage'
   | 'afterMessage'
   | 'beforeToolCall'
   | 'afterToolCall'
   | 'onError'
   | 'onSessionStart'
-  | 'onSessionEnd';
+  | 'onSessionEnd'
+  | 'onPluginLoad'
+  | 'onPluginUnload';
 
-// 插件钩子处理器
+/**
+ * 钩子处理器
+ */
 export type HookHandler<T = unknown> = (context: T) => Promise<T | void> | T | void;
 
-// 插件接口
-export interface Plugin {
-  metadata: PluginMetadata;
-  tools?: ToolDefinition[];
-  hooks?: Partial<Record<HookType, HookHandler>>;
-  activate?: () => Promise<void> | void;
-  deactivate?: () => Promise<void> | void;
+/**
+ * 钩子定义
+ */
+export interface HookDefinition {
+  type: PluginHookType;
+  handler: HookHandler;
+  priority?: number; // 优先级，数字越小越先执行
 }
 
-// 插件状态
+/**
+ * 插件接口
+ */
+export interface Plugin {
+  metadata: PluginMetadata;
+
+  // 生命周期钩子
+  init?(context: PluginContext): Promise<void>;
+  activate?(context: PluginContext): Promise<void>;
+  deactivate?(): Promise<void>;
+
+  // 插件提供的功能
+  tools?: ToolDefinition[];
+  commands?: CommandDefinition[];
+  hooks?: HookDefinition[];
+}
+
+// ============ 插件状态 ============
+
+/**
+ * 插件状态
+ */
 export interface PluginState {
   metadata: PluginMetadata;
   path: string;
   enabled: boolean;
   loaded: boolean;
+  initialized: boolean;
+  activated: boolean;
   error?: string;
+  loadTime?: number;
+  lastReloadTime?: number;
+  dependencies: string[]; // 解析后的依赖列表
+  dependents: string[]; // 依赖此插件的其他插件
 }
 
-// 插件管理器
+/**
+ * 插件配置
+ */
+export interface PluginConfig {
+  enabled?: boolean;
+  autoLoad?: boolean;
+  config?: Record<string, unknown>;
+}
+
+// ============ 版本检查工具 ============
+
+/**
+ * 简化的 semver 版本比较
+ */
+class VersionChecker {
+  /**
+   * 检查版本是否满足范围要求
+   * 支持: ^1.0.0, ~1.0.0, >=1.0.0, 1.0.0, *
+   */
+  static satisfies(version: string, range: string): boolean {
+    if (range === '*' || range === 'latest') return true;
+
+    const v = this.parseVersion(version);
+    if (!v) return false;
+
+    // 精确匹配
+    if (!range.match(/[~^><=]/)) {
+      return version === range;
+    }
+
+    // ^1.0.0 - 兼容主版本
+    if (range.startsWith('^')) {
+      const r = this.parseVersion(range.slice(1));
+      if (!r) return false;
+      return v.major === r.major && this.compareVersion(v, r) >= 0;
+    }
+
+    // ~1.0.0 - 兼容次版本
+    if (range.startsWith('~')) {
+      const r = this.parseVersion(range.slice(1));
+      if (!r) return false;
+      return v.major === r.major && v.minor === r.minor && v.patch >= r.patch;
+    }
+
+    // >=1.0.0
+    if (range.startsWith('>=')) {
+      const r = this.parseVersion(range.slice(2));
+      if (!r) return false;
+      return this.compareVersion(v, r) >= 0;
+    }
+
+    // >1.0.0
+    if (range.startsWith('>')) {
+      const r = this.parseVersion(range.slice(1));
+      if (!r) return false;
+      return this.compareVersion(v, r) > 0;
+    }
+
+    // <=1.0.0
+    if (range.startsWith('<=')) {
+      const r = this.parseVersion(range.slice(2));
+      if (!r) return false;
+      return this.compareVersion(v, r) <= 0;
+    }
+
+    // <1.0.0
+    if (range.startsWith('<')) {
+      const r = this.parseVersion(range.slice(1));
+      if (!r) return false;
+      return this.compareVersion(v, r) < 0;
+    }
+
+    return false;
+  }
+
+  private static parseVersion(version: string): { major: number; minor: number; patch: number } | null {
+    const match = version.match(/^(\d+)\.(\d+)\.(\d+)/);
+    if (!match) return null;
+    return {
+      major: parseInt(match[1], 10),
+      minor: parseInt(match[2], 10),
+      patch: parseInt(match[3], 10),
+    };
+  }
+
+  private static compareVersion(
+    v1: { major: number; minor: number; patch: number },
+    v2: { major: number; minor: number; patch: number }
+  ): number {
+    if (v1.major !== v2.major) return v1.major - v2.major;
+    if (v1.minor !== v2.minor) return v1.minor - v2.minor;
+    return v1.patch - v2.patch;
+  }
+}
+
+// ============ 插件管理器 ============
+
+/**
+ * 插件管理器
+ * 负责插件的发现、加载、卸载、依赖管理、版本检查、配置管理等
+ */
 export class PluginManager extends EventEmitter {
   private plugins: Map<string, Plugin> = new Map();
   private pluginStates: Map<string, PluginState> = new Map();
+  private pluginContexts: Map<string, PluginContext> = new Map();
+  private pluginConfigs: Map<string, Record<string, unknown>> = new Map();
   private pluginDirs: string[] = [];
   private configDir: string;
+  private pluginConfigFile: string;
+  private fileWatchers: Map<string, fs.FSWatcher> = new Map();
+  private claudeCodeVersion: string = '2.0.76'; // 当前 Claude Code 版本
 
-  constructor() {
+  // 注册的工具、命令和钩子
+  private registeredTools: Map<string, ToolDefinition[]> = new Map();
+  private registeredCommands: Map<string, CommandDefinition[]> = new Map();
+  private registeredHooks: Map<string, HookDefinition[]> = new Map();
+
+  constructor(claudeCodeVersion?: string) {
     super();
+
+    if (claudeCodeVersion) {
+      this.claudeCodeVersion = claudeCodeVersion;
+    }
+
     this.configDir = process.env.CLAUDE_CONFIG_DIR ||
                      path.join(process.env.HOME || '~', '.claude');
+
+    this.pluginConfigFile = path.join(this.configDir, 'plugins.json');
 
     // 默认插件目录
     this.pluginDirs = [
@@ -72,7 +312,21 @@ export class PluginManager extends EventEmitter {
       path.join(process.cwd(), '.claude', 'plugins'),
     ];
 
-    // 确保插件目录存在
+    // 确保目录存在
+    this.ensureDirectories();
+
+    // 加载插件配置
+    this.loadPluginConfigs();
+  }
+
+  /**
+   * 确保必要的目录存在
+   */
+  private ensureDirectories(): void {
+    if (!fs.existsSync(this.configDir)) {
+      fs.mkdirSync(this.configDir, { recursive: true });
+    }
+
     for (const dir of this.pluginDirs) {
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
@@ -80,14 +334,52 @@ export class PluginManager extends EventEmitter {
     }
   }
 
-  // 添加插件搜索目录
-  addPluginDir(dir: string): void {
-    if (!this.pluginDirs.includes(dir)) {
-      this.pluginDirs.push(dir);
+  /**
+   * 加载插件配置文件
+   */
+  private loadPluginConfigs(): void {
+    try {
+      if (fs.existsSync(this.pluginConfigFile)) {
+        const configs = JSON.parse(fs.readFileSync(this.pluginConfigFile, 'utf-8'));
+        for (const [name, config] of Object.entries(configs)) {
+          this.pluginConfigs.set(name, config as Record<string, unknown>);
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to load plugin configs:', err);
     }
   }
 
-  // 发现所有插件
+  /**
+   * 保存插件配置文件
+   */
+  private savePluginConfigs(): void {
+    try {
+      const configs: Record<string, unknown> = {};
+      for (const [name, config] of Array.from(this.pluginConfigs.entries())) {
+        configs[name] = config;
+      }
+      fs.writeFileSync(this.pluginConfigFile, JSON.stringify(configs, null, 2));
+    } catch (err) {
+      console.error('Failed to save plugin configs:', err);
+    }
+  }
+
+  /**
+   * 添加插件搜索目录
+   */
+  addPluginDir(dir: string): void {
+    if (!this.pluginDirs.includes(dir)) {
+      this.pluginDirs.push(dir);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+    }
+  }
+
+  /**
+   * 发现所有插件
+   */
   async discover(): Promise<PluginState[]> {
     const discovered: PluginState[] = [];
 
@@ -107,23 +399,34 @@ export class PluginManager extends EventEmitter {
         try {
           const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf-8'));
 
-          const state: PluginState = {
-            metadata: {
-              name: packageJson.name || entry.name,
-              version: packageJson.version || '0.0.0',
-              description: packageJson.description,
-              author: packageJson.author,
-              homepage: packageJson.homepage,
-              license: packageJson.license,
-              main: packageJson.main || 'index.js',
-              engines: packageJson.engines,
-            },
-            path: pluginPath,
-            enabled: true,
-            loaded: false,
+          const metadata: PluginMetadata = {
+            name: packageJson.name || entry.name,
+            version: packageJson.version || '0.0.0',
+            description: packageJson.description,
+            author: packageJson.author,
+            homepage: packageJson.homepage,
+            license: packageJson.license,
+            main: packageJson.main || 'index.js',
+            engines: packageJson.engines,
+            dependencies: packageJson.claudePluginDependencies || packageJson.dependencies,
+            peerDependencies: packageJson.peerDependencies,
           };
 
-          this.pluginStates.set(state.metadata.name, state);
+          // 从配置中读取启用状态
+          const config = this.pluginConfigs.get(metadata.name) as PluginConfig | undefined;
+
+          const state: PluginState = {
+            metadata,
+            path: pluginPath,
+            enabled: config?.enabled !== false,
+            loaded: false,
+            initialized: false,
+            activated: false,
+            dependencies: [],
+            dependents: [],
+          };
+
+          this.pluginStates.set(metadata.name, state);
           discovered.push(state);
         } catch (err) {
           console.warn(`Failed to read plugin at ${pluginPath}:`, err);
@@ -131,56 +434,394 @@ export class PluginManager extends EventEmitter {
       }
     }
 
+    // 解析依赖关系
+    this.resolveDependencies();
+
     return discovered;
   }
 
-  // 加载插件
-  async load(name: string): Promise<boolean> {
+  /**
+   * 解析插件依赖关系
+   */
+  private resolveDependencies(): void {
+    for (const state of Array.from(this.pluginStates.values())) {
+      state.dependencies = [];
+      state.dependents = [];
+
+      if (state.metadata.dependencies) {
+        for (const depName of Object.keys(state.metadata.dependencies)) {
+          // 只处理插件依赖
+          if (this.pluginStates.has(depName)) {
+            state.dependencies.push(depName);
+          }
+        }
+      }
+    }
+
+    // 构建反向依赖
+    for (const state of Array.from(this.pluginStates.values())) {
+      for (const depName of state.dependencies) {
+        const depState = this.pluginStates.get(depName);
+        if (depState && !depState.dependents.includes(state.metadata.name)) {
+          depState.dependents.push(state.metadata.name);
+        }
+      }
+    }
+  }
+
+  /**
+   * 检查插件引擎兼容性
+   */
+  private checkEngineCompatibility(metadata: PluginMetadata): boolean {
+    if (!metadata.engines) return true;
+
+    // 检查 Node.js 版本
+    if (metadata.engines.node) {
+      const nodeVersion = process.version.slice(1); // 去掉 'v'
+      if (!VersionChecker.satisfies(nodeVersion, metadata.engines.node)) {
+        return false;
+      }
+    }
+
+    // 检查 Claude Code 版本
+    if (metadata.engines['claude-code']) {
+      if (!VersionChecker.satisfies(this.claudeCodeVersion, metadata.engines['claude-code'])) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * 检查插件依赖
+   */
+  private checkDependencies(name: string): { satisfied: boolean; missing: string[] } {
+    const state = this.pluginStates.get(name);
+    if (!state || !state.metadata.dependencies) {
+      return { satisfied: true, missing: [] };
+    }
+
+    const missing: string[] = [];
+
+    for (const [depName, versionRange] of Object.entries(state.metadata.dependencies)) {
+      const depState = this.pluginStates.get(depName);
+
+      if (!depState) {
+        missing.push(`${depName}@${versionRange} (not found)`);
+        continue;
+      }
+
+      if (!depState.loaded) {
+        missing.push(`${depName}@${versionRange} (not loaded)`);
+        continue;
+      }
+
+      if (!VersionChecker.satisfies(depState.metadata.version, versionRange)) {
+        missing.push(`${depName}@${versionRange} (found ${depState.metadata.version})`);
+      }
+    }
+
+    return { satisfied: missing.length === 0, missing };
+  }
+
+  /**
+   * 创建插件上下文（沙箱）
+   */
+  private createPluginContext(name: string, pluginPath: string): PluginContext {
+    const events = new EventEmitter();
+
+    // 配置 API
+    const configAPI: PluginConfigAPI = {
+      get: <T = unknown>(key: string, defaultValue?: T): T | undefined => {
+        const config = this.pluginConfigs.get(name);
+        return (config?.[key] as T) ?? defaultValue;
+      },
+      set: async (key: string, value: unknown): Promise<void> => {
+        let config = this.pluginConfigs.get(name);
+        if (!config) {
+          config = {};
+          this.pluginConfigs.set(name, config);
+        }
+        config[key] = value;
+        this.savePluginConfigs();
+      },
+      getAll: (): Record<string, unknown> => {
+        return { ...this.pluginConfigs.get(name) };
+      },
+      has: (key: string): boolean => {
+        return this.pluginConfigs.get(name)?.[key] !== undefined;
+      },
+      delete: async (key: string): Promise<void> => {
+        const config = this.pluginConfigs.get(name);
+        if (config) {
+          delete config[key];
+          this.savePluginConfigs();
+        }
+      },
+    };
+
+    // 日志 API
+    const logger: PluginLogger = {
+      debug: (message: string, ...args: unknown[]): void => {
+        console.debug(`[Plugin:${name}]`, message, ...args);
+      },
+      info: (message: string, ...args: unknown[]): void => {
+        console.info(`[Plugin:${name}]`, message, ...args);
+      },
+      warn: (message: string, ...args: unknown[]): void => {
+        console.warn(`[Plugin:${name}]`, message, ...args);
+      },
+      error: (message: string, ...args: unknown[]): void => {
+        console.error(`[Plugin:${name}]`, message, ...args);
+      },
+    };
+
+    // 文件系统 API（限制在插件目录内）
+    const fsAPI: PluginFileSystemAPI = {
+      readFile: async (relativePath: string): Promise<string> => {
+        const fullPath = path.join(pluginPath, relativePath);
+        if (!fullPath.startsWith(pluginPath)) {
+          throw new Error('Access denied: path outside plugin directory');
+        }
+        return fs.promises.readFile(fullPath, 'utf-8');
+      },
+      writeFile: async (relativePath: string, content: string): Promise<void> => {
+        const fullPath = path.join(pluginPath, relativePath);
+        if (!fullPath.startsWith(pluginPath)) {
+          throw new Error('Access denied: path outside plugin directory');
+        }
+        await fs.promises.writeFile(fullPath, content, 'utf-8');
+      },
+      exists: async (relativePath: string): Promise<boolean> => {
+        const fullPath = path.join(pluginPath, relativePath);
+        if (!fullPath.startsWith(pluginPath)) {
+          throw new Error('Access denied: path outside plugin directory');
+        }
+        return fs.existsSync(fullPath);
+      },
+      readdir: async (relativePath: string = ''): Promise<string[]> => {
+        const fullPath = path.join(pluginPath, relativePath);
+        if (!fullPath.startsWith(pluginPath)) {
+          throw new Error('Access denied: path outside plugin directory');
+        }
+        return fs.promises.readdir(fullPath);
+      },
+    };
+
+    // 工具 API
+    const toolsAPI: PluginToolAPI = {
+      register: (tool: ToolDefinition): void => {
+        let tools = this.registeredTools.get(name);
+        if (!tools) {
+          tools = [];
+          this.registeredTools.set(name, tools);
+        }
+        tools.push(tool);
+        this.emit('tool:registered', name, tool);
+      },
+      unregister: (toolName: string): void => {
+        const tools = this.registeredTools.get(name);
+        if (tools) {
+          const index = tools.findIndex(t => t.name === toolName);
+          if (index !== -1) {
+            tools.splice(index, 1);
+            this.emit('tool:unregistered', name, toolName);
+          }
+        }
+      },
+      getRegistered: (): ToolDefinition[] => {
+        return [...(this.registeredTools.get(name) || [])];
+      },
+    };
+
+    // 命令 API
+    const commandsAPI: PluginCommandAPI = {
+      register: (command: CommandDefinition): void => {
+        let commands = this.registeredCommands.get(name);
+        if (!commands) {
+          commands = [];
+          this.registeredCommands.set(name, commands);
+        }
+        commands.push(command);
+        this.emit('command:registered', name, command);
+      },
+      unregister: (commandName: string): void => {
+        const commands = this.registeredCommands.get(name);
+        if (commands) {
+          const index = commands.findIndex(c => c.name === commandName);
+          if (index !== -1) {
+            commands.splice(index, 1);
+            this.emit('command:unregistered', name, commandName);
+          }
+        }
+      },
+      getRegistered: (): CommandDefinition[] => {
+        return [...(this.registeredCommands.get(name) || [])];
+      },
+    };
+
+    // 钩子 API
+    const hooksAPI: PluginHookAPI = {
+      on: (hookType: PluginHookType, handler: HookHandler): void => {
+        let hooks = this.registeredHooks.get(name);
+        if (!hooks) {
+          hooks = [];
+          this.registeredHooks.set(name, hooks);
+        }
+        hooks.push({ type: hookType, handler });
+        this.emit('hook:registered', name, hookType);
+      },
+      off: (hookType: PluginHookType, handler: HookHandler): void => {
+        const hooks = this.registeredHooks.get(name);
+        if (hooks) {
+          const index = hooks.findIndex(h => h.type === hookType && h.handler === handler);
+          if (index !== -1) {
+            hooks.splice(index, 1);
+            this.emit('hook:unregistered', name, hookType);
+          }
+        }
+      },
+      getRegistered: (): Array<{ type: PluginHookType; handler: HookHandler }> => {
+        return [...(this.registeredHooks.get(name) || [])];
+      },
+    };
+
+    const context: PluginContext = {
+      pluginName: name,
+      pluginPath,
+      config: configAPI,
+      logger,
+      fs: fsAPI,
+      tools: toolsAPI,
+      commands: commandsAPI,
+      hooks: hooksAPI,
+      events,
+    };
+
+    this.pluginContexts.set(name, context);
+    return context;
+  }
+
+  /**
+   * 加载插件（完整生命周期）
+   */
+  async load(name: string, options: { force?: boolean; skipDeps?: boolean } = {}): Promise<boolean> {
     const state = this.pluginStates.get(name);
     if (!state) {
       throw new Error(`Plugin not found: ${name}`);
     }
 
-    if (state.loaded) {
+    if (state.loaded && !options.force) {
       return true;
     }
 
     try {
-      const mainFile = path.join(state.path, state.metadata.main || 'index.js');
+      // 1. 检查引擎兼容性
+      if (!this.checkEngineCompatibility(state.metadata)) {
+        throw new Error(
+          `Plugin ${name} is not compatible with current environment. ` +
+          `Requires: ${JSON.stringify(state.metadata.engines)}`
+        );
+      }
 
+      // 2. 检查并加载依赖
+      if (!options.skipDeps) {
+        for (const depName of state.dependencies) {
+          const depState = this.pluginStates.get(depName);
+          if (!depState) {
+            throw new Error(`Dependency not found: ${depName}`);
+          }
+          if (!depState.loaded) {
+            const loaded = await this.load(depName, options);
+            if (!loaded) {
+              throw new Error(`Failed to load dependency: ${depName}`);
+            }
+          }
+        }
+
+        // 验证依赖版本
+        const depCheck = this.checkDependencies(name);
+        if (!depCheck.satisfied) {
+          throw new Error(`Dependency requirements not satisfied: ${depCheck.missing.join(', ')}`);
+        }
+      }
+
+      // 3. 查找主文件
+      const mainFile = path.join(state.path, state.metadata.main || 'index.js');
       if (!fs.existsSync(mainFile)) {
         throw new Error(`Plugin main file not found: ${mainFile}`);
       }
 
-      // 动态导入插件
-      const pluginModule = await import(`file://${mainFile}`);
+      // 4. 创建插件上下文（沙箱）
+      const context = this.createPluginContext(name, state.path);
+
+      // 5. 动态导入插件
+      const pluginModule = await import(`file://${mainFile}?t=${Date.now()}`);
       const plugin: Plugin = pluginModule.default || pluginModule;
 
-      // 验证插件
+      // 6. 验证插件
       if (!plugin.metadata) {
         plugin.metadata = state.metadata;
       }
 
-      // 激活插件
-      if (plugin.activate) {
-        await plugin.activate();
+      // 7. 初始化插件（新增）
+      if (plugin.init) {
+        await plugin.init(context);
+        state.initialized = true;
       }
 
+      // 8. 激活插件
+      if (plugin.activate) {
+        await plugin.activate(context);
+        state.activated = true;
+      }
+
+      // 9. 注册插件提供的工具、命令、钩子
+      if (plugin.tools) {
+        for (const tool of plugin.tools) {
+          context.tools.register(tool);
+        }
+      }
+
+      if (plugin.commands) {
+        for (const command of plugin.commands) {
+          context.commands.register(command);
+        }
+      }
+
+      if (plugin.hooks) {
+        for (const hook of plugin.hooks) {
+          context.hooks.on(hook.type, hook.handler);
+        }
+      }
+
+      // 10. 保存插件实例
       this.plugins.set(name, plugin);
       state.loaded = true;
+      state.loadTime = Date.now();
       state.error = undefined;
 
       this.emit('plugin:loaded', name, plugin);
+      await this.executeHook('onPluginLoad', { pluginName: name, plugin });
+
       return true;
     } catch (err) {
-      state.error = String(err);
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      state.error = errorMsg;
+      state.loaded = false;
+      state.initialized = false;
+      state.activated = false;
       this.emit('plugin:error', name, err);
+      console.error(`Failed to load plugin ${name}:`, errorMsg);
       return false;
     }
   }
 
-  // 卸载插件
-  async unload(name: string): Promise<boolean> {
+  /**
+   * 卸载插件
+   */
+  async unload(name: string, options: { force?: boolean } = {}): Promise<boolean> {
     const plugin = this.plugins.get(name);
     const state = this.pluginStates.get(name);
 
@@ -189,89 +830,337 @@ export class PluginManager extends EventEmitter {
     }
 
     try {
+      // 1. 检查是否有其他插件依赖此插件
+      if (!options.force && state.dependents.length > 0) {
+        const loadedDependents = state.dependents.filter(
+          depName => this.pluginStates.get(depName)?.loaded
+        );
+        if (loadedDependents.length > 0) {
+          throw new Error(
+            `Cannot unload plugin ${name}: it is required by ${loadedDependents.join(', ')}`
+          );
+        }
+      }
+
+      // 2. 停止文件监听（如果启用了热重载）
+      const watcher = this.fileWatchers.get(name);
+      if (watcher) {
+        watcher.close();
+        this.fileWatchers.delete(name);
+      }
+
+      // 3. 执行卸载钩子
+      await this.executeHook('onPluginUnload', { pluginName: name, plugin });
+
+      // 4. 调用插件的 deactivate
       if (plugin.deactivate) {
         await plugin.deactivate();
       }
 
+      // 5. 清理注册的工具、命令、钩子
+      this.registeredTools.delete(name);
+      this.registeredCommands.delete(name);
+      this.registeredHooks.delete(name);
+
+      // 6. 清理插件上下文
+      this.pluginContexts.delete(name);
+
+      // 7. 删除插件实例
       this.plugins.delete(name);
+
+      // 8. 更新状态
       state.loaded = false;
+      state.initialized = false;
+      state.activated = false;
 
       this.emit('plugin:unloaded', name);
       return true;
     } catch (err) {
-      state.error = String(err);
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      state.error = errorMsg;
+      console.error(`Failed to unload plugin ${name}:`, errorMsg);
       return false;
     }
   }
 
-  // 加载所有已发现的插件
-  async loadAll(): Promise<void> {
-    await this.discover();
-
-    for (const [name, state] of this.pluginStates) {
-      if (state.enabled) {
-        await this.load(name);
-      }
+  /**
+   * 重载插件（热重载）
+   */
+  async reload(name: string): Promise<boolean> {
+    const state = this.pluginStates.get(name);
+    if (!state) {
+      return false;
     }
-  }
 
-  // 卸载所有插件
-  async unloadAll(): Promise<void> {
-    for (const name of this.plugins.keys()) {
+    const wasLoaded = state.loaded;
+    if (wasLoaded) {
       await this.unload(name);
     }
-  }
 
-  // 获取所有插件工具
-  getTools(): ToolDefinition[] {
-    const tools: ToolDefinition[] = [];
-
-    for (const plugin of this.plugins.values()) {
-      if (plugin.tools) {
-        tools.push(...plugin.tools);
-      }
+    const result = await this.load(name, { force: true });
+    if (result) {
+      state.lastReloadTime = Date.now();
+      this.emit('plugin:reloaded', name);
     }
 
+    return result;
+  }
+
+  /**
+   * 启用插件热重载
+   */
+  enableHotReload(name: string): void {
+    const state = this.pluginStates.get(name);
+    if (!state || this.fileWatchers.has(name)) {
+      return;
+    }
+
+    try {
+      const watcher = fs.watch(
+        state.path,
+        { recursive: true },
+        async (eventType, filename) => {
+          if (!filename) return;
+
+          // 忽略 node_modules 和隐藏文件
+          if (filename.includes('node_modules') || filename.startsWith('.')) {
+            return;
+          }
+
+          // 只监听 JS/TS 文件
+          if (!/\.(js|ts|mjs|cjs)$/.test(filename)) {
+            return;
+          }
+
+          console.info(`[Plugin:${name}] File changed: ${filename}, reloading...`);
+
+          // 防抖：延迟重载以避免多次快速触发
+          const timeoutKey = `${name}_reload`;
+          const existingTimeout = (this as any)[timeoutKey];
+          if (existingTimeout) {
+            clearTimeout(existingTimeout);
+          }
+
+          (this as any)[timeoutKey] = setTimeout(async () => {
+            await this.reload(name);
+          }, 500);
+        }
+      );
+
+      this.fileWatchers.set(name, watcher);
+      console.info(`[Plugin:${name}] Hot reload enabled`);
+    } catch (err) {
+      console.error(`Failed to enable hot reload for plugin ${name}:`, err);
+    }
+  }
+
+  /**
+   * 禁用插件热重载
+   */
+  disableHotReload(name: string): void {
+    const watcher = this.fileWatchers.get(name);
+    if (watcher) {
+      watcher.close();
+      this.fileWatchers.delete(name);
+      console.info(`[Plugin:${name}] Hot reload disabled`);
+    }
+  }
+
+  /**
+   * 加载所有已发现的插件（拓扑排序）
+   */
+  async loadAll(options: { enableHotReload?: boolean } = {}): Promise<void> {
+    await this.discover();
+
+    // 拓扑排序：按依赖顺序加载
+    const loaded = new Set<string>();
+    const loading = new Set<string>();
+
+    const loadWithDeps = async (name: string): Promise<void> => {
+      const state = this.pluginStates.get(name);
+      if (!state || !state.enabled || loaded.has(name)) {
+        return;
+      }
+
+      if (loading.has(name)) {
+        throw new Error(`Circular dependency detected: ${name}`);
+      }
+
+      loading.add(name);
+
+      // 先加载依赖
+      for (const depName of state.dependencies) {
+        await loadWithDeps(depName);
+      }
+
+      // 再加载自己
+      await this.load(name);
+      loaded.add(name);
+      loading.delete(name);
+
+      // 启用热重载
+      if (options.enableHotReload) {
+        this.enableHotReload(name);
+      }
+    };
+
+    for (const name of Array.from(this.pluginStates.keys())) {
+      await loadWithDeps(name);
+    }
+  }
+
+  /**
+   * 卸载所有插件（反向拓扑排序）
+   */
+  async unloadAll(): Promise<void> {
+    // 按依赖的反向顺序卸载
+    const unloaded = new Set<string>();
+
+    const unloadWithDependents = async (name: string): Promise<void> => {
+      if (unloaded.has(name)) {
+        return;
+      }
+
+      const state = this.pluginStates.get(name);
+      if (!state) {
+        return;
+      }
+
+      // 先卸载依赖此插件的其他插件
+      for (const depName of state.dependents) {
+        await unloadWithDependents(depName);
+      }
+
+      // 再卸载自己
+      await this.unload(name, { force: true });
+      unloaded.add(name);
+    };
+
+    for (const name of Array.from(this.plugins.keys())) {
+      await unloadWithDependents(name);
+    }
+  }
+
+  /**
+   * 获取所有注册的工具
+   */
+  getTools(): ToolDefinition[] {
+    const tools: ToolDefinition[] = [];
+    for (const toolList of Array.from(this.registeredTools.values())) {
+      tools.push(...toolList);
+    }
     return tools;
   }
 
-  // 执行钩子
-  async executeHook<T>(hookType: HookType, context: T): Promise<T> {
+  /**
+   * 获取所有注册的命令
+   */
+  getCommands(): CommandDefinition[] {
+    const commands: CommandDefinition[] = [];
+    for (const commandList of Array.from(this.registeredCommands.values())) {
+      commands.push(...commandList);
+    }
+    return commands;
+  }
+
+  /**
+   * 获取指定插件的工具
+   */
+  getPluginTools(name: string): ToolDefinition[] {
+    return this.registeredTools.get(name) || [];
+  }
+
+  /**
+   * 获取指定插件的命令
+   */
+  getPluginCommands(name: string): CommandDefinition[] {
+    return this.registeredCommands.get(name) || [];
+  }
+
+  /**
+   * 获取指定插件的钩子
+   */
+  getPluginHooks(name: string): HookDefinition[] {
+    return this.registeredHooks.get(name) || [];
+  }
+
+  /**
+   * 执行钩子（按优先级排序）
+   */
+  async executeHook<T>(hookType: PluginHookType, context: T): Promise<T> {
     let result = context;
 
-    for (const plugin of this.plugins.values()) {
-      if (plugin.hooks?.[hookType]) {
-        try {
-          const hookResult = await plugin.hooks[hookType]!(result);
-          if (hookResult !== undefined) {
-            result = hookResult as T;
-          }
-        } catch (err) {
-          this.emit('hook:error', hookType, plugin.metadata.name, err);
+    // 收集所有相关钩子
+    const hooks: Array<{ plugin: string; hook: HookDefinition }> = [];
+    for (const [pluginName, hookList] of Array.from(this.registeredHooks.entries())) {
+      for (const hook of hookList) {
+        if (hook.type === hookType) {
+          hooks.push({ plugin: pluginName, hook });
         }
+      }
+    }
+
+    // 按优先级排序（数字越小优先级越高）
+    hooks.sort((a, b) => (a.hook.priority || 100) - (b.hook.priority || 100));
+
+    // 依次执行
+    for (const { plugin, hook } of hooks) {
+      try {
+        const hookResult = await hook.handler(result);
+        if (hookResult !== undefined) {
+          result = hookResult as T;
+        }
+      } catch (err) {
+        this.emit('hook:error', hookType, plugin, err);
+        console.error(`Error in hook ${hookType} from plugin ${plugin}:`, err);
       }
     }
 
     return result;
   }
 
-  // 获取已加载的插件
+  /**
+   * 获取已加载的插件
+   */
   getLoadedPlugins(): Plugin[] {
     return Array.from(this.plugins.values());
   }
 
-  // 获取插件状态列表
+  /**
+   * 获取插件状态列表
+   */
   getPluginStates(): PluginState[] {
     return Array.from(this.pluginStates.values());
   }
 
-  // 获取插件
+  /**
+   * 获取插件
+   */
   getPlugin(name: string): Plugin | undefined {
     return this.plugins.get(name);
   }
 
-  // 安装插件（从路径复制）
-  async install(sourcePath: string): Promise<PluginState> {
+  /**
+   * 获取插件状态
+   */
+  getPluginState(name: string): PluginState | undefined {
+    return this.pluginStates.get(name);
+  }
+
+  /**
+   * 获取插件上下文
+   */
+  getPluginContext(name: string): PluginContext | undefined {
+    return this.pluginContexts.get(name);
+  }
+
+  /**
+   * 安装插件（从路径复制）
+   */
+  async install(
+    sourcePath: string,
+    options: { autoLoad?: boolean; enableHotReload?: boolean } = {}
+  ): Promise<PluginState> {
     const packagePath = path.join(sourcePath, 'package.json');
 
     if (!fs.existsSync(packagePath)) {
@@ -285,6 +1174,13 @@ export class PluginManager extends EventEmitter {
       throw new Error('Invalid plugin: name not specified in package.json');
     }
 
+    // 检查是否已安装
+    const existingState = this.pluginStates.get(name);
+    if (existingState) {
+      // 卸载旧版本
+      await this.unload(name);
+    }
+
     // 目标路径
     const targetDir = path.join(this.pluginDirs[0], name);
 
@@ -295,34 +1191,66 @@ export class PluginManager extends EventEmitter {
 
     fs.cpSync(sourcePath, targetDir, { recursive: true });
 
-    // 重新发现并加载
+    // 重新发现
     await this.discover();
-    await this.load(name);
 
-    return this.pluginStates.get(name)!;
+    const state = this.pluginStates.get(name);
+    if (!state) {
+      throw new Error(`Failed to discover installed plugin: ${name}`);
+    }
+
+    // 自动加载
+    if (options.autoLoad !== false) {
+      await this.load(name);
+
+      if (options.enableHotReload) {
+        this.enableHotReload(name);
+      }
+    }
+
+    this.emit('plugin:installed', name, state);
+    return state;
   }
 
-  // 卸载插件（从磁盘删除）
+  /**
+   * 卸载插件（从磁盘删除）
+   */
   async uninstall(name: string): Promise<boolean> {
     const state = this.pluginStates.get(name);
     if (!state) {
       return false;
     }
 
+    // 检查依赖
+    if (state.dependents.length > 0) {
+      throw new Error(
+        `Cannot uninstall plugin ${name}: it is required by ${state.dependents.join(', ')}`
+      );
+    }
+
     // 先卸载
-    await this.unload(name);
+    if (state.loaded) {
+      await this.unload(name, { force: true });
+    }
 
     // 删除文件
     if (fs.existsSync(state.path)) {
       fs.rmSync(state.path, { recursive: true });
     }
 
+    // 删除配置
+    this.pluginConfigs.delete(name);
+    this.savePluginConfigs();
+
     this.pluginStates.delete(name);
+    this.emit('plugin:uninstalled', name);
     return true;
   }
 
-  // 启用/禁用插件
-  setEnabled(name: string, enabled: boolean): boolean {
+  /**
+   * 启用/禁用插件
+   */
+  async setEnabled(name: string, enabled: boolean): Promise<boolean> {
     const state = this.pluginStates.get(name);
     if (!state) {
       return false;
@@ -330,51 +1258,362 @@ export class PluginManager extends EventEmitter {
 
     state.enabled = enabled;
 
+    // 更新配置
+    let config = this.pluginConfigs.get(name);
+    if (!config) {
+      config = {};
+      this.pluginConfigs.set(name, config);
+    }
+    config.enabled = enabled;
+    this.savePluginConfigs();
+
+    // 如果禁用，卸载插件
     if (!enabled && state.loaded) {
-      this.unload(name);
+      await this.unload(name);
     }
 
+    // 如果启用，加载插件
+    if (enabled && !state.loaded) {
+      await this.load(name);
+    }
+
+    this.emit('plugin:enabled-changed', name, enabled);
     return true;
+  }
+
+  /**
+   * 清理所有资源
+   */
+  async cleanup(): Promise<void> {
+    // 停止所有文件监听
+    for (const watcher of Array.from(this.fileWatchers.values())) {
+      watcher.close();
+    }
+    this.fileWatchers.clear();
+
+    // 卸载所有插件
+    await this.unloadAll();
   }
 }
 
-// 创建插件执行器（用于执行插件提供的工具）
+// ============ 插件执行器 ============
+
+/**
+ * 插件工具执行器
+ * 用于执行插件提供的工具
+ */
 export class PluginToolExecutor {
+  private manager: PluginManager;
+  private toolExecutors: Map<string, (input: unknown) => Promise<ToolResult>> = new Map();
+
+  constructor(manager: PluginManager) {
+    this.manager = manager;
+
+    // 监听工具注册事件
+    this.manager.on('tool:registered', (pluginName: string, tool: ToolDefinition) => {
+      this.registerToolExecutor(pluginName, tool);
+    });
+
+    this.manager.on('tool:unregistered', (pluginName: string, toolName: string) => {
+      this.toolExecutors.delete(toolName);
+    });
+  }
+
+  /**
+   * 注册工具执行器
+   */
+  private registerToolExecutor(pluginName: string, tool: ToolDefinition): void {
+    // 获取插件实例
+    const plugin = this.manager.getPlugin(pluginName);
+    if (!plugin) return;
+
+    // 查找工具的执行方法
+    const pluginWithExecutor = plugin as Plugin & {
+      executeTool?: (toolName: string, input: unknown) => Promise<ToolResult>;
+      [key: string]: unknown;
+    };
+
+    // 创建执行器
+    const executor = async (input: unknown): Promise<ToolResult> => {
+      try {
+        // 尝试调用插件的 executeTool 方法
+        if (pluginWithExecutor.executeTool) {
+          return await pluginWithExecutor.executeTool(tool.name, input);
+        }
+
+        // 尝试查找同名方法
+        const methodName = `execute_${tool.name}`;
+        const method = pluginWithExecutor[methodName];
+        if (typeof method === 'function') {
+          return await method.call(plugin, input);
+        }
+
+        return {
+          success: false,
+          error: `Plugin ${pluginName} does not provide an executor for tool ${tool.name}`,
+        };
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        return {
+          success: false,
+          error: `Error executing tool ${tool.name}: ${errorMsg}`,
+        };
+      }
+    };
+
+    this.toolExecutors.set(tool.name, executor);
+  }
+
+  /**
+   * 执行工具
+   */
+  async execute(toolName: string, input: unknown): Promise<ToolResult> {
+    const executor = this.toolExecutors.get(toolName);
+
+    if (!executor) {
+      return {
+        success: false,
+        error: `Tool not found: ${toolName}`,
+      };
+    }
+
+    try {
+      return await executor(input);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      return {
+        success: false,
+        error: `Error executing tool ${toolName}: ${errorMsg}`,
+      };
+    }
+  }
+
+  /**
+   * 获取所有可用的工具
+   */
+  getAvailableTools(): string[] {
+    return Array.from(this.toolExecutors.keys());
+  }
+
+  /**
+   * 检查工具是否存在
+   */
+  hasTool(toolName: string): boolean {
+    return this.toolExecutors.has(toolName);
+  }
+}
+
+/**
+ * 插件命令执行器
+ */
+export class PluginCommandExecutor {
   private manager: PluginManager;
 
   constructor(manager: PluginManager) {
     this.manager = manager;
   }
 
-  async execute(toolName: string, input: unknown): Promise<ToolResult> {
-    // 查找提供该工具的插件
-    for (const plugin of this.manager.getLoadedPlugins()) {
-      const tool = plugin.tools?.find(t => t.name === toolName);
-      if (tool) {
-        // 这里需要插件提供执行器
-        // 简化实现：假设插件有 execute 方法
-        const pluginWithExecutor = plugin as Plugin & {
-          execute?: (toolName: string, input: unknown) => Promise<ToolResult>;
-        };
+  /**
+   * 执行命令
+   */
+  async execute(commandName: string, args: string[]): Promise<void> {
+    const commands = this.manager.getCommands();
+    const command = commands.find(c => c.name === commandName);
 
-        if (pluginWithExecutor.execute) {
-          return await pluginWithExecutor.execute(toolName, input);
-        }
+    if (!command) {
+      throw new Error(`Command not found: ${commandName}`);
+    }
 
-        return {
-          success: false,
-          error: `Plugin ${plugin.metadata.name} does not provide an executor`,
-        };
+    // 查找提供此命令的插件
+    let pluginName: string | undefined;
+    for (const [name, cmds] of (this.manager as any).registeredCommands) {
+      if (cmds.some((c: CommandDefinition) => c.name === commandName)) {
+        pluginName = name;
+        break;
       }
     }
 
-    return {
-      success: false,
-      error: `Tool not found in any plugin: ${toolName}`,
-    };
+    if (!pluginName) {
+      throw new Error(`Plugin for command ${commandName} not found`);
+    }
+
+    const context = this.manager.getPluginContext(pluginName);
+    if (!context) {
+      throw new Error(`Context for plugin ${pluginName} not found`);
+    }
+
+    await command.execute(args, context);
+  }
+
+  /**
+   * 获取所有可用的命令
+   */
+  getAvailableCommands(): CommandDefinition[] {
+    return this.manager.getCommands();
+  }
+
+  /**
+   * 获取命令帮助信息
+   */
+  getCommandHelp(commandName: string): string {
+    const command = this.manager.getCommands().find(c => c.name === commandName);
+    if (!command) {
+      return `Command not found: ${commandName}`;
+    }
+
+    let help = `Command: ${command.name}\n`;
+    help += `Description: ${command.description}\n`;
+
+    if (command.usage) {
+      help += `Usage: ${command.usage}\n`;
+    }
+
+    if (command.examples && command.examples.length > 0) {
+      help += '\nExamples:\n';
+      for (const example of command.examples) {
+        help += `  ${example}\n`;
+      }
+    }
+
+    return help;
   }
 }
 
-// 默认实例
+// ============ 默认实例 ============
+
+/**
+ * 默认插件管理器实例
+ */
 export const pluginManager = new PluginManager();
-export const pluginExecutor = new PluginToolExecutor(pluginManager);
+
+/**
+ * 默认工具执行器实例
+ */
+export const pluginToolExecutor = new PluginToolExecutor(pluginManager);
+
+/**
+ * 默认命令执行器实例
+ */
+export const pluginCommandExecutor = new PluginCommandExecutor(pluginManager);
+
+// ============ 便捷导出 ============
+
+/**
+ * 创建新的插件管理器实例
+ */
+export function createPluginManager(claudeCodeVersion?: string): PluginManager {
+  return new PluginManager(claudeCodeVersion);
+}
+
+/**
+ * 创建插件开发助手
+ */
+export interface PluginHelper {
+  /**
+   * 验证插件元数据
+   */
+  validateMetadata(metadata: PluginMetadata): { valid: boolean; errors: string[] };
+
+  /**
+   * 创建插件模板
+   */
+  createTemplate(name: string, options?: {
+    author?: string;
+    description?: string;
+    version?: string;
+  }): string;
+}
+
+export const pluginHelper: PluginHelper = {
+  validateMetadata(metadata: PluginMetadata): { valid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    if (!metadata.name || typeof metadata.name !== 'string') {
+      errors.push('Invalid or missing name');
+    }
+
+    if (!metadata.version || typeof metadata.version !== 'string') {
+      errors.push('Invalid or missing version');
+    }
+
+    if (metadata.engines) {
+      if (metadata.engines.node && typeof metadata.engines.node !== 'string') {
+        errors.push('Invalid engines.node');
+      }
+      if (metadata.engines['claude-code'] && typeof metadata.engines['claude-code'] !== 'string') {
+        errors.push('Invalid engines.claude-code');
+      }
+    }
+
+    return { valid: errors.length === 0, errors };
+  },
+
+  createTemplate(name: string, options = {}): string {
+    const author = options.author || 'Your Name';
+    const description = options.description || 'A Claude Code plugin';
+    const version = options.version || '1.0.0';
+
+    return `
+// ${name} - Claude Code Plugin
+
+export default {
+  metadata: {
+    name: '${name}',
+    version: '${version}',
+    description: '${description}',
+    author: '${author}',
+    engines: {
+      'claude-code': '^2.0.0',
+      'node': '>=18.0.0'
+    }
+  },
+
+  async init(context) {
+    context.logger.info('Initializing ${name} plugin');
+    // Plugin initialization code
+  },
+
+  async activate(context) {
+    context.logger.info('Activating ${name} plugin');
+
+    // Register tools
+    // context.tools.register({
+    //   name: 'my-tool',
+    //   description: 'My custom tool',
+    //   inputSchema: {
+    //     type: 'object',
+    //     properties: {},
+    //     required: []
+    //   }
+    // });
+
+    // Register commands
+    // context.commands.register({
+    //   name: 'my-command',
+    //   description: 'My custom command',
+    //   async execute(args, ctx) {
+    //     ctx.logger.info('Executing command');
+    //   }
+    // });
+
+    // Register hooks
+    // context.hooks.on('beforeMessage', async (msg) => {
+    //   // Process message
+    //   return msg;
+    // });
+  },
+
+  async deactivate() {
+    console.log('Deactivating ${name} plugin');
+  },
+
+  // Optional: Execute tool
+  async executeTool(toolName, input) {
+    // Handle tool execution
+    return { success: true, output: 'Tool executed' };
+  }
+};
+`.trim();
+  },
+};
+

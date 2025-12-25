@@ -13,6 +13,7 @@ import { registerAuthCommands } from './auth.js';
 import { registerToolsCommands } from './tools.js';
 import { registerUtilityCommands } from './utility.js';
 import { registerDevelopmentCommands } from './development.js';
+import { registerApiCommands } from './api.js';
 
 let initialized = false;
 
@@ -29,6 +30,7 @@ export function initializeCommands(): void {
   registerToolsCommands();
   registerUtilityCommands();
   registerDevelopmentCommands();
+  registerApiCommands();
 
   initialized = true;
 }
@@ -80,3 +82,4 @@ export { registerAuthCommands } from './auth.js';
 export { registerToolsCommands } from './tools.js';
 export { registerUtilityCommands } from './utility.js';
 export { registerDevelopmentCommands } from './development.js';
+export { registerApiCommands } from './api.js';

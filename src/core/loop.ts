@@ -172,7 +172,9 @@ export class ConversationLoop {
     type: 'text' | 'tool_start' | 'tool_end' | 'done';
     content?: string;
     toolName?: string;
+    toolInput?: unknown;
     toolResult?: string;
+    toolError?: string;
   }> {
     this.session.addMessage({
       role: 'user',
@@ -200,7 +202,7 @@ export class ConversationLoop {
         } else if (event.type === 'tool_use_start') {
           currentToolId = event.id || '';
           toolCalls.set(currentToolId, { name: event.name || '', input: '' });
-          yield { type: 'tool_start', toolName: event.name };
+          yield { type: 'tool_start', toolName: event.name, toolInput: undefined };
         } else if (event.type === 'tool_use_delta') {
           const tool = toolCalls.get(currentToolId);
           if (tool) {
@@ -220,7 +222,9 @@ export class ConversationLoop {
           yield {
             type: 'tool_end',
             toolName: tool.name,
-            toolResult: result.output || result.error,
+            toolInput: input,
+            toolResult: result.success ? result.output : undefined,
+            toolError: result.success ? undefined : result.error,
           };
 
           assistantContent.push({
@@ -239,7 +243,9 @@ export class ConversationLoop {
           yield {
             type: 'tool_end',
             toolName: tool.name,
-            toolResult: `Parse error: ${err}`,
+            toolInput: undefined,
+            toolResult: undefined,
+            toolError: `Parse error: ${err}`,
           };
         }
       }

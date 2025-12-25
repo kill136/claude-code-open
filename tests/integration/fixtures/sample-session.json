@@ -1,0 +1,25 @@
+{
+  "id": "test-session-abc123",
+  "model": "claude-sonnet-4-5-20250929",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Hello, Claude!"
+    },
+    {
+      "role": "assistant",
+      "content": "Hello! How can I help you today?"
+    }
+  ],
+  "cwd": "/home/user/test-project",
+  "createdAt": 1703001600000,
+  "updatedAt": 1703001600000,
+  "metadata": {
+    "title": "Test Session"
+  },
+  "cost": {
+    "inputTokens": 100,
+    "outputTokens": 50,
+    "totalCost": 0.0015
+  }
+}

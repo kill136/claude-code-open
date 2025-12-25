@@ -8,6 +8,14 @@ import { commandRegistry } from './registry.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import {
+  startOAuthLogin,
+  logout as authLogout,
+  setupToken,
+  getAuth,
+  isAuthenticated,
+  getAuthType,
+} from '../auth/index.js';
 
 // 获取认证文件路径
 const getAuthFile = () => path.join(os.homedir(), '.claude', 'auth.json');
@@ -143,7 +151,8 @@ Note: API keys start with "sk-ant-"`;
         ? 'Console (API Billing)'
         : 'OAuth';
 
-      const oauthInfo = `OAuth Login: ${loginType}
+      // 先显示说明信息
+      const oauthIntro = `OAuth Login: ${loginType}
 
 OAuth authentication provides seamless integration with your Claude
 or Anthropic Console account.
@@ -187,33 +196,79 @@ How OAuth Login Works:
    • Refresh token for automatic renewal
    • Encrypted storage (mode 0600)
 
-OAuth Implementation Status:
+OAuth Implementation Note:
 
-  This educational reverse-engineering project includes the OAuth
-  framework, which can be found in:
-    src/auth/index.ts
-
-  The full browser-based OAuth flow includes:
+  This educational reverse-engineering project includes a complete OAuth
+  framework in src/auth/index.ts with:
   ✓ PKCE (Proof Key for Code Exchange) generation
   ✓ Local callback server (port 9876)
   ✓ Secure state parameter validation
   ✓ Token exchange and storage
   ✓ Automatic token refresh
 
-For immediate use, please use API key authentication:
-  /login --api-key
+Attempting to start OAuth login...
+`;
 
-Or for quick setup:
-  /setup-token
+      ctx.ui.addMessage('assistant', oauthIntro);
 
-Current Status: ${authStatus}
+      // 尝试启动 OAuth 流程
+      try {
+        ctx.ui.addActivity('Starting OAuth login flow...');
 
-Note: Full OAuth integration with Anthropic's servers requires
-official API endpoints and proper OAuth client registration.`;
+        // 调用认证系统的 startOAuthLogin()
+        const authResult = await startOAuthLogin();
 
-      ctx.ui.addMessage('assistant', oauthInfo);
-      ctx.ui.addActivity(`Showed OAuth login info (${loginType})`);
-      return { success: true };
+        if (authResult && authResult.accessToken) {
+          const successMsg = `✅ OAuth Login Successful!
+
+Authentication Details:
+  • Type: OAuth
+  • Access Token: ${authResult.accessToken.substring(0, 20)}...
+  • Expires At: ${authResult.expiresAt ? new Date(authResult.expiresAt).toLocaleString() : 'N/A'}
+  • Scope: ${authResult.scope?.join(', ') || 'N/A'}
+
+Credentials saved to:
+  ~/.claude/auth.json
+
+You can now use Claude Code with your OAuth credentials.
+
+Current Status: Authenticated (OAuth)
+
+To verify your authentication:
+  /doctor
+  /status`;
+
+          ctx.ui.addMessage('assistant', successMsg);
+          ctx.ui.addActivity('OAuth login completed successfully');
+          return { success: true };
+        } else {
+          throw new Error('OAuth login returned invalid result');
+        }
+      } catch (error) {
+        const errorMsg = `❌ OAuth Login Failed
+
+Error: ${error instanceof Error ? error.message : String(error)}
+
+This educational project includes the OAuth framework, but full
+OAuth integration requires:
+  • Official OAuth client registration
+  • Valid authorization endpoints
+  • Proper redirect URI configuration
+
+For immediate use, please try:
+  /login --api-key     Setup with API key
+  /setup-token         Quick API key setup
+
+Alternative OAuth Setup:
+  1. If you have official Claude Code CLI, use that for OAuth
+  2. Then copy ~/.claude/auth.json to this installation
+
+Current Status: ${authStatus}`;
+
+        ctx.ui.addMessage('assistant', errorMsg);
+        ctx.ui.addActivity(`OAuth login failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        return { success: false };
+      }
     }
 
     // 未知方法
@@ -242,18 +297,35 @@ export const logoutCommand: SlashCommand = {
     const credentialsFile = getCredentialsFile();
     const configFile = getConfigFile();
 
-    let loggedOut = false;
+    // 检查当前认证状态
+    const wasAuthenticated = isAuthenticated();
+    const authType = getAuthType();
+    const currentAuthInfo = getAuth();
+
     let clearedItems: string[] = [];
 
-    // 1. 清除 OAuth token
-    if (fs.existsSync(authFile)) {
-      try {
-        fs.unlinkSync(authFile);
-        clearedItems.push('OAuth token');
-        loggedOut = true;
-      } catch (err) {
-        // 忽略错误
-      }
+    // 显示当前认证状态
+    ctx.ui.addActivity('Logging out...');
+
+    if (!wasAuthenticated) {
+      ctx.ui.addMessage('assistant', `No active session found.
+
+You are not currently authenticated.
+
+To login:
+  /login              Show login options
+  /login --api-key    Setup with API key
+  /login --oauth      OAuth login
+  /setup-token        Quick API key setup`);
+      return { success: true };
+    }
+
+    // 调用认证系统的 logout() 函数
+    try {
+      authLogout();
+      clearedItems.push('OAuth token (from auth system)');
+    } catch (err) {
+      // 继续处理其他清理
     }
 
     // 2. 清除存储的 API key
@@ -261,7 +333,6 @@ export const logoutCommand: SlashCommand = {
       try {
         fs.unlinkSync(credentialsFile);
         clearedItems.push('Stored API key');
-        loggedOut = true;
       } catch (err) {
         // 忽略错误
       }
@@ -287,7 +358,6 @@ export const logoutCommand: SlashCommand = {
 
         if (modified) {
           fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
-          loggedOut = true;
         }
       } catch (err) {
         // 忽略错误
@@ -295,38 +365,46 @@ export const logoutCommand: SlashCommand = {
     }
 
     // 构建退出消息
-    let logoutInfo = `Logout from Claude Code\n\n`;
+    let logoutInfo = `✅ Logout Successful
 
-    if (loggedOut) {
-      logoutInfo += `✓ Successfully logged out\n\n`;
-      logoutInfo += `Cleared:\n`;
-      for (const item of clearedItems) {
-        logoutInfo += `  • ${item}\n`;
-      }
-      logoutInfo += `\n`;
-    } else {
-      logoutInfo += `No active session found.\n\n`;
+Previous Authentication:
+  • Type: ${authType || 'Unknown'}
+  ${currentAuthInfo?.accessToken ? `• Access Token: ${currentAuthInfo.accessToken.substring(0, 20)}...` : ''}
+  ${currentAuthInfo?.apiKey ? `• API Key: ${currentAuthInfo.apiKey.substring(0, 15)}...` : ''}
+
+Cleared:
+`;
+
+    for (const item of clearedItems) {
+      logoutInfo += `  • ${item}\n`;
     }
 
-    logoutInfo += `To completely remove all authentication:\n\n`;
-    logoutInfo += `1. Remove environment variables:\n`;
-    logoutInfo += `   unset ANTHROPIC_API_KEY\n`;
-    logoutInfo += `   unset CLAUDE_API_KEY\n`;
-    logoutInfo += `   unset CLAUDE_CODE_OAUTH_TOKEN\n\n`;
-    logoutInfo += `2. Clear stored credentials:\n`;
-    logoutInfo += `   rm -f ${authFile}\n`;
-    logoutInfo += `   rm -f ${credentialsFile}\n\n`;
-    logoutInfo += `3. Clear session history (optional):\n`;
-    logoutInfo += `   rm -rf ~/.claude/sessions/*\n\n`;
-    logoutInfo += `After logout:\n`;
-    logoutInfo += `  • You'll need to re-authenticate to use Claude\n`;
-    logoutInfo += `  • Session history is preserved\n`;
-    logoutInfo += `  • Settings are preserved\n`;
+    logoutInfo += `
+To completely remove all authentication:
+
+1. Remove environment variables:
+   unset ANTHROPIC_API_KEY
+   unset CLAUDE_API_KEY
+   unset CLAUDE_CODE_OAUTH_TOKEN
+
+2. Verify credentials cleared:
+   ls -la ~/.claude/
+
+3. Clear session history (optional):
+   rm -rf ~/.claude/sessions/*
+
+After logout:
+  • You'll need to re-authenticate to use Claude
+  • Session history is preserved
+  • Settings are preserved
+
+To login again:
+  /login              Show login options
+  /login --api-key    Setup with API key
+  /login --oauth      OAuth login`;
 
     ctx.ui.addMessage('assistant', logoutInfo);
-    if (loggedOut) {
-      ctx.ui.addActivity('Logged out successfully');
-    }
+    ctx.ui.addActivity('Logged out successfully');
     return { success: true };
   },
 };

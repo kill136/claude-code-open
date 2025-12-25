@@ -8,7 +8,35 @@ import * as path from 'path';
 import { BaseTool } from './base.js';
 import type { FileReadInput, FileWriteInput, FileEditInput, FileResult, ToolDefinition } from '../types/index.js';
 
-export class FileReadTool extends BaseTool<FileReadInput, FileResult> {
+/**
+ * 差异预览接口
+ */
+interface DiffPreview {
+  diff: string;
+  additions: number;
+  deletions: number;
+  contextLines: number;
+}
+
+/**
+ * 批量编辑接口
+ */
+interface BatchEdit {
+  old_string: string;
+  new_string: string;
+  replace_all?: boolean;
+}
+
+/**
+ * 扩展的编辑输入接口（包含批量编辑）
+ */
+interface ExtendedFileEditInput extends FileEditInput {
+  batch_edits?: BatchEdit[];
+  show_diff?: boolean;
+  require_confirmation?: boolean;
+}
+
+export class ReadTool extends BaseTool<FileReadInput, FileResult> {
   name = 'Read';
   description = `Reads a file from the local filesystem.
 
@@ -131,7 +159,7 @@ Usage:
   }
 }
 
-export class FileWriteTool extends BaseTool<FileWriteInput, FileResult> {
+export class WriteTool extends BaseTool<FileWriteInput, FileResult> {
   name = 'Write';
   description = `Writes a file to the local filesystem.
 
@@ -182,15 +210,179 @@ Usage:
   }
 }
 
-export class FileEditTool extends BaseTool<FileEditInput, FileResult> {
+/**
+ * 生成 Unified Diff 格式的差异预览
+ */
+function generateUnifiedDiff(
+  filePath: string,
+  oldContent: string,
+  newContent: string,
+  contextLines: number = 3
+): DiffPreview {
+  const oldLines = oldContent.split('\n');
+  const newLines = newContent.split('\n');
+
+  // 找到所有不同的行
+  const changes: Array<{ type: 'add' | 'delete' | 'equal'; line: string; oldIndex?: number; newIndex?: number }> = [];
+
+  let i = 0;
+  let j = 0;
+
+  while (i < oldLines.length || j < newLines.length) {
+    if (i >= oldLines.length) {
+      changes.push({ type: 'add', line: newLines[j], newIndex: j });
+      j++;
+    } else if (j >= newLines.length) {
+      changes.push({ type: 'delete', line: oldLines[i], oldIndex: i });
+      i++;
+    } else if (oldLines[i] === newLines[j]) {
+      changes.push({ type: 'equal', line: oldLines[i], oldIndex: i, newIndex: j });
+      i++;
+      j++;
+    } else {
+      // 检测是修改还是插入/删除
+      const isInNew = newLines.slice(j).includes(oldLines[i]);
+      const isInOld = oldLines.slice(i).includes(newLines[j]);
+
+      if (!isInNew) {
+        changes.push({ type: 'delete', line: oldLines[i], oldIndex: i });
+        i++;
+      } else if (!isInOld) {
+        changes.push({ type: 'add', line: newLines[j], newIndex: j });
+        j++;
+      } else {
+        // 都存在，按照距离判断
+        const distNew = newLines.slice(j).indexOf(oldLines[i]);
+        const distOld = oldLines.slice(i).indexOf(newLines[j]);
+
+        if (distNew <= distOld) {
+          changes.push({ type: 'add', line: newLines[j], newIndex: j });
+          j++;
+        } else {
+          changes.push({ type: 'delete', line: oldLines[i], oldIndex: i });
+          i++;
+        }
+      }
+    }
+  }
+
+  // 生成 unified diff 格式
+  let diff = '';
+  diff += `--- a/${path.basename(filePath)}\n`;
+  diff += `+++ b/${path.basename(filePath)}\n`;
+
+  // 查找变化块（hunks）
+  const hunks: Array<{ start: number; end: number }> = [];
+  for (let idx = 0; idx < changes.length; idx++) {
+    if (changes[idx].type !== 'equal') {
+      const start = Math.max(0, idx - contextLines);
+      const end = Math.min(changes.length - 1, idx + contextLines);
+
+      if (hunks.length === 0 || start > hunks[hunks.length - 1].end + 1) {
+        hunks.push({ start, end });
+      } else {
+        hunks[hunks.length - 1].end = end;
+      }
+    }
+  }
+
+  let additions = 0;
+  let deletions = 0;
+
+  // 生成每个 hunk
+  for (const hunk of hunks) {
+    const hunkChanges = changes.slice(hunk.start, hunk.end + 1);
+
+    // 计算 hunk 头部的行号范围
+    let oldStart = 0;
+    let oldCount = 0;
+    let newStart = 0;
+    let newCount = 0;
+
+    for (const change of hunkChanges) {
+      if (change.type === 'delete' || change.type === 'equal') {
+        if (oldCount === 0 && change.oldIndex !== undefined) {
+          oldStart = change.oldIndex + 1;
+        }
+        oldCount++;
+      }
+      if (change.type === 'add' || change.type === 'equal') {
+        if (newCount === 0 && change.newIndex !== undefined) {
+          newStart = change.newIndex + 1;
+        }
+        newCount++;
+      }
+    }
+
+    diff += `@@ -${oldStart},${oldCount} +${newStart},${newCount} @@\n`;
+
+    // 生成 hunk 内容
+    for (const change of hunkChanges) {
+      if (change.type === 'equal') {
+        diff += ` ${change.line}\n`;
+      } else if (change.type === 'delete') {
+        diff += `-${change.line}\n`;
+        deletions++;
+      } else if (change.type === 'add') {
+        diff += `+${change.line}\n`;
+        additions++;
+      }
+    }
+  }
+
+  return {
+    diff,
+    additions,
+    deletions,
+    contextLines,
+  };
+}
+
+/**
+ * 备份文件内容（用于回滚）
+ */
+class FileBackup {
+  private backups: Map<string, string> = new Map();
+
+  backup(filePath: string, content: string): void {
+    this.backups.set(filePath, content);
+  }
+
+  restore(filePath: string): boolean {
+    const content = this.backups.get(filePath);
+    if (content === undefined) {
+      return false;
+    }
+    try {
+      fs.writeFileSync(filePath, content, 'utf-8');
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  clear(): void {
+    this.backups.clear();
+  }
+
+  has(filePath: string): boolean {
+    return this.backups.has(filePath);
+  }
+}
+
+export class EditTool extends BaseTool<ExtendedFileEditInput, FileResult> {
   name = 'Edit';
-  description = `Performs exact string replacements in files.
+  description = `Performs exact string replacements in files with diff preview.
 
 Usage:
 - You must use Read tool at least once before editing
 - Preserve exact indentation as it appears in the file
 - The edit will FAIL if old_string is not unique
-- Use replace_all for replacing all occurrences`;
+- Use replace_all for replacing all occurrences
+- Use batch_edits for atomic multi-edit operations
+- Set show_diff=true to preview changes before applying`;
+
+  private fileBackup = new FileBackup();
 
   getInputSchema(): ToolDefinition['inputSchema'] {
     return {
@@ -213,53 +405,173 @@ Usage:
           description: 'Replace all occurrences (default false)',
           default: false,
         },
+        batch_edits: {
+          type: 'array',
+          description: 'Array of edit operations to perform atomically. If any edit fails, all changes are rolled back.',
+          items: {
+            type: 'object',
+            properties: {
+              old_string: { type: 'string' },
+              new_string: { type: 'string' },
+              replace_all: { type: 'boolean', default: false },
+            },
+            required: ['old_string', 'new_string'],
+          },
+        },
+        show_diff: {
+          type: 'boolean',
+          description: 'Show unified diff preview of changes (default true)',
+          default: true,
+        },
+        require_confirmation: {
+          type: 'boolean',
+          description: 'Require user confirmation before applying changes (default false)',
+          default: false,
+        },
       },
-      required: ['file_path', 'old_string', 'new_string'],
+      required: ['file_path'],
     };
   }
 
-  async execute(input: FileEditInput): Promise<FileResult> {
-    const { file_path, old_string, new_string, replace_all = false } = input;
+  async execute(input: ExtendedFileEditInput): Promise<FileResult> {
+    const {
+      file_path,
+      old_string,
+      new_string,
+      replace_all = false,
+      batch_edits,
+      show_diff = true,
+      require_confirmation = false,
+    } = input;
 
     try {
       if (!fs.existsSync(file_path)) {
         return { success: false, error: `File not found: ${file_path}` };
       }
 
-      let content = fs.readFileSync(file_path, 'utf-8');
-
-      // 检查 old_string 是否存在
-      if (!content.includes(old_string)) {
-        return { success: false, error: `old_string not found in file` };
+      const stat = fs.statSync(file_path);
+      if (stat.isDirectory()) {
+        return { success: false, error: `Path is a directory: ${file_path}` };
       }
 
-      // 如果不是 replace_all，检查唯一性
-      if (!replace_all) {
-        const matches = content.split(old_string).length - 1;
-        if (matches > 1) {
-          return {
-            success: false,
-            error: `old_string appears ${matches} times. Use replace_all=true or provide more context.`,
-          };
+      const originalContent = fs.readFileSync(file_path, 'utf-8');
+
+      // 备份原始内容
+      this.fileBackup.backup(file_path, originalContent);
+
+      // 确定编辑操作列表
+      const edits: BatchEdit[] = batch_edits || [{ old_string: old_string!, new_string: new_string!, replace_all }];
+
+      // 验证所有编辑操作
+      let currentContent = originalContent;
+      const validationErrors: string[] = [];
+
+      for (let i = 0; i < edits.length; i++) {
+        const edit = edits[i];
+
+        if (!currentContent.includes(edit.old_string)) {
+          validationErrors.push(`Edit ${i + 1}: old_string not found in file`);
+          continue;
+        }
+
+        // 如果不是 replace_all，检查唯一性
+        if (!edit.replace_all) {
+          const matches = currentContent.split(edit.old_string).length - 1;
+          if (matches > 1) {
+            validationErrors.push(
+              `Edit ${i + 1}: old_string appears ${matches} times. Use replace_all=true or provide more context.`
+            );
+            continue;
+          }
+        }
+
+        // 应用编辑（用于验证后续编辑）
+        if (edit.replace_all) {
+          currentContent = currentContent.split(edit.old_string).join(edit.new_string);
+        } else {
+          currentContent = currentContent.replace(edit.old_string, edit.new_string);
         }
       }
 
-      // 执行替换
-      if (replace_all) {
-        content = content.split(old_string).join(new_string);
-      } else {
-        content = content.replace(old_string, new_string);
+      if (validationErrors.length > 0) {
+        return {
+          success: false,
+          error: `Validation failed:\n${validationErrors.join('\n')}`,
+        };
       }
 
-      fs.writeFileSync(file_path, content, 'utf-8');
+      const modifiedContent = currentContent;
 
-      return {
-        success: true,
-        output: `Successfully edited ${file_path}`,
-        content,
-      };
+      // 生成差异预览
+      let diffPreview: DiffPreview | null = null;
+      if (show_diff) {
+        diffPreview = generateUnifiedDiff(file_path, originalContent, modifiedContent);
+      }
+
+      // 检查是否需要确认
+      if (require_confirmation) {
+        return {
+          success: false,
+          error: 'Confirmation required before applying changes',
+          output: diffPreview ? this.formatDiffOutput(diffPreview) : undefined,
+        };
+      }
+
+      // 执行实际的文件写入
+      try {
+        fs.writeFileSync(file_path, modifiedContent, 'utf-8');
+
+        // 构建输出消息
+        let output = '';
+
+        if (batch_edits) {
+          output += `Successfully applied ${edits.length} edit(s) to ${file_path}\n`;
+        } else {
+          output += `Successfully edited ${file_path}\n`;
+        }
+
+        if (diffPreview) {
+          output += '\n' + this.formatDiffOutput(diffPreview);
+        }
+
+        // 清除备份
+        this.fileBackup.clear();
+
+        return {
+          success: true,
+          output,
+          content: modifiedContent,
+        };
+      } catch (writeErr) {
+        // 写入失败，尝试回滚
+        this.fileBackup.restore(file_path);
+        return {
+          success: false,
+          error: `Error writing file: ${writeErr}. Changes have been rolled back.`,
+        };
+      }
     } catch (err) {
-      return { success: false, error: `Error editing file: ${err}` };
+      // 发生错误，尝试回滚
+      if (this.fileBackup.has(file_path)) {
+        this.fileBackup.restore(file_path);
+      }
+      return {
+        success: false,
+        error: `Error editing file: ${err}. Changes have been rolled back.`,
+      };
     }
+  }
+
+  /**
+   * 格式化差异输出
+   */
+  private formatDiffOutput(diffPreview: DiffPreview): string {
+    const { diff, additions, deletions } = diffPreview;
+    let output = '';
+    output += `Changes: +${additions} -${deletions}\n`;
+    output += '─'.repeat(60) + '\n';
+    output += diff;
+    output += '─'.repeat(60);
+    return output;
   }
 }

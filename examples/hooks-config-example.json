@@ -1,0 +1,105 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "type": "command",
+        "command": "./scripts/pre-tool.sh $TOOL_NAME",
+        "timeout": 5000,
+        "blocking": true,
+        "matcher": "Bash"
+      },
+      {
+        "type": "url",
+        "url": "http://localhost:8080/hooks/pre-tool",
+        "method": "POST",
+        "timeout": 3000,
+        "blocking": false
+      }
+    ],
+    "PostToolUse": [
+      {
+        "type": "command",
+        "command": "echo 'Tool $TOOL_NAME executed'",
+        "blocking": false
+      },
+      {
+        "type": "url",
+        "url": "http://localhost:8080/hooks/post-tool",
+        "headers": {
+          "X-Hook-Type": "PostToolUse",
+          "Authorization": "Bearer your-token-here"
+        }
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "type": "url",
+        "url": "http://localhost:8080/hooks/tool-failure",
+        "method": "POST"
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "type": "command",
+        "command": "./scripts/validate-prompt.sh",
+        "blocking": true,
+        "timeout": 2000
+      }
+    ],
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "echo 'Session started: $SESSION_ID'"
+      },
+      {
+        "type": "url",
+        "url": "http://localhost:8080/hooks/session-start"
+      }
+    ],
+    "SessionEnd": [
+      {
+        "type": "url",
+        "url": "http://localhost:8080/hooks/session-end"
+      }
+    ],
+    "Notification": [
+      {
+        "type": "url",
+        "url": "http://localhost:8080/hooks/notification"
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "type": "command",
+        "command": "./scripts/permission-handler.sh",
+        "blocking": true,
+        "timeout": 10000
+      }
+    ],
+    "SubagentStart": [
+      {
+        "type": "url",
+        "url": "http://localhost:8080/hooks/subagent-start"
+      }
+    ],
+    "SubagentStop": [
+      {
+        "type": "url",
+        "url": "http://localhost:8080/hooks/subagent-stop"
+      }
+    ],
+    "PreCompact": [
+      {
+        "type": "command",
+        "command": "echo 'Compacting session...'",
+        "blocking": false
+      }
+    ],
+    "Stop": [
+      {
+        "type": "url",
+        "url": "http://localhost:8080/hooks/stop"
+      }
+    ]
+  }
+}

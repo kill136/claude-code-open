@@ -21,11 +21,11 @@ export * from './skill.js';
 
 import { toolRegistry } from './base.js';
 import { BashTool, BashOutputTool, KillShellTool } from './bash.js';
-import { FileReadTool, FileWriteTool, FileEditTool } from './file.js';
+import { ReadTool, WriteTool, EditTool } from './file.js';
 import { GlobTool, GrepTool } from './search.js';
 import { WebFetchTool, WebSearchTool } from './web.js';
 import { TodoWriteTool } from './todo.js';
-import { AgentTool, TaskOutputTool } from './agent.js';
+import { TaskTool, TaskOutputTool, ListAgentsTool } from './agent.js';
 import { NotebookEditTool } from './notebook.js';
 import { EnterPlanModeTool, ExitPlanModeTool } from './planmode.js';
 import { ListMcpResourcesTool, ReadMcpResourceTool } from './mcp.js';
@@ -42,9 +42,9 @@ export function registerAllTools(): void {
   toolRegistry.register(new KillShellTool());
 
   // 文件工具
-  toolRegistry.register(new FileReadTool());
-  toolRegistry.register(new FileWriteTool());
-  toolRegistry.register(new FileEditTool());
+  toolRegistry.register(new ReadTool());
+  toolRegistry.register(new WriteTool());
+  toolRegistry.register(new EditTool());
 
   // 搜索工具
   toolRegistry.register(new GlobTool());
@@ -58,8 +58,9 @@ export function registerAllTools(): void {
   toolRegistry.register(new TodoWriteTool());
 
   // 代理工具
-  toolRegistry.register(new AgentTool());
+  toolRegistry.register(new TaskTool());
   toolRegistry.register(new TaskOutputTool());
+  toolRegistry.register(new ListAgentsTool());
 
   // Notebook 编辑
   toolRegistry.register(new NotebookEditTool());

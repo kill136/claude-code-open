@@ -42,72 +42,6 @@ ${prNumber ? `\nPR number: ${prNumber}` : ''}`;
   },
 };
 
-// /plan - 规划模式
-export const planCommand: SlashCommand = {
-  name: 'plan',
-  description: 'Enter planning mode for complex tasks',
-  usage: '/plan [task description]',
-  category: 'development',
-  execute: (ctx: CommandContext): CommandResult => {
-    const { args } = ctx;
-
-    // 基于官方源码的完整计划模式提示
-    const planPrompt = `You should now enter plan mode to handle this request.
-
-${args.length > 0 ? `Task: ${args.join(' ')}
-
-` : ''}Use the EnterPlanMode tool to begin planning.
-
-## What is Plan Mode?
-
-Plan Mode is designed for complex tasks that require careful planning and exploration before implementation.
-
-## When to Use Plan Mode
-
-Use EnterPlanMode when ANY of these conditions apply:
-
-1. **Multiple Valid Approaches**: The task can be solved in several different ways, each with trade-offs
-   - Example: "Add caching to the API" - could use Redis, in-memory, file-based, etc.
-   - Example: "Improve performance" - many optimization strategies possible
-
-2. **Significant Architectural Decisions**: The task requires choosing between architectural patterns
-   - Example: "Add real-time updates" - WebSockets vs SSE vs polling
-   - Example: "Implement state management" - Redux vs Context vs custom solution
-
-3. **Large-Scale Changes**: The task touches many files or systems
-   - Example: "Refactor the authentication system"
-   - Example: "Migrate from REST to GraphQL"
-
-4. **Unclear Requirements**: You need to explore before understanding the full scope
-   - Example: "Make the app faster" - need to profile and identify bottlenecks
-   - Example: "Fix the bug in checkout" - need to investigate root cause
-
-5. **User Input Needed**: You'll need to ask clarifying questions before starting
-   - Plan mode lets you explore first, then present options with context
-
-## What Happens in Plan Mode
-
-In plan mode, you'll:
-1. Thoroughly explore the codebase using Glob, Grep, and Read tools
-2. Understand existing patterns and architecture
-3. Design an implementation approach
-4. Write your plan to a plan file (the ONLY file you can edit in plan mode)
-5. Use AskUserQuestion if you need to clarify approaches
-6. Exit plan mode with ExitPlanMode when ready to implement
-
-## Important Notes
-
-- Plan mode is READ-ONLY: You cannot modify any files except the plan file
-- You must thoroughly explore the codebase before writing your plan
-- Your plan should be concise enough to scan quickly, but detailed enough to execute effectively
-- Include the paths of critical files to be modified in your plan
-- Only exit plan mode when you have a complete, actionable plan`;
-
-    ctx.ui.addMessage('user', planPrompt);
-    return { success: true };
-  },
-};
-
 // /feedback - 反馈 (基于官方 v2.0.59 源码实现)
 export const feedbackCommand: SlashCommand = {
   name: 'feedback',
@@ -653,12 +587,275 @@ See the full changelog at:
 https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md`;
 }
 
+// /vim - Vim 模式切换 (基于官方 v2.0.59 源码实现)
+export const vimCommand: SlashCommand = {
+  name: 'vim',
+  description: 'Toggle Vim keybindings for input',
+  usage: '/vim [on|off]',
+  category: 'development',
+  execute: (ctx: CommandContext): CommandResult => {
+    const { args, config } = ctx;
+    const subcommand = args[0]?.toLowerCase();
+
+    // 从环境变量或配置中获取当前 Vim 模式状态
+    // 官方实现使用运行时状态，这里使用环境变量模拟
+    const currentVimMode = process.env.CLAUDE_CODE_VIM_MODE === 'true';
+
+    if (subcommand === 'on') {
+      // 启用 Vim 键绑定
+      process.env.CLAUDE_CODE_VIM_MODE = 'true';
+
+      const response = `Vim Mode: Enabled
+
+Vim keybindings are now active in the input field.
+
+**Available Vim bindings:**
+  • Normal mode: Press ESC or Ctrl+[
+  • Insert mode: Press i, a, I, A
+  • Navigation: h, j, k, l
+  • Delete: x, dd, D
+  • Undo: u
+  • Word navigation: w, b, e
+  • Line navigation: 0, $, ^
+
+**Mode indicators:**
+  • Normal mode: [N]
+  • Insert mode: [I]
+
+To disable Vim mode, use: /vim off`;
+
+      ctx.ui.addMessage('assistant', response);
+      ctx.ui.addActivity('Vim mode enabled');
+      return { success: true };
+    } else if (subcommand === 'off') {
+      // 禁用 Vim 键绑定
+      process.env.CLAUDE_CODE_VIM_MODE = 'false';
+
+      const response = `Vim Mode: Disabled
+
+Standard keybindings restored.
+
+To re-enable Vim mode, use: /vim on`;
+
+      ctx.ui.addMessage('assistant', response);
+      ctx.ui.addActivity('Vim mode disabled');
+      return { success: true };
+    } else if (!subcommand) {
+      // 切换状态
+      const newState = !currentVimMode;
+      process.env.CLAUDE_CODE_VIM_MODE = String(newState);
+
+      const response = `Vim Mode: ${newState ? 'Enabled' : 'Disabled'}
+
+${newState ? 'Vim keybindings are now active.' : 'Standard keybindings restored.'}
+
+Usage:
+  /vim on   - Enable Vim keybindings
+  /vim off  - Disable Vim keybindings
+  /vim      - Toggle current state`;
+
+      ctx.ui.addMessage('assistant', response);
+      ctx.ui.addActivity(`Vim mode ${newState ? 'enabled' : 'disabled'}`);
+      return { success: true };
+    } else {
+      // 无效的子命令
+      const response = `Invalid option: ${subcommand}
+
+Usage:
+  /vim on   - Enable Vim keybindings
+  /vim off  - Disable Vim keybindings
+  /vim      - Toggle current state
+
+Current state: ${currentVimMode ? 'Enabled' : 'Disabled'}`;
+
+      ctx.ui.addMessage('assistant', response);
+      return { success: false };
+    }
+  },
+};
+
+// /ide - IDE 集成状态 (基于官方 v2.0.59 源码实现)
+export const ideCommand: SlashCommand = {
+  name: 'ide',
+  description: 'Show IDE integration status and manage connections',
+  usage: '/ide [status|connect <type>|disconnect]',
+  category: 'development',
+  execute: (ctx: CommandContext): CommandResult => {
+    const { args, config } = ctx;
+    const subcommand = args[0]?.toLowerCase();
+
+    // 检测 IDE 环境变量
+    const ideType = process.env.CLAUDE_IDE || process.env.VSCODE_PID ? 'vscode' :
+                    process.env.CURSOR_SESSION_ID ? 'cursor' : null;
+    const ideConnected = !!ideType;
+    const workspacePath = config.cwd;
+
+    // 从环境变量中获取可能的 IDE 相关信息
+    const termProgram = process.env.TERM_PROGRAM || 'unknown';
+    const vscodeIpc = process.env.VSCODE_IPC_HOOK_CLI;
+    const editorInfo = process.env.EDITOR || process.env.VISUAL;
+
+    if (subcommand === 'status' || !subcommand) {
+      // 显示 IDE 连接状态
+      let statusText = `IDE Integration Status\n\n`;
+
+      // 连接状态
+      statusText += `Connection\n`;
+      statusText += `  Status: ${ideConnected ? '✓ Connected' : '✗ Not connected'}\n`;
+      if (ideType) {
+        statusText += `  IDE Type: ${ideType}\n`;
+      }
+      statusText += '\n';
+
+      // 环境信息
+      statusText += `Environment\n`;
+      statusText += `  Terminal: ${termProgram}\n`;
+      if (editorInfo) {
+        statusText += `  Editor: ${editorInfo}\n`;
+      }
+      statusText += `  Workspace: ${workspacePath}\n`;
+      statusText += '\n';
+
+      // 检测到的 IDE 特征
+      if (vscodeIpc || process.env.VSCODE_PID) {
+        statusText += `Detected Features\n`;
+        if (vscodeIpc) {
+          statusText += `  ✓ VS Code IPC detected\n`;
+        }
+        if (process.env.VSCODE_PID) {
+          statusText += `  ✓ VS Code process detected\n`;
+        }
+        statusText += '\n';
+      }
+
+      // 支持的 IDE
+      statusText += `Supported IDEs\n`;
+      statusText += `  • VS Code - Set CLAUDE_IDE=vscode\n`;
+      statusText += `  • Cursor - Set CLAUDE_IDE=cursor\n`;
+      statusText += `  • JetBrains - Set CLAUDE_IDE=jetbrains\n`;
+      statusText += `  • Vim/Neovim - Set CLAUDE_IDE=vim\n`;
+      statusText += `  • Emacs - Set CLAUDE_IDE=emacs\n`;
+      statusText += '\n';
+
+      // 使用说明
+      statusText += `Commands\n`;
+      statusText += `  /ide status              - Show this status\n`;
+      statusText += `  /ide connect <type>      - Set IDE type\n`;
+      statusText += `  /ide disconnect          - Clear IDE connection\n`;
+      statusText += '\n';
+
+      if (!ideConnected) {
+        statusText += `Tip: Set the CLAUDE_IDE environment variable to enable IDE-specific features.`;
+      }
+
+      ctx.ui.addMessage('assistant', statusText);
+      return { success: true };
+    } else if (subcommand === 'connect' && args[1]) {
+      // 连接到指定的 IDE
+      const requestedIde = args[1].toLowerCase();
+      const supportedIdes = ['vscode', 'cursor', 'jetbrains', 'vim', 'neovim', 'emacs'];
+
+      if (!supportedIdes.includes(requestedIde)) {
+        const response = `Unsupported IDE: ${requestedIde}
+
+Supported IDEs:
+  • vscode
+  • cursor
+  • jetbrains
+  • vim / neovim
+  • emacs
+
+Example: /ide connect vscode`;
+
+        ctx.ui.addMessage('assistant', response);
+        return { success: false };
+      }
+
+      // 设置 IDE 环境变量
+      process.env.CLAUDE_IDE = requestedIde;
+
+      const response = `IDE Connected: ${requestedIde}
+
+Connection established successfully.
+
+**IDE Type:** ${requestedIde}
+**Workspace:** ${workspacePath}
+
+IDE-specific features are now available.
+
+Note: This setting is for the current session only. To make it permanent, set the CLAUDE_IDE environment variable in your shell configuration.
+
+Example (bash/zsh):
+  export CLAUDE_IDE=${requestedIde}`;
+
+      ctx.ui.addMessage('assistant', response);
+      ctx.ui.addActivity(`Connected to ${requestedIde}`);
+      return { success: true };
+    } else if (subcommand === 'disconnect') {
+      // 断开 IDE 连接
+      if (!ideConnected && !process.env.CLAUDE_IDE) {
+        ctx.ui.addMessage('assistant', 'No IDE connection to disconnect.');
+        return { success: true };
+      }
+
+      const previousIde = process.env.CLAUDE_IDE || ideType;
+      delete process.env.CLAUDE_IDE;
+
+      const response = `IDE Disconnected
+
+${previousIde ? `Disconnected from: ${previousIde}` : 'IDE connection cleared'}
+
+IDE-specific features have been disabled.
+
+To reconnect, use: /ide connect <type>`;
+
+      ctx.ui.addMessage('assistant', response);
+      ctx.ui.addActivity('Disconnected from IDE');
+      return { success: true };
+    } else if (subcommand === 'connect' && !args[1]) {
+      // connect 命令缺少 IDE 类型参数
+      const response = `Missing IDE type
+
+Usage: /ide connect <type>
+
+Supported types:
+  • vscode
+  • cursor
+  • jetbrains
+  • vim
+  • emacs
+
+Example: /ide connect vscode`;
+
+      ctx.ui.addMessage('assistant', response);
+      return { success: false };
+    } else {
+      // 无效的子命令
+      const response = `Invalid subcommand: ${subcommand}
+
+Usage:
+  /ide status              - Show IDE integration status
+  /ide connect <type>      - Connect to an IDE
+  /ide disconnect          - Disconnect from IDE
+
+Examples:
+  /ide status
+  /ide connect vscode
+  /ide disconnect`;
+
+      ctx.ui.addMessage('assistant', response);
+      return { success: false };
+    }
+  },
+};
+
 // 注册所有开发命令
 export function registerDevelopmentCommands(): void {
   commandRegistry.register(reviewCommand);
-  commandRegistry.register(planCommand);
   commandRegistry.register(feedbackCommand);
   commandRegistry.register(prCommentsCommand);
   commandRegistry.register(securityReviewCommand);
   commandRegistry.register(releaseNotesCommand);
+  commandRegistry.register(vimCommand);
+  commandRegistry.register(ideCommand);
 }

@@ -16,6 +16,8 @@ export interface VersionInfo {
   changelog?: string;
   downloadUrl?: string;
   minimumNodeVersion?: string;
+  description?: string;
+  dependencies?: Record<string, string>;
 }
 
 // 更新配置
@@ -23,8 +25,9 @@ export interface UpdateConfig {
   checkInterval?: number; // 检查间隔（毫秒）
   autoDownload?: boolean;
   autoInstall?: boolean;
-  channel?: 'stable' | 'beta' | 'latest';
+  channel?: 'stable' | 'beta' | 'canary' | 'latest';
   registryUrl?: string;
+  packageName?: string;
 }
 
 // 更新状态
@@ -42,6 +45,26 @@ export interface UpdateCheckResult {
   hasUpdate: boolean;
   currentVersion: string;
   latestVersion: string;
+  versionInfo?: VersionInfo;
+  changelog?: string[];
+}
+
+// 更新选项
+export interface UpdateOptions {
+  version?: string;
+  force?: boolean;
+  beta?: boolean;
+  canary?: boolean;
+  dryRun?: boolean;
+  showProgress?: boolean;
+}
+
+// 更新信息（用于导出函数）
+export interface UpdateInfo {
+  current: string;
+  latest: string;
+  hasUpdate: boolean;
+  changelog?: string[];
   versionInfo?: VersionInfo;
 }
 
@@ -62,11 +85,12 @@ export class UpdateManager extends EventEmitter {
       autoInstall: config.autoInstall ?? false,
       channel: config.channel || 'stable',
       registryUrl: config.registryUrl || 'https://registry.npmjs.org',
+      packageName: config.packageName || 'claude-code-open',
     };
 
     // 从 package.json 读取当前版本
     this.currentVersion = this.readCurrentVersion();
-    this.packageName = '@anthropic-ai/claude-code';
+    this.packageName = this.config.packageName;
   }
 
   // 读取当前版本
@@ -90,6 +114,11 @@ export class UpdateManager extends EventEmitter {
     return this.currentVersion;
   }
 
+  // 获取配置
+  getConfig(): Required<UpdateConfig> {
+    return this.config;
+  }
+
   // 检查更新
   async checkForUpdates(): Promise<UpdateCheckResult> {
     this.status = 'checking';
@@ -101,11 +130,22 @@ export class UpdateManager extends EventEmitter {
 
       this.lastCheck = Date.now();
 
+      let versionInfo: VersionInfo | undefined;
+      let changelog: string[] | undefined;
+
       if (hasUpdate) {
+        // 获取版本详细信息
+        versionInfo = await this.fetchVersionInfo(latestVersion);
+
+        // 获取变更日志
+        changelog = await this.getChangelog(this.currentVersion);
+
         this.status = 'available';
         this.emit('update-available', {
           currentVersion: this.currentVersion,
           latestVersion,
+          versionInfo,
+          changelog,
         });
 
         if (this.config.autoDownload) {
@@ -120,6 +160,8 @@ export class UpdateManager extends EventEmitter {
         hasUpdate,
         currentVersion: this.currentVersion,
         latestVersion,
+        versionInfo,
+        changelog,
       };
     } catch (err) {
       this.status = 'error';
@@ -143,6 +185,9 @@ export class UpdateManager extends EventEmitter {
 
             let version: string;
             switch (this.config.channel) {
+              case 'canary':
+                version = distTags.canary || distTags.next || distTags.latest;
+                break;
               case 'beta':
                 version = distTags.beta || distTags.latest;
                 break;
@@ -155,6 +200,35 @@ export class UpdateManager extends EventEmitter {
             }
 
             resolve(version);
+          } catch (err) {
+            reject(err);
+          }
+        });
+      }).on('error', reject);
+    });
+  }
+
+  // 获取特定版本的详细信息
+  private async fetchVersionInfo(version: string): Promise<VersionInfo> {
+    return new Promise((resolve, reject) => {
+      const url = `${this.config.registryUrl}/${this.packageName}/${version}`;
+
+      https.get(url, (res) => {
+        let data = '';
+        res.on('data', (chunk) => data += chunk);
+        res.on('end', () => {
+          try {
+            const versionData = JSON.parse(data);
+
+            const info: VersionInfo = {
+              version: versionData.version,
+              releaseDate: versionData.time || new Date().toISOString(),
+              description: versionData.description,
+              minimumNodeVersion: versionData.engines?.node,
+              dependencies: versionData.dependencies,
+            };
+
+            resolve(info);
           } catch (err) {
             reject(err);
           }
@@ -179,22 +253,35 @@ export class UpdateManager extends EventEmitter {
   }
 
   // 下载更新
-  async download(version?: string): Promise<void> {
+  async download(version?: string, options: UpdateOptions = {}): Promise<void> {
     this.status = 'downloading';
     this.emit('downloading');
 
     try {
       const targetVersion = version || await this.fetchLatestVersion();
 
+      if (options.dryRun) {
+        this.emit('dry-run', { action: 'download', version: targetVersion });
+        return;
+      }
+
+      if (options.showProgress) {
+        this.emit('progress', { phase: 'downloading', percent: 0 });
+      }
+
       // 使用 npm pack 下载
       const result = await this.executeNpm(['pack', `${this.packageName}@${targetVersion}`]);
+
+      if (options.showProgress) {
+        this.emit('progress', { phase: 'downloading', percent: 100 });
+      }
 
       if (result.success) {
         this.status = 'ready';
         this.emit('downloaded', { version: targetVersion });
 
         if (this.config.autoInstall) {
-          await this.install(targetVersion);
+          await this.install(targetVersion, options);
         }
       } else {
         throw new Error(result.error || 'Download failed');
@@ -207,17 +294,37 @@ export class UpdateManager extends EventEmitter {
   }
 
   // 安装更新
-  async install(version?: string): Promise<void> {
+  async install(version?: string, options: UpdateOptions = {}): Promise<void> {
     this.status = 'installing';
     this.emit('installing');
 
     try {
       const targetVersion = version || 'latest';
-      const result = await this.executeNpm([
+
+      if (options.dryRun) {
+        this.emit('dry-run', { action: 'install', version: targetVersion });
+        return;
+      }
+
+      if (options.showProgress) {
+        this.emit('progress', { phase: 'installing', percent: 0 });
+      }
+
+      const args = [
         'install',
         '-g',
         `${this.packageName}@${targetVersion}`,
-      ]);
+      ];
+
+      if (options.force) {
+        args.push('--force');
+      }
+
+      const result = await this.executeNpm(args);
+
+      if (options.showProgress) {
+        this.emit('progress', { phase: 'installing', percent: 100 });
+      }
 
       if (result.success) {
         this.emit('installed', { version: targetVersion });
@@ -230,6 +337,55 @@ export class UpdateManager extends EventEmitter {
       this.emit('error', err);
       throw err;
     }
+  }
+
+  // 回滚到指定版本
+  async rollback(version: string, options: UpdateOptions = {}): Promise<void> {
+    this.status = 'installing';
+    this.emit('rollback', { version });
+
+    try {
+      if (options.dryRun) {
+        this.emit('dry-run', { action: 'rollback', version });
+        return;
+      }
+
+      // 验证版本是否存在
+      const availableVersions = await this.listAvailableVersions();
+      if (!availableVersions.includes(version)) {
+        throw new Error(`Version ${version} not found`);
+      }
+
+      // 卸载当前版本并安装指定版本
+      await this.install(version, options);
+
+      this.emit('rollback-complete', { version });
+    } catch (err) {
+      this.status = 'error';
+      this.emit('error', err);
+      throw err;
+    }
+  }
+
+  // 列出可用版本
+  async listAvailableVersions(): Promise<string[]> {
+    return new Promise((resolve, reject) => {
+      const url = `${this.config.registryUrl}/${this.packageName}`;
+
+      https.get(url, (res) => {
+        let data = '';
+        res.on('data', (chunk) => data += chunk);
+        res.on('end', () => {
+          try {
+            const packageInfo = JSON.parse(data);
+            const versions = Object.keys(packageInfo.versions || {});
+            resolve(versions.sort((a, b) => this.compareVersions(b, a)));
+          } catch (err) {
+            reject(err);
+          }
+        });
+      }).on('error', reject);
+    });
   }
 
   // 执行 npm 命令
@@ -326,7 +482,90 @@ export class UpdateManager extends EventEmitter {
   }
 }
 
-// 版本检查器（简化版）
+// 检查更新（导出函数）
+export async function checkForUpdates(options: UpdateConfig = {}): Promise<UpdateInfo> {
+  const manager = new UpdateManager(options);
+  const result = await manager.checkForUpdates();
+
+  return {
+    current: result.currentVersion,
+    latest: result.latestVersion,
+    hasUpdate: result.hasUpdate,
+    changelog: result.changelog,
+    versionInfo: result.versionInfo,
+  };
+}
+
+// 执行更新（导出函数）
+export async function performUpdate(options: UpdateOptions = {}): Promise<boolean> {
+  const manager = new UpdateManager({
+    channel: options.beta ? 'beta' : options.canary ? 'canary' : 'stable',
+  });
+
+  try {
+    // 显示进度事件
+    if (options.showProgress) {
+      manager.on('progress', ({ phase, percent }) => {
+        console.log(`[${phase}] ${percent}%`);
+      });
+    }
+
+    // Dry-run 模式
+    if (options.dryRun) {
+      manager.on('dry-run', ({ action, version }) => {
+        console.log(`[DRY-RUN] Would ${action} version ${version}`);
+      });
+    }
+
+    // 检查更新
+    const updateInfo = await manager.checkForUpdates();
+
+    if (!updateInfo.hasUpdate) {
+      console.log('Already up to date!');
+      return true;
+    }
+
+    // 下载并安装
+    await manager.download(options.version, options);
+
+    if (!options.dryRun && !manager.getConfig().autoInstall) {
+      await manager.install(options.version, options);
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Update failed:', error);
+    return false;
+  }
+}
+
+// 回滚版本（导出函数）
+export async function rollbackVersion(version: string, options: UpdateOptions = {}): Promise<boolean> {
+  const manager = new UpdateManager();
+
+  try {
+    // 显示进度事件
+    if (options.showProgress) {
+      manager.on('progress', ({ phase, percent }) => {
+        console.log(`[${phase}] ${percent}%`);
+      });
+    }
+
+    await manager.rollback(version, options);
+    return true;
+  } catch (error) {
+    console.error('Rollback failed:', error);
+    return false;
+  }
+}
+
+// 列出可用版本
+export async function listVersions(options: UpdateConfig = {}): Promise<string[]> {
+  const manager = new UpdateManager(options);
+  return manager.listAvailableVersions();
+}
+
+// 版本检查器（简化版，向后兼容）
 export async function checkVersion(): Promise<{
   current: string;
   latest: string;
@@ -342,7 +581,7 @@ export async function checkVersion(): Promise<{
   };
 }
 
-// 安装特定版本
+// 安装特定版本（简化版，向后兼容）
 export async function installVersion(version: string): Promise<boolean> {
   const manager = new UpdateManager();
 

@@ -23,6 +23,18 @@ export interface SandboxOptions {
   network?: boolean;
   /** 是否禁用沙箱 */
   disableSandbox?: boolean;
+  /** 是否允许访问 /dev */
+  allowDevAccess?: boolean;
+  /** 是否允许访问 /proc */
+  allowProcAccess?: boolean;
+  /** 是否允许访问 /sys */
+  allowSysAccess?: boolean;
+  /** 自定义环境变量白名单 */
+  envWhitelist?: string[];
+  /** 最大内存限制（字节） */
+  maxMemory?: number;
+  /** 最大 CPU 使用率 (0-100) */
+  maxCpu?: number;
 }
 
 export interface SandboxResult {
@@ -48,51 +60,101 @@ export function isBubblewrapAvailable(): boolean {
 /**
  * 获取沙箱的默认配置
  */
-function getDefaultSandboxConfig(cwd: string): string[] {
+function getDefaultSandboxConfig(cwd: string, options: SandboxOptions = {}): string[] {
   const home = os.homedir();
   const tmpDir = os.tmpdir();
 
-  return [
+  const config: string[] = [
     // 基本的隔离设置
     '--unshare-all',        // 取消共享所有命名空间
-    '--share-net',          // 但共享网络（可选）
     '--die-with-parent',    // 父进程退出时终止
-
-    // 基础文件系统
-    '--ro-bind', '/usr', '/usr',
-    '--ro-bind', '/bin', '/bin',
-    '--ro-bind', '/lib', '/lib',
-    '--ro-bind', '/lib64', '/lib64',
-    '--symlink', '/usr/lib', '/lib',
-    '--symlink', '/usr/lib64', '/lib64',
-    '--symlink', '/usr/bin', '/bin',
-
-    // /etc 下的必要文件
-    '--ro-bind', '/etc/resolv.conf', '/etc/resolv.conf',
-    '--ro-bind', '/etc/hosts', '/etc/hosts',
-    '--ro-bind', '/etc/passwd', '/etc/passwd',
-    '--ro-bind', '/etc/group', '/etc/group',
-    '--ro-bind', '/etc/ssl', '/etc/ssl',
-    '--ro-bind', '/etc/ca-certificates', '/etc/ca-certificates',
-
-    // proc 和 dev
-    '--proc', '/proc',
-    '--dev', '/dev',
-
-    // 临时目录
-    '--tmpfs', '/tmp',
-    '--bind', tmpDir, tmpDir,
-
-    // 工作目录（可写）
-    '--bind', cwd, cwd,
-    '--chdir', cwd,
-
-    // 用户目录（只读）
-    '--ro-bind', home, home,
-
-    // Node.js 和 npm 相关
-    '--ro-bind', '/usr/local', '/usr/local',
   ];
+
+  // 网络访问控制
+  if (options.network !== false) {
+    config.push('--share-net');
+  }
+
+  // 基础文件系统 - 只读绑定
+  const readOnlyDirs = ['/usr', '/bin', '/lib', '/lib64'];
+  for (const dir of readOnlyDirs) {
+    if (fs.existsSync(dir)) {
+      config.push('--ro-bind', dir, dir);
+    }
+  }
+
+  // 符号链接
+  config.push('--symlink', '/usr/lib', '/lib');
+  config.push('--symlink', '/usr/lib64', '/lib64');
+  config.push('--symlink', '/usr/bin', '/bin');
+
+  // /etc 下的必要文件
+  const etcFiles = [
+    '/etc/resolv.conf',
+    '/etc/hosts',
+    '/etc/passwd',
+    '/etc/group',
+    '/etc/ssl',
+    '/etc/ca-certificates',
+    '/etc/nsswitch.conf',
+    '/etc/protocols',
+    '/etc/services',
+  ];
+
+  for (const file of etcFiles) {
+    if (fs.existsSync(file)) {
+      try {
+        config.push('--ro-bind', file, file);
+      } catch {
+        // 忽略无法绑定的文件
+      }
+    }
+  }
+
+  // /proc 访问
+  if (options.allowProcAccess !== false) {
+    config.push('--proc', '/proc');
+  }
+
+  // /dev 访问
+  if (options.allowDevAccess !== false) {
+    config.push('--dev', '/dev');
+  } else {
+    // 最小化 /dev 访问 - 只允许必要的设备
+    config.push('--dev-bind', '/dev/null', '/dev/null');
+    config.push('--dev-bind', '/dev/zero', '/dev/zero');
+    config.push('--dev-bind', '/dev/random', '/dev/random');
+    config.push('--dev-bind', '/dev/urandom', '/dev/urandom');
+  }
+
+  // /sys 访问（默认不允许）
+  if (options.allowSysAccess === true && fs.existsSync('/sys')) {
+    config.push('--ro-bind', '/sys', '/sys');
+  }
+
+  // 临时目录
+  config.push('--tmpfs', '/tmp');
+  if (fs.existsSync(tmpDir)) {
+    config.push('--bind', tmpDir, tmpDir);
+  }
+
+  // 工作目录（可写）
+  if (fs.existsSync(cwd)) {
+    config.push('--bind', cwd, cwd);
+    config.push('--chdir', cwd);
+  }
+
+  // 用户目录（默认只读）
+  if (fs.existsSync(home)) {
+    config.push('--ro-bind', home, home);
+  }
+
+  // Node.js 和 npm 相关
+  if (fs.existsSync('/usr/local')) {
+    config.push('--ro-bind', '/usr/local', '/usr/local');
+  }
+
+  return config;
 }
 
 /**
@@ -110,6 +172,10 @@ export async function executeInSandbox(
     readOnlyPaths = [],
     network = true,
     disableSandbox = false,
+    allowDevAccess = true,
+    allowProcAccess = true,
+    allowSysAccess = false,
+    envWhitelist,
   } = options;
 
   // 如果禁用沙箱或 bwrap 不可用，直接执行
@@ -118,15 +184,12 @@ export async function executeInSandbox(
   }
 
   // 构建 bwrap 参数
-  const bwrapArgs = getDefaultSandboxConfig(cwd);
-
-  // 如果禁用网络
-  if (!network) {
-    const netIdx = bwrapArgs.indexOf('--share-net');
-    if (netIdx >= 0) {
-      bwrapArgs.splice(netIdx, 1);
-    }
-  }
+  const bwrapArgs = getDefaultSandboxConfig(cwd, {
+    network,
+    allowDevAccess,
+    allowProcAccess,
+    allowSysAccess,
+  });
 
   // 添加额外的可写路径
   for (const p of writablePaths) {
@@ -142,6 +205,27 @@ export async function executeInSandbox(
     }
   }
 
+  // 准备环境变量
+  let sandboxEnv = { ...process.env, ...env };
+
+  // 如果指定了环境变量白名单，则过滤
+  if (envWhitelist && envWhitelist.length > 0) {
+    const filteredEnv: Record<string, string> = {};
+    for (const key of envWhitelist) {
+      if (sandboxEnv[key]) {
+        filteredEnv[key] = sandboxEnv[key];
+      }
+    }
+    // 保留一些必要的环境变量
+    const essentialVars = ['PATH', 'HOME', 'USER', 'LANG', 'TERM'];
+    for (const key of essentialVars) {
+      if (sandboxEnv[key] && !filteredEnv[key]) {
+        filteredEnv[key] = sandboxEnv[key];
+      }
+    }
+    sandboxEnv = filteredEnv;
+  }
+
   // 添加命令
   bwrapArgs.push('--', 'bash', '-c', command);
 
@@ -151,7 +235,7 @@ export async function executeInSandbox(
     let killed = false;
 
     const proc = spawn('bwrap', bwrapArgs, {
-      env: { ...process.env, ...env },
+      env: sandboxEnv,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
 

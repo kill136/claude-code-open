@@ -1,11 +1,19 @@
 /**
  * 权限模式系统
  * 控制工具执行的权限检查
+ *
+ * 功能：
+ * - 工具级权限控制 (allow/deny 特定工具)
+ * - 路径级权限 (支持 glob patterns)
+ * - 命令级权限 (Bash 命令白名单/黑名单)
+ * - 永久记忆和会话记忆
+ * - 权限审计日志
  */
 
 import * as readline from 'readline';
 import * as path from 'path';
 import * as fs from 'fs';
+import { minimatch } from 'minimatch';
 import type { PermissionMode } from '../types/index.js';
 
 // 权限请求类型
@@ -53,6 +61,52 @@ interface RememberedPermission {
   timestamp: number;
 }
 
+// 权限配置格式（匹配官方 CLI settings.json 格式）
+export interface PermissionConfig {
+  // 工具级白名单/黑名单
+  tools?: {
+    allow?: string[];  // 允许的工具名称列表
+    deny?: string[];   // 禁止的工具名称列表
+  };
+
+  // 路径级白名单/黑名单（支持 glob patterns）
+  paths?: {
+    allow?: string[];  // 允许访问的路径 glob patterns
+    deny?: string[];   // 禁止访问的路径 glob patterns
+  };
+
+  // Bash 命令级白名单/黑名单（支持 glob patterns）
+  commands?: {
+    allow?: string[];  // 允许的命令 patterns
+    deny?: string[];   // 禁止的命令 patterns
+  };
+
+  // 网络请求白名单/黑名单
+  network?: {
+    allow?: string[];  // 允许的域名/URL patterns
+    deny?: string[];   // 禁止的域名/URL patterns
+  };
+
+  // 审计日志配置
+  audit?: {
+    enabled?: boolean;
+    logFile?: string;
+    maxSize?: number;  // 最大日志文件大小（字节）
+  };
+}
+
+// 审计日志条目
+interface AuditLogEntry {
+  timestamp: string;
+  type: PermissionType;
+  tool: string;
+  resource?: string;
+  decision: 'allow' | 'deny';
+  reason: string;
+  scope?: 'once' | 'session' | 'always';
+  user?: boolean;  // 是否由用户手动决定
+}
+
 // 权限管理器
 export class PermissionManager {
   private mode: PermissionMode = 'default';
@@ -62,10 +116,23 @@ export class PermissionManager {
   private allowedDirs: string[] = [];
   private configDir: string;
 
+  // 权限配置（从 settings.json 加载）
+  private permissionConfig: PermissionConfig = {};
+
+  // 审计日志
+  private auditLogPath: string;
+  private auditEnabled: boolean = false;
+
   constructor(mode: PermissionMode = 'default') {
     this.mode = mode;
     this.configDir = process.env.CLAUDE_CONFIG_DIR ||
                      path.join(process.env.HOME || '~', '.claude');
+
+    // 审计日志路径
+    this.auditLogPath = path.join(this.configDir, 'permissions-audit.log');
+
+    // 加载权限配置（从 settings.json）
+    this.loadPermissionConfig();
 
     // 加载持久化的权限
     this.loadPersistedPermissions();
@@ -113,34 +180,48 @@ export class PermissionManager {
 
   // 检查权限
   async check(request: PermissionRequest): Promise<PermissionDecision> {
+    let decision: PermissionDecision;
+
     // 根据模式处理
     switch (this.mode) {
       case 'bypassPermissions':
-        return { allowed: true, reason: 'Permissions bypassed' };
+        decision = { allowed: true, reason: 'Permissions bypassed' };
+        break;
 
       case 'dontAsk':
         // 对于安全操作自动允许，危险操作自动拒绝
-        return this.autoDecide(request);
+        decision = this.autoDecide(request);
+        break;
 
       case 'acceptEdits':
         // 自动接受文件编辑
         if (request.type === 'file_write' || request.type === 'file_read') {
-          return { allowed: true, reason: 'Auto-accept edits mode' };
+          decision = { allowed: true, reason: 'Auto-accept edits mode' };
+        } else {
+          decision = await this.checkWithRules(request);
         }
-        return this.checkWithRules(request);
+        break;
 
       case 'plan':
         // 计划模式下不执行任何操作
-        return { allowed: false, reason: 'Plan mode - no execution' };
+        decision = { allowed: false, reason: 'Plan mode - no execution' };
+        break;
 
       case 'delegate':
         // 委托模式 - 需要实现更复杂的逻辑
-        return this.checkWithRules(request);
+        decision = await this.checkWithRules(request);
+        break;
 
       case 'default':
       default:
-        return this.checkWithRules(request);
+        decision = await this.checkWithRules(request);
+        break;
     }
+
+    // 记录审计日志
+    this.logAudit(request, decision);
+
+    return decision;
   }
 
   // 自动决策（用于 dontAsk 模式）
@@ -163,19 +244,49 @@ export class PermissionManager {
 
   // 根据规则检查
   private async checkWithRules(request: PermissionRequest): Promise<PermissionDecision> {
-    // 首先检查已记住的权限
+    // 1. 检查工具级权限配置（优先级最高）
+    const toolCheck = this.checkToolPermission(request);
+    if (toolCheck !== null) {
+      return { allowed: toolCheck, reason: toolCheck ? 'Tool allowed by config' : 'Tool denied by config' };
+    }
+
+    // 2. 检查路径级权限配置
+    if (request.resource && (request.type === 'file_read' || request.type === 'file_write' || request.type === 'file_delete')) {
+      const pathCheck = this.checkPathPermission(request.resource);
+      if (pathCheck !== null) {
+        return { allowed: pathCheck, reason: pathCheck ? 'Path allowed by config' : 'Path denied by config' };
+      }
+    }
+
+    // 3. 检查命令级权限配置
+    if (request.type === 'bash_command' && request.resource) {
+      const cmdCheck = this.checkCommandPermission(request.resource);
+      if (cmdCheck !== null) {
+        return { allowed: cmdCheck, reason: cmdCheck ? 'Command allowed by config' : 'Command denied by config' };
+      }
+    }
+
+    // 4. 检查网络权限配置
+    if (request.type === 'network_request' && request.resource) {
+      const netCheck = this.checkNetworkPermission(request.resource);
+      if (netCheck !== null) {
+        return { allowed: netCheck, reason: netCheck ? 'Network allowed by config' : 'Network denied by config' };
+      }
+    }
+
+    // 5. 检查已记住的权限
     const remembered = this.checkRemembered(request);
     if (remembered !== null) {
       return { allowed: remembered, reason: 'Previously remembered' };
     }
 
-    // 检查会话权限
+    // 6. 检查会话权限
     const sessionKey = this.getPermissionKey(request);
     if (this.sessionPermissions.has(sessionKey)) {
       return { allowed: this.sessionPermissions.get(sessionKey)!, reason: 'Session permission' };
     }
 
-    // 检查规则
+    // 7. 检查预定义规则
     for (const rule of this.rules) {
       if (this.ruleMatches(rule, request)) {
         if (rule.action === 'allow') {
@@ -188,7 +299,7 @@ export class PermissionManager {
       }
     }
 
-    // 交互式询问
+    // 8. 交互式询问
     return this.askUser(request);
   }
 
@@ -375,6 +486,246 @@ export class PermissionManager {
     }
   }
 
+  // 加载权限配置（从 settings.json）
+  private loadPermissionConfig(): void {
+    const settingsFile = path.join(this.configDir, 'settings.json');
+
+    if (!fs.existsSync(settingsFile)) {
+      return;
+    }
+
+    try {
+      const settings = JSON.parse(fs.readFileSync(settingsFile, 'utf-8'));
+      if (settings.permissions) {
+        this.permissionConfig = settings.permissions;
+
+        // 配置审计日志
+        if (this.permissionConfig.audit?.enabled) {
+          this.auditEnabled = true;
+          if (this.permissionConfig.audit.logFile) {
+            this.auditLogPath = path.resolve(this.permissionConfig.audit.logFile);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to load permission config from settings.json:', err);
+    }
+  }
+
+  // 检查工具级权限
+  private checkToolPermission(request: PermissionRequest): boolean | null {
+    const { tools } = this.permissionConfig;
+    if (!tools) return null;
+
+    // 黑名单优先
+    if (tools.deny?.length) {
+      for (const pattern of tools.deny) {
+        if (this.matchesPattern(request.tool, pattern)) {
+          return false;
+        }
+      }
+    }
+
+    // 白名单检查
+    if (tools.allow?.length) {
+      for (const pattern of tools.allow) {
+        if (this.matchesPattern(request.tool, pattern)) {
+          return true;
+        }
+      }
+      // 如果定义了白名单，但不在白名单中，则拒绝
+      return false;
+    }
+
+    return null;
+  }
+
+  // 检查路径级权限（支持 glob patterns）
+  private checkPathPermission(filePath: string): boolean | null {
+    const { paths } = this.permissionConfig;
+    if (!paths) return null;
+
+    const resolvedPath = path.resolve(filePath);
+
+    // 黑名单优先
+    if (paths.deny?.length) {
+      for (const pattern of paths.deny) {
+        if (this.matchesGlobPath(resolvedPath, pattern)) {
+          return false;
+        }
+      }
+    }
+
+    // 白名单检查
+    if (paths.allow?.length) {
+      for (const pattern of paths.allow) {
+        if (this.matchesGlobPath(resolvedPath, pattern)) {
+          return true;
+        }
+      }
+      // 如果定义了白名单，但不在白名单中，则拒绝
+      return false;
+    }
+
+    return null;
+  }
+
+  // 检查命令级权限（支持 glob patterns）
+  private checkCommandPermission(command: string): boolean | null {
+    const { commands } = this.permissionConfig;
+    if (!commands) return null;
+
+    // 提取命令主体（第一个单词）
+    const cmdName = command.trim().split(/\s+/)[0];
+
+    // 黑名单优先
+    if (commands.deny?.length) {
+      for (const pattern of commands.deny) {
+        if (this.matchesPattern(command, pattern) || this.matchesPattern(cmdName, pattern)) {
+          return false;
+        }
+      }
+    }
+
+    // 白名单检查
+    if (commands.allow?.length) {
+      for (const pattern of commands.allow) {
+        if (this.matchesPattern(command, pattern) || this.matchesPattern(cmdName, pattern)) {
+          return true;
+        }
+      }
+      // 如果定义了白名单，但不在白名单中，则拒绝
+      return false;
+    }
+
+    return null;
+  }
+
+  // 检查网络权限
+  private checkNetworkPermission(url: string): boolean | null {
+    const { network } = this.permissionConfig;
+    if (!network) return null;
+
+    // 提取域名
+    let domain: string;
+    try {
+      const urlObj = new URL(url);
+      domain = urlObj.hostname;
+    } catch {
+      domain = url;
+    }
+
+    // 黑名单优先
+    if (network.deny?.length) {
+      for (const pattern of network.deny) {
+        if (this.matchesPattern(domain, pattern) || this.matchesPattern(url, pattern)) {
+          return false;
+        }
+      }
+    }
+
+    // 白名单检查
+    if (network.allow?.length) {
+      for (const pattern of network.allow) {
+        if (this.matchesPattern(domain, pattern) || this.matchesPattern(url, pattern)) {
+          return true;
+        }
+      }
+      // 如果定义了白名单，但不在白名单中，则拒绝
+      return false;
+    }
+
+    return null;
+  }
+
+  // 模式匹配（支持通配符 * 和 ?）
+  private matchesPattern(value: string, pattern: string): boolean {
+    // 精确匹配
+    if (value === pattern) return true;
+
+    // 通配符匹配
+    if (pattern.includes('*') || pattern.includes('?')) {
+      return minimatch(value, pattern, { nocase: false });
+    }
+
+    // 包含匹配
+    return value.includes(pattern);
+  }
+
+  // Glob 路径匹配
+  private matchesGlobPath(filePath: string, pattern: string): boolean {
+    // 将 pattern 解析为绝对路径（如果不是 glob pattern）
+    let globPattern = pattern;
+
+    // 如果 pattern 不包含通配符，将其视为路径前缀
+    if (!pattern.includes('*') && !pattern.includes('?') && !pattern.includes('[')) {
+      const resolvedPattern = path.resolve(pattern);
+      return filePath.startsWith(resolvedPattern);
+    }
+
+    // 使用 minimatch 进行 glob 匹配
+    return minimatch(filePath, globPattern, {
+      dot: true,
+      matchBase: false,
+      nocase: process.platform === 'win32'
+    });
+  }
+
+  // 记录审计日志
+  private logAudit(request: PermissionRequest, decision: PermissionDecision): void {
+    if (!this.auditEnabled) return;
+
+    const entry: AuditLogEntry = {
+      timestamp: new Date().toISOString(),
+      type: request.type,
+      tool: request.tool,
+      resource: request.resource,
+      decision: decision.allowed ? 'allow' : 'deny',
+      reason: decision.reason || 'No reason provided',
+      scope: decision.scope,
+      user: decision.scope !== undefined,  // 如果有 scope，说明是用户决定的
+    };
+
+    try {
+      // 检查日志文件大小
+      const maxSize = this.permissionConfig.audit?.maxSize || 10 * 1024 * 1024; // 默认 10MB
+      if (fs.existsSync(this.auditLogPath)) {
+        const stats = fs.statSync(this.auditLogPath);
+        if (stats.size > maxSize) {
+          // 归档旧日志
+          const archivePath = `${this.auditLogPath}.${Date.now()}`;
+          fs.renameSync(this.auditLogPath, archivePath);
+        }
+      }
+
+      // 追加日志
+      const logLine = JSON.stringify(entry) + '\n';
+      fs.appendFileSync(this.auditLogPath, logLine);
+    } catch (err) {
+      console.warn('Failed to write audit log:', err);
+    }
+  }
+
+  // 设置权限配置
+  setPermissionConfig(config: PermissionConfig): void {
+    this.permissionConfig = config;
+
+    // 更新审计日志配置
+    if (config.audit?.enabled) {
+      this.auditEnabled = true;
+      if (config.audit.logFile) {
+        this.auditLogPath = path.resolve(config.audit.logFile);
+      }
+    } else {
+      this.auditEnabled = false;
+    }
+  }
+
+  // 获取权限配置
+  getPermissionConfig(): PermissionConfig {
+    return { ...this.permissionConfig };
+  }
+
   // 导出权限配置
   export(): object {
     return {
@@ -382,6 +733,8 @@ export class PermissionManager {
       rules: this.rules,
       rememberedPermissions: this.rememberedPermissions,
       allowedDirs: this.allowedDirs,
+      permissionConfig: this.permissionConfig,
+      auditEnabled: this.auditEnabled,
     };
   }
 }
@@ -425,3 +778,6 @@ export function requiresPermission(type: PermissionType, descriptionFn?: (input:
 
 // 默认权限管理器实例
 export const permissionManager = new PermissionManager();
+
+// ============ T071: 细粒度工具权限控制 ============
+export * from './tools.js';

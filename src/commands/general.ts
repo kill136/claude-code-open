@@ -367,6 +367,261 @@ export const versionCommand: SlashCommand = {
   },
 };
 
+// /memory - 记忆管理 (官方风格)
+export const memoryCommand: SlashCommand = {
+  name: 'memory',
+  aliases: ['mem', 'remember'],
+  description: 'Manage persistent memory for user preferences and project context',
+  usage: '/memory [show|add|clear|search] [content]',
+  category: 'general',
+  execute: async (ctx: CommandContext): Promise<CommandResult> => {
+    const { args } = ctx;
+
+    // 动态导入 memory 模块
+    const { getMemoryManager } = await import('../memory/index.js');
+    const memoryManager = getMemoryManager(ctx.config.cwd);
+
+    // 无参数或 show：显示所有记忆
+    if (args.length === 0 || args[0] === 'show') {
+      const entries = memoryManager.list();
+
+      if (entries.length === 0) {
+        ctx.ui.addMessage('assistant', 'No memory entries found.\n\nUse /memory add <content> to create memories.');
+        return { success: true };
+      }
+
+      let memoryText = `Memory Entries (${entries.length})\n\n`;
+
+      // 按作用域分组
+      const globalEntries = entries.filter(e => e.scope === 'global');
+      const projectEntries = entries.filter(e => e.scope === 'project');
+
+      if (projectEntries.length > 0) {
+        memoryText += `Project Memory (${projectEntries.length})\n`;
+        memoryText += `${'-'.repeat(20)}\n`;
+        for (const entry of projectEntries) {
+          const updatedDate = new Date(entry.updatedAt).toLocaleDateString();
+          memoryText += `  • ${entry.key}: ${entry.value}\n`;
+          memoryText += `    Updated: ${updatedDate}\n`;
+        }
+        memoryText += '\n';
+      }
+
+      if (globalEntries.length > 0) {
+        memoryText += `Global Memory (${globalEntries.length})\n`;
+        memoryText += `${'-'.repeat(20)}\n`;
+        for (const entry of globalEntries) {
+          const updatedDate = new Date(entry.updatedAt).toLocaleDateString();
+          memoryText += `  • ${entry.key}: ${entry.value}\n`;
+          memoryText += `    Updated: ${updatedDate}\n`;
+        }
+        memoryText += '\n';
+      }
+
+      memoryText += `Commands:\n`;
+      memoryText += `  /memory add <key>: <value>  - Add new memory\n`;
+      memoryText += `  /memory search <query>      - Search memories\n`;
+      memoryText += `  /memory clear               - Clear all memories\n`;
+
+      ctx.ui.addMessage('assistant', memoryText);
+      return { success: true };
+    }
+
+    // add: 添加记忆
+    if (args[0] === 'add') {
+      if (args.length < 2) {
+        ctx.ui.addMessage('assistant', 'Usage: /memory add <key>: <value>\n\nExample: /memory add preferred_language: TypeScript');
+        return { success: false };
+      }
+
+      const content = args.slice(1).join(' ');
+      const colonIndex = content.indexOf(':');
+
+      if (colonIndex === -1) {
+        ctx.ui.addMessage('assistant', 'Invalid format. Use: /memory add <key>: <value>\n\nExample: /memory add coding_style: functional programming');
+        return { success: false };
+      }
+
+      const key = content.substring(0, colonIndex).trim();
+      const value = content.substring(colonIndex + 1).trim();
+
+      if (!key || !value) {
+        ctx.ui.addMessage('assistant', 'Both key and value are required.\n\nExample: /memory add test_framework: Jest');
+        return { success: false };
+      }
+
+      memoryManager.set(key, value, 'project');
+      ctx.ui.addMessage('assistant', `Memory added:\n  ${key}: ${value}\n\nThis will be remembered for future conversations in this project.`);
+      ctx.ui.addActivity(`Added memory: ${key}`);
+      return { success: true };
+    }
+
+    // clear: 清除记忆
+    if (args[0] === 'clear') {
+      const scope = args[1] === 'global' ? 'global' : 'project';
+      memoryManager.clear(scope);
+      ctx.ui.addMessage('assistant', `${scope === 'global' ? 'Global' : 'Project'} memory cleared.`);
+      ctx.ui.addActivity('Cleared memory');
+      return { success: true };
+    }
+
+    // search: 搜索记忆
+    if (args[0] === 'search') {
+      if (args.length < 2) {
+        ctx.ui.addMessage('assistant', 'Usage: /memory search <query>\n\nExample: /memory search language');
+        return { success: false };
+      }
+
+      const query = args.slice(1).join(' ');
+      const results = memoryManager.search(query);
+
+      if (results.length === 0) {
+        ctx.ui.addMessage('assistant', `No memories found matching "${query}".`);
+        return { success: true };
+      }
+
+      let searchText = `Search Results for "${query}" (${results.length})\n\n`;
+      for (const entry of results) {
+        searchText += `  • ${entry.key}: ${entry.value}\n`;
+        searchText += `    Scope: ${entry.scope}, Updated: ${new Date(entry.updatedAt).toLocaleDateString()}\n`;
+      }
+
+      ctx.ui.addMessage('assistant', searchText);
+      return { success: true };
+    }
+
+    // 未知子命令
+    ctx.ui.addMessage('assistant', `Unknown memory command: ${args[0]}\n\nAvailable commands:\n  /memory [show]     - Show all memories\n  /memory add        - Add new memory\n  /memory clear      - Clear memories\n  /memory search     - Search memories`);
+    return { success: false };
+  },
+};
+
+// /plan - 计划模式管理 (增强版)
+export const planCommand: SlashCommand = {
+  name: 'plan',
+  description: 'Enter planning mode or manage current plan',
+  usage: '/plan [status|exit|<task>]',
+  category: 'development',
+  execute: async (ctx: CommandContext): Promise<CommandResult> => {
+    const { args } = ctx;
+
+    // 动态导入 planmode 模块
+    const { isPlanModeActive, getPlanFile } = await import('../tools/planmode.js');
+
+    // /plan status - 显示当前计划状态
+    if (args.length > 0 && args[0] === 'status') {
+      if (!isPlanModeActive()) {
+        ctx.ui.addMessage('assistant', 'Not currently in plan mode.\n\nUse /plan to enter plan mode for complex tasks.');
+        return { success: true };
+      }
+
+      const planFile = getPlanFile();
+      let statusText = `Plan Mode Status\n\n`;
+      statusText += `Status: Active (READ-ONLY mode)\n`;
+      statusText += `Plan File: ${planFile || 'Not yet created'}\n\n`;
+
+      // 如果计划文件存在，读取并显示
+      if (planFile) {
+        try {
+          const fs = await import('fs');
+          if (fs.existsSync(planFile)) {
+            const planContent = fs.readFileSync(planFile, 'utf-8');
+            statusText += `Current Plan:\n`;
+            statusText += `${'='.repeat(40)}\n`;
+            statusText += planContent;
+            statusText += `\n${'='.repeat(40)}\n\n`;
+          }
+        } catch (error) {
+          // 忽略读取错误
+        }
+      }
+
+      statusText += `Commands:\n`;
+      statusText += `  /plan exit  - Exit plan mode and present plan for approval\n`;
+
+      ctx.ui.addMessage('assistant', statusText);
+      return { success: true };
+    }
+
+    // /plan exit - 退出计划模式
+    if (args.length > 0 && args[0] === 'exit') {
+      if (!isPlanModeActive()) {
+        ctx.ui.addMessage('assistant', 'Not currently in plan mode.');
+        return { success: false };
+      }
+
+      // 使用 ExitPlanMode 工具的提示
+      const exitPrompt = 'Use the ExitPlanMode tool to exit plan mode and present your plan for approval.';
+      ctx.ui.addMessage('user', exitPrompt);
+      return { success: true };
+    }
+
+    // /plan 或 /plan <task> - 进入计划模式
+    const taskDescription = args.join(' ');
+
+    // 基于官方源码的完整计划模式提示
+    const planPrompt = `You should now enter plan mode to handle this request.
+
+${taskDescription ? `Task: ${taskDescription}
+
+` : ''}Use the EnterPlanMode tool to begin planning.
+
+## What is Plan Mode?
+
+Plan Mode is designed for complex tasks that require careful planning and exploration before implementation.
+
+## When to Use Plan Mode
+
+Use EnterPlanMode when ANY of these conditions apply:
+
+1. **Multiple Valid Approaches**: The task can be solved in several different ways, each with trade-offs
+   - Example: "Add caching to the API" - could use Redis, in-memory, file-based, etc.
+   - Example: "Improve performance" - many optimization strategies possible
+
+2. **Significant Architectural Decisions**: The task requires choosing between architectural patterns
+   - Example: "Add real-time updates" - WebSockets vs SSE vs polling
+   - Example: "Implement state management" - Redux vs Context vs custom solution
+
+3. **Large-Scale Changes**: The task touches many files or systems
+   - Example: "Refactor the authentication system"
+   - Example: "Migrate from REST to GraphQL"
+
+4. **Unclear Requirements**: You need to explore before understanding the full scope
+   - Example: "Make the app faster" - need to profile and identify bottlenecks
+   - Example: "Fix the bug in checkout" - need to investigate root cause
+
+5. **User Input Needed**: You'll need to ask clarifying questions before starting
+   - Plan mode lets you explore first, then present options with context
+
+## What Happens in Plan Mode
+
+In plan mode, you'll:
+1. Thoroughly explore the codebase using Glob, Grep, and Read tools
+2. Understand existing patterns and architecture
+3. Design an implementation approach
+4. Write your plan to a plan file (the ONLY file you can edit in plan mode)
+5. Use AskUserQuestion if you need to clarify approaches
+6. Exit plan mode with ExitPlanMode when ready to implement
+
+## Important Notes
+
+- Plan mode is READ-ONLY: You cannot modify any files except the plan file
+- You must thoroughly explore the codebase before writing your plan
+- Your plan should be concise enough to scan quickly, but detailed enough to execute effectively
+- Include the paths of critical files to be modified in your plan
+- Only exit plan mode when you have a complete, actionable plan
+
+## Available Commands
+
+While in plan mode:
+  /plan status  - View current plan and status
+  /plan exit    - Exit plan mode (or use ExitPlanMode tool)`;
+
+    ctx.ui.addMessage('user', planPrompt);
+    return { success: true };
+  },
+};
+
 // 注册所有通用命令
 export function registerGeneralCommands(): void {
   commandRegistry.register(helpCommand);
@@ -376,4 +631,6 @@ export function registerGeneralCommands(): void {
   commandRegistry.register(doctorCommand);
   commandRegistry.register(bugCommand);
   commandRegistry.register(versionCommand);
+  commandRegistry.register(memoryCommand);
+  commandRegistry.register(planCommand);
 }

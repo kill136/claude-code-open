@@ -1,0 +1,76 @@
+{
+  "apiKey": "your-api-key-here",
+  "model": "sonnet",
+  "permissions": {
+    "tools": {
+      "allow": [
+        "Read",
+        "Glob",
+        "Grep",
+        "WebFetch"
+      ],
+      "deny": [
+        "Bash:rm *",
+        "Bash:sudo *",
+        "Write:/etc/**"
+      ]
+    },
+    "paths": {
+      "allow": [
+        "/home/user/project/**",
+        "/tmp/**",
+        "~/.claude/**"
+      ],
+      "deny": [
+        "/etc/**",
+        "/root/**",
+        "/sys/**",
+        "/proc/**",
+        "~/.ssh/**",
+        "**/.env",
+        "**/credentials.json"
+      ]
+    },
+    "commands": {
+      "allow": [
+        "ls*",
+        "pwd",
+        "cat*",
+        "head*",
+        "tail*",
+        "grep*",
+        "find*",
+        "git status",
+        "git log*",
+        "git diff*",
+        "npm*",
+        "node*"
+      ],
+      "deny": [
+        "rm -rf *",
+        "sudo *",
+        "chmod 777 *",
+        "dd *",
+        "mkfs*",
+        "> /dev/sd*"
+      ]
+    },
+    "network": {
+      "allow": [
+        "*.anthropic.com",
+        "api.github.com",
+        "*.npmjs.org"
+      ],
+      "deny": [
+        "*.malicious-site.com",
+        "192.168.*",
+        "10.*"
+      ]
+    },
+    "audit": {
+      "enabled": true,
+      "logFile": "~/.claude/permissions-audit.log",
+      "maxSize": 10485760
+    }
+  }
+}

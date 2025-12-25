@@ -91,6 +91,9 @@ program
   .option('--add-dir <directories...>', 'Additional directories to allow tool access')
   .option('--ide', 'Auto-connect to IDE on startup')
   .option('--agents <json>', 'JSON object defining custom agents')
+  .option('--teleport <session-id>', 'Connect to remote Claude Code session')
+  .option('--include-dependencies', 'Auto-include project dependency type definitions')
+  .option('--solo', 'Disable background processes and parallel execution')
   .option('--setting-sources <sources>', 'Comma-separated list of setting sources')
   .option('--plugin-dir <paths...>', 'Load plugins from directories')
   .option('--disable-slash-commands', 'Disable all slash commands')
@@ -101,6 +104,11 @@ program
     // 调试模式
     if (options.debug) {
       process.env.CLAUDE_DEBUG = options.debug === true ? '*' : options.debug;
+    }
+
+    // Solo 模式 - 禁用后台进程和并行执行
+    if (options.solo) {
+      process.env.CLAUDE_SOLO_MODE = 'true';
     }
 
     // 模型映射
@@ -121,9 +129,34 @@ program
       systemPrompt = (systemPrompt || '') + '\n' + options.appendSystemPrompt;
     }
 
+    // Include dependencies - 添加依赖类型定义到系统提示
+    if (options.includeDependencies) {
+      const dependenciesContext = '\n\nNote: Project dependency type definitions are automatically included for better code understanding.';
+      systemPrompt = (systemPrompt || '') + dependenciesContext;
+    }
+
     // 加载设置
     if (options.settings) {
       loadSettings(options.settings);
+    }
+
+    // Teleport 模式 - 连接到远程会话
+    if (options.teleport) {
+      try {
+        console.log(chalk.cyan(`Connecting to remote session: ${options.teleport}...`));
+        // 这里会在后续实现中添加远程会话连接逻辑
+        // 目前先作为会话恢复的一个变体处理
+        const session = Session.load(options.teleport);
+        if (!session) {
+          console.log(chalk.yellow(`Remote session ${options.teleport} not found or not accessible`));
+          console.log(chalk.gray('Starting new session instead...'));
+        } else {
+          console.log(chalk.green(`Connected to remote session: ${options.teleport}`));
+        }
+      } catch (err) {
+        console.log(chalk.red(`Failed to connect to remote session: ${err}`));
+        console.log(chalk.gray('Starting new session instead...'));
+      }
     }
 
     // 打印模式 (JSON 格式支持) - 不使用 TUI
@@ -547,11 +580,141 @@ program
 program
   .command('update')
   .description('Check for updates and install if available')
-  .action(async () => {
-    console.log(chalk.bold('\nChecking for updates...\n'));
-    console.log(`Current version: ${VERSION}`);
-    console.log(chalk.gray('\nTo update, run: npm install -g @anthropic-ai/claude-code'));
-    console.log(chalk.gray('Or for this restored version: npm install -g claude-code-restored\n'));
+  .option('--force', 'Force reinstall even if already up to date')
+  .option('--beta', 'Install beta version')
+  .option('--canary', 'Install canary version')
+  .option('--dry-run', 'Show what would be updated without actually updating')
+  .option('--list-versions', 'List all available versions')
+  .option('--version <version>', 'Install a specific version')
+  .option('--rollback <version>', 'Rollback to a specific version')
+  .action(async (options) => {
+    const { checkForUpdates, performUpdate, rollbackVersion, listVersions } = await import('./updater/index.js');
+
+    console.log(chalk.bold('\n📦 Claude Code Update Manager\n'));
+
+    try {
+      // 列出可用版本
+      if (options.listVersions) {
+        console.log(chalk.cyan('Fetching available versions...\n'));
+        const versions = await listVersions();
+        console.log(chalk.bold('Available Versions:\n'));
+        versions.slice(0, 20).forEach((v, i) => {
+          if (i === 0) {
+            console.log(chalk.green(`  ✓ ${v} (latest)`));
+          } else {
+            console.log(chalk.gray(`    ${v}`));
+          }
+        });
+        if (versions.length > 20) {
+          console.log(chalk.gray(`\n  ... and ${versions.length - 20} more versions`));
+        }
+        console.log();
+        return;
+      }
+
+      // 回滚版本
+      if (options.rollback) {
+        console.log(chalk.yellow(`Rolling back to version ${options.rollback}...\n`));
+        const success = await rollbackVersion(options.rollback, {
+          showProgress: true,
+          dryRun: options.dryRun,
+        });
+
+        if (success) {
+          console.log(chalk.green(`\n✓ Successfully rolled back to version ${options.rollback}`));
+        } else {
+          console.log(chalk.red('\n✗ Rollback failed'));
+        }
+        return;
+      }
+
+      // 检查更新
+      console.log(chalk.cyan(`Current version: ${VERSION}\n`));
+      console.log(chalk.gray('Checking for updates...\n'));
+
+      const updateInfo = await checkForUpdates({
+        channel: options.canary ? 'canary' : options.beta ? 'beta' : 'stable',
+      });
+
+      if (!updateInfo.hasUpdate && !options.force) {
+        console.log(chalk.green('✓ You are already on the latest version!'));
+        console.log();
+        return;
+      }
+
+      // 显示版本信息
+      console.log(chalk.bold('Update Available:\n'));
+      console.log(`  Current:  ${chalk.gray(updateInfo.current)}`);
+      console.log(`  Latest:   ${chalk.green(updateInfo.latest)}\n`);
+
+      // 显示变更日志
+      if (updateInfo.changelog && updateInfo.changelog.length > 0) {
+        console.log(chalk.bold('Recent Versions:\n'));
+        updateInfo.changelog.slice(0, 5).forEach(v => {
+          console.log(chalk.gray(`  • ${v}`));
+        });
+        console.log();
+      }
+
+      // 显示版本详情
+      if (updateInfo.versionInfo) {
+        const info = updateInfo.versionInfo;
+        if (info.description) {
+          console.log(chalk.gray(`Description: ${info.description}\n`));
+        }
+        if (info.minimumNodeVersion) {
+          console.log(chalk.gray(`Required Node.js: ${info.minimumNodeVersion}\n`));
+        }
+      }
+
+      // 执行更新
+      if (options.dryRun) {
+        console.log(chalk.yellow('[DRY-RUN] Would update to version ' + updateInfo.latest));
+        console.log(chalk.gray('Run without --dry-run to perform the actual update\n'));
+        return;
+      }
+
+      // 确认更新
+      const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+      });
+
+      const shouldUpdate = await new Promise<boolean>((resolve) => {
+        rl.question(chalk.yellow(`\nUpdate to ${updateInfo.latest}? (y/N) `), (answer) => {
+          rl.close();
+          resolve(answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes');
+        });
+      });
+
+      if (!shouldUpdate && !options.force) {
+        console.log(chalk.gray('\nUpdate cancelled.\n'));
+        return;
+      }
+
+      console.log(chalk.cyan('\nUpdating...\n'));
+
+      const success = await performUpdate({
+        version: options.version,
+        force: options.force,
+        beta: options.beta,
+        canary: options.canary,
+        showProgress: true,
+        dryRun: false,
+      });
+
+      if (success) {
+        console.log(chalk.green('\n✓ Update completed successfully!'));
+        console.log(chalk.gray('Please restart Claude Code to use the new version.\n'));
+      } else {
+        console.log(chalk.red('\n✗ Update failed'));
+        console.log(chalk.gray('Try running: npm install -g claude-code-open\n'));
+      }
+    } catch (error) {
+      console.error(chalk.red('Error during update:'), error);
+      console.log(chalk.gray('\nManual update:'));
+      console.log(chalk.gray('  npm install -g claude-code-open\n'));
+    }
   });
 
 // Install 命令

@@ -1,41 +1,88 @@
 /**
  * Hooks 系统
- * 支持在工具调用前后执行自定义脚本
+ * 支持在工具调用前后执行自定义脚本或 URL 回调
+ * 基于官方 Claude Code CLI v2.0.76 逆向分析
  */
 
 import { spawn } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 
+/**
+ * Hook 事件类型（官方支持的 12 种事件）
+ */
 export type HookEvent =
-  | 'PreToolUse'
-  | 'PostToolUse'
-  | 'PostToolUseFailure'
-  | 'PrePromptSubmit'
-  | 'PostPromptSubmit'
-  | 'Notification'
-  | 'Stop'
-  | 'SessionStart'
-  | 'SessionEnd'
-  | 'SubagentStart'
-  | 'SubagentStop'
-  | 'PreCompact'
-  | 'PermissionRequest';
+  | 'PreToolUse'           // 工具执行前
+  | 'PostToolUse'          // 工具执行后
+  | 'PostToolUseFailure'   // 工具执行失败后
+  | 'Notification'         // 通知事件
+  | 'UserPromptSubmit'     // 用户提交提示
+  | 'SessionStart'         // 会话开始
+  | 'SessionEnd'           // 会话结束
+  | 'Stop'                 // 停止事件
+  | 'SubagentStart'        // 子代理开始
+  | 'SubagentStop'         // 子代理停止
+  | 'PreCompact'           // 压缩前
+  | 'PermissionRequest';   // 权限请求
 
-export interface HookConfig {
-  /** 事件类型 */
-  event: HookEvent;
-  /** 匹配条件（工具名或正则） */
-  matcher?: string;
-  /** 执行的命令 */
+/**
+ * Hook 类型
+ */
+export type HookType = 'command' | 'url';
+
+/**
+ * Command Hook 配置
+ */
+export interface CommandHookConfig {
+  type: 'command';
+  /** 执行的命令（支持环境变量替换，如 $TOOL_NAME） */
   command: string;
   /** 命令参数 */
   args?: string[];
-  /** 超时时间（毫秒） */
-  timeout?: number;
   /** 环境变量 */
   env?: Record<string, string>;
-  /** 是否阻塞（等待完成） */
+  /** 超时时间（毫秒，默认 30000） */
+  timeout?: number;
+  /** 是否阻塞（等待完成，默认 true） */
+  blocking?: boolean;
+  /** 匹配条件（工具名或正则） */
+  matcher?: string;
+}
+
+/**
+ * URL Hook 配置
+ */
+export interface UrlHookConfig {
+  type: 'url';
+  /** 回调 URL */
+  url: string;
+  /** HTTP 方法（默认 POST） */
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH';
+  /** 请求头 */
+  headers?: Record<string, string>;
+  /** 超时时间（毫秒，默认 10000） */
+  timeout?: number;
+  /** 是否阻塞（等待完成，默认 false） */
+  blocking?: boolean;
+  /** 匹配条件（工具名或正则） */
+  matcher?: string;
+}
+
+/**
+ * Hook 配置（联合类型）
+ */
+export type HookConfig = CommandHookConfig | UrlHookConfig;
+
+/**
+ * 旧版 Hook 配置（兼容性）
+ */
+export interface LegacyHookConfig {
+  event: HookEvent;
+  matcher?: string;
+  command: string;
+  args?: string[];
+  timeout?: number;
+  env?: Record<string, string>;
   blocking?: boolean;
 }
 
@@ -56,18 +103,43 @@ export interface HookResult {
   blockMessage?: string;
 }
 
-// 已注册的 hooks
-const registeredHooks: HookConfig[] = [];
+/**
+ * 注册的 Hooks 存储（按事件类型分组）
+ */
+export interface RegisteredHooks {
+  [event: string]: HookConfig[];
+}
+
+const registeredHooks: RegisteredHooks = {};
 
 /**
  * 注册 hook
  */
-export function registerHook(config: HookConfig): void {
-  registeredHooks.push(config);
+export function registerHook(event: HookEvent, config: HookConfig): void {
+  if (!registeredHooks[event]) {
+    registeredHooks[event] = [];
+  }
+  registeredHooks[event].push(config);
 }
 
 /**
- * 从配置文件加载 hooks
+ * 注册旧版 hook（兼容性）
+ */
+export function registerLegacyHook(config: LegacyHookConfig): void {
+  const hookConfig: CommandHookConfig = {
+    type: 'command',
+    command: config.command,
+    args: config.args,
+    env: config.env,
+    timeout: config.timeout,
+    blocking: config.blocking,
+    matcher: config.matcher,
+  };
+  registerHook(config.event, hookConfig);
+}
+
+/**
+ * 从配置文件加载 hooks（支持新旧两种格式）
  */
 export function loadHooksFromFile(configPath: string): void {
   if (!fs.existsSync(configPath)) return;
@@ -76,14 +148,81 @@ export function loadHooksFromFile(configPath: string): void {
     const content = fs.readFileSync(configPath, 'utf-8');
     const config = JSON.parse(content);
 
-    if (config.hooks && Array.isArray(config.hooks)) {
+    // 新格式：{ "hooks": { "PreToolUse": [...], "PostToolUse": [...] } }
+    if (config.hooks && typeof config.hooks === 'object' && !Array.isArray(config.hooks)) {
+      for (const [eventName, hooks] of Object.entries(config.hooks)) {
+        if (!isValidHookEvent(eventName)) {
+          console.warn(`Unknown hook event: ${eventName}`);
+          continue;
+        }
+
+        const hookArray = Array.isArray(hooks) ? hooks : [hooks];
+        for (const hook of hookArray) {
+          if (isValidHookConfig(hook)) {
+            registerHook(eventName as HookEvent, hook);
+          } else {
+            console.warn(`Invalid hook config for event ${eventName}:`, hook);
+          }
+        }
+      }
+    }
+    // 旧格式：{ "hooks": [...] }（兼容性）
+    else if (config.hooks && Array.isArray(config.hooks)) {
       for (const hook of config.hooks) {
-        registerHook(hook);
+        if (isValidLegacyHookConfig(hook)) {
+          registerLegacyHook(hook);
+        }
       }
     }
   } catch (err) {
     console.error(`Failed to load hooks from ${configPath}:`, err);
   }
+}
+
+/**
+ * 验证 Hook 事件名称
+ */
+function isValidHookEvent(event: string): boolean {
+  const validEvents: HookEvent[] = [
+    'PreToolUse',
+    'PostToolUse',
+    'PostToolUseFailure',
+    'Notification',
+    'UserPromptSubmit',
+    'SessionStart',
+    'SessionEnd',
+    'Stop',
+    'SubagentStart',
+    'SubagentStop',
+    'PreCompact',
+    'PermissionRequest',
+  ];
+  return validEvents.includes(event as HookEvent);
+}
+
+/**
+ * 验证 Hook 配置
+ */
+function isValidHookConfig(config: any): config is HookConfig {
+  if (!config || typeof config !== 'object') return false;
+
+  if (config.type === 'command') {
+    return typeof config.command === 'string';
+  } else if (config.type === 'url') {
+    return typeof config.url === 'string';
+  }
+
+  return false;
+}
+
+/**
+ * 验证旧版 Hook 配置
+ */
+function isValidLegacyHookConfig(config: any): config is LegacyHookConfig {
+  return config &&
+         typeof config === 'object' &&
+         typeof config.event === 'string' &&
+         typeof config.command === 'string';
 }
 
 /**
@@ -110,9 +249,9 @@ export function loadProjectHooks(projectDir: string): void {
  * 获取匹配的 hooks
  */
 function getMatchingHooks(event: HookEvent, toolName?: string): HookConfig[] {
-  return registeredHooks.filter((hook) => {
-    if (hook.event !== event) return false;
+  const hooks = registeredHooks[event] || [];
 
+  return hooks.filter((hook) => {
     if (hook.matcher && toolName) {
       // 支持正则匹配
       if (hook.matcher.startsWith('/') && hook.matcher.endsWith('/')) {
@@ -128,13 +267,29 @@ function getMatchingHooks(event: HookEvent, toolName?: string): HookConfig[] {
 }
 
 /**
- * 执行单个 hook
+ * 替换命令中的环境变量占位符
  */
-async function executeHook(hook: HookConfig, input: HookInput): Promise<HookResult> {
+function replaceCommandVariables(command: string, input: HookInput): string {
+  return command
+    .replace(/\$TOOL_NAME/g, input.toolName || '')
+    .replace(/\$EVENT/g, input.event)
+    .replace(/\$SESSION_ID/g, input.sessionId || '');
+}
+
+/**
+ * 执行 Command Hook
+ */
+async function executeCommandHook(
+  hook: CommandHookConfig,
+  input: HookInput
+): Promise<HookResult> {
   return new Promise((resolve) => {
     const timeout = hook.timeout || 30000;
     let stdout = '';
     let stderr = '';
+
+    // 替换命令中的环境变量
+    const command = replaceCommandVariables(hook.command, input);
 
     // 准备环境变量
     const env = {
@@ -152,11 +307,13 @@ async function executeHook(hook: HookConfig, input: HookInput): Promise<HookResu
       toolInput: input.toolInput,
       toolOutput: input.toolOutput,
       message: input.message,
+      sessionId: input.sessionId,
     });
 
-    const proc = spawn(hook.command, hook.args || [], {
+    const proc = spawn(command, hook.args || [], {
       env,
       stdio: ['pipe', 'pipe', 'pipe'],
+      shell: true, // 使用 shell 执行以支持复杂命令
     });
 
     const timeoutId = setTimeout(() => {
@@ -219,6 +376,106 @@ async function executeHook(hook: HookConfig, input: HookInput): Promise<HookResu
       });
     });
   });
+}
+
+/**
+ * 执行 URL Hook
+ */
+async function executeUrlHook(
+  hook: UrlHookConfig,
+  input: HookInput
+): Promise<HookResult> {
+  const timeout = hook.timeout || 10000;
+  const method = hook.method || 'POST';
+
+  const payload = {
+    event: input.event,
+    toolName: input.toolName,
+    toolInput: input.toolInput,
+    toolOutput: input.toolOutput,
+    message: input.message,
+    sessionId: input.sessionId,
+    timestamp: new Date().toISOString(),
+  };
+
+  try {
+    // 使用 fetch API（Node.js 18+ 内置）
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'User-Agent': 'Claude-Code-Hooks/2.0',
+      ...(hook.headers || {}),
+    };
+
+    const response = await fetch(hook.url, {
+      method,
+      headers,
+      body: method !== 'GET' ? JSON.stringify(payload) : undefined,
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    const responseText = await response.text();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: `HTTP ${response.status}: ${responseText}`,
+      };
+    }
+
+    // 尝试解析 JSON 响应
+    try {
+      const responseJson = JSON.parse(responseText);
+      if (responseJson.blocked) {
+        return {
+          success: false,
+          blocked: true,
+          blockMessage: responseJson.message || 'Blocked by hook',
+        };
+      }
+      return {
+        success: true,
+        output: responseText,
+      };
+    } catch {
+      // 非 JSON 响应
+      return {
+        success: true,
+        output: responseText,
+      };
+    }
+  } catch (err: any) {
+    if (err.name === 'AbortError') {
+      return {
+        success: false,
+        error: 'Hook request timed out',
+      };
+    }
+    return {
+      success: false,
+      error: err.message || 'Unknown error',
+    };
+  }
+}
+
+/**
+ * 执行单个 hook（根据类型分发）
+ */
+async function executeHook(hook: HookConfig, input: HookInput): Promise<HookResult> {
+  if (hook.type === 'command') {
+    return executeCommandHook(hook, input);
+  } else if (hook.type === 'url') {
+    return executeUrlHook(hook, input);
+  } else {
+    return {
+      success: false,
+      error: `Unknown hook type: ${(hook as any).type}`,
+    };
+  }
 }
 
 /**
@@ -294,17 +551,102 @@ export async function runPostToolUseHooks(
 }
 
 /**
+ * UserPromptSubmit hook - 用户提交提示时触发
+ */
+export async function runUserPromptSubmitHooks(
+  prompt: string,
+  sessionId?: string
+): Promise<{ allowed: boolean; message?: string }> {
+  const results = await runHooks({
+    event: 'UserPromptSubmit',
+    message: prompt,
+    sessionId,
+  });
+
+  const blockCheck = isBlocked(results);
+  return {
+    allowed: !blockCheck.blocked,
+    message: blockCheck.message,
+  };
+}
+
+/**
+ * Stop hook - 停止事件触发
+ */
+export async function runStopHooks(
+  reason?: string,
+  sessionId?: string
+): Promise<void> {
+  await runHooks({
+    event: 'Stop',
+    message: reason,
+    sessionId,
+  });
+}
+
+/**
+ * PreCompact hook - 压缩前触发
+ */
+export async function runPreCompactHooks(
+  sessionId?: string,
+  currentTokens?: number
+): Promise<{ allowed: boolean; message?: string }> {
+  const results = await runHooks({
+    event: 'PreCompact',
+    message: currentTokens ? `Current tokens: ${currentTokens}` : undefined,
+    sessionId,
+  });
+
+  const blockCheck = isBlocked(results);
+  return {
+    allowed: !blockCheck.blocked,
+    message: blockCheck.message,
+  };
+}
+
+/**
+ * PostToolUseFailure hook - 工具执行失败后触发
+ */
+export async function runPostToolUseFailureHooks(
+  toolName: string,
+  toolInput: unknown,
+  error: string,
+  sessionId?: string
+): Promise<void> {
+  await runHooks({
+    event: 'PostToolUseFailure',
+    toolName,
+    toolInput,
+    message: error,
+    sessionId,
+  });
+}
+
+/**
  * 清除所有已注册的 hooks
  */
 export function clearHooks(): void {
-  registeredHooks.length = 0;
+  for (const event in registeredHooks) {
+    delete registeredHooks[event];
+  }
 }
 
 /**
  * 获取已注册的 hooks 数量
  */
 export function getHookCount(): number {
-  return registeredHooks.length;
+  let count = 0;
+  for (const event in registeredHooks) {
+    count += registeredHooks[event].length;
+  }
+  return count;
+}
+
+/**
+ * 获取指定事件的 hooks 数量
+ */
+export function getEventHookCount(event: HookEvent): number {
+  return (registeredHooks[event] || []).length;
 }
 
 /**
@@ -405,22 +747,61 @@ export async function runNotificationHooks(
 }
 
 /**
- * 获取所有已注册的 hooks
+ * 获取所有已注册的 hooks（按事件分组）
  */
-export function getRegisteredHooks(): HookConfig[] {
-  return [...registeredHooks];
+export function getRegisteredHooks(): RegisteredHooks {
+  return { ...registeredHooks };
+}
+
+/**
+ * 获取所有已注册的 hooks（扁平数组，兼容旧版）
+ */
+export function getRegisteredHooksFlat(): Array<{ event: HookEvent; config: HookConfig }> {
+  const result: Array<{ event: HookEvent; config: HookConfig }> = [];
+  for (const [event, hooks] of Object.entries(registeredHooks)) {
+    for (const config of hooks) {
+      result.push({ event: event as HookEvent, config });
+    }
+  }
+  return result;
+}
+
+/**
+ * 获取指定事件的 hooks
+ */
+export function getHooksForEvent(event: HookEvent): HookConfig[] {
+  return [...(registeredHooks[event] || [])];
 }
 
 /**
  * 取消注册 hook
  */
-export function unregisterHook(config: HookConfig): boolean {
-  const index = registeredHooks.findIndex(
-    (h) => h.event === config.event && h.command === config.command
-  );
+export function unregisterHook(event: HookEvent, config: HookConfig): boolean {
+  const hooks = registeredHooks[event];
+  if (!hooks) return false;
+
+  const index = hooks.findIndex((h) => {
+    if (h.type === 'command' && config.type === 'command') {
+      return h.command === config.command;
+    } else if (h.type === 'url' && config.type === 'url') {
+      return h.url === config.url;
+    }
+    return false;
+  });
+
   if (index !== -1) {
-    registeredHooks.splice(index, 1);
+    hooks.splice(index, 1);
+    if (hooks.length === 0) {
+      delete registeredHooks[event];
+    }
     return true;
   }
   return false;
+}
+
+/**
+ * 清除指定事件的所有 hooks
+ */
+export function clearEventHooks(event: HookEvent): void {
+  delete registeredHooks[event];
 }

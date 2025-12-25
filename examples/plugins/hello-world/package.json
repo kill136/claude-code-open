@@ -1,0 +1,12 @@
+{
+  "name": "hello-world",
+  "version": "1.0.0",
+  "description": "A simple hello world plugin for Claude Code",
+  "main": "index.js",
+  "author": "Claude Code Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0",
+    "claude-code": "^2.0.0"
+  }
+}
