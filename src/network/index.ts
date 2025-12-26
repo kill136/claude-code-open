@@ -4,9 +4,8 @@
  */
 
 // 代理支持
+export type { ProxyConfig, ProxyAgentOptions } from './proxy.js';
 export {
-  ProxyConfig,
-  ProxyAgentOptions,
   getProxyFromEnv,
   parseProxyUrl,
   shouldBypassProxy,
@@ -15,8 +14,8 @@ export {
 } from './proxy.js';
 
 // 超时和取消
+export type { TimeoutConfig } from './timeout.js';
 export {
-  TimeoutConfig,
   DEFAULT_TIMEOUTS,
   createTimeoutSignal,
   combineSignals,
@@ -29,8 +28,8 @@ export {
 } from './timeout.js';
 
 // 重试策略
+export type { RetryConfig } from './retry.js';
 export {
-  RetryConfig,
   DEFAULT_RETRY_CONFIG,
   calculateRetryDelay,
   isRetryableError,

@@ -9,7 +9,7 @@ export { ModelStats, modelStats } from './stats.js';
 export { ThinkingManager, thinkingManager } from './thinking.js';
 export { QuotaManager, quotaManager } from './quota.js';
 export { SubagentModelConfig, subagentModelConfig, AGENT_TYPES, type ModelSelectionStrategy } from './subagent-config.js';
-export {
+export type {
   ModelInfo,
   ModelCapabilities,
   ModelPricing,
