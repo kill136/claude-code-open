@@ -6,63 +6,44 @@
  * AI capabilities through the client application.
  *
  * Based on MCP Specification 2024-11-05
+ *
+ * ## Overview
+ *
+ * Sampling allows MCP servers to request LLM capabilities from the client.
+ * This is a "reverse" request flow where the server initiates the request
+ * and the client fulfills it by calling an LLM.
+ *
+ * ## Security
+ *
+ * Sampling requests SHOULD always involve human-in-the-loop review for:
+ * - Trust and safety considerations
+ * - Prompt injection attack prevention
+ * - Cost control
+ *
+ * ## Workflow
+ *
+ * 1. Server sends `sampling/createMessage` request to client
+ * 2. Client reviews request (can modify messages, system prompt, etc.)
+ * 3. Client executes LLM sampling
+ * 4. Client reviews completion before returning
+ * 5. Client returns result to server
  */
 
 import { EventEmitter } from 'events';
+import type {
+  CreateMessageParams,
+  CreateMessageResult,
+  ModelPreferences,
+  SamplingMessageContent,
+} from './protocol.js';
 
-// ============ Type Definitions ============
-
-/**
- * Sampling message content
- */
-export interface SamplingMessage {
-  role: 'user' | 'assistant';
-  content: {
-    type: string;
-    text?: string;
-    [key: string]: unknown;
-  };
-}
-
-/**
- * Model preferences for sampling
- */
-export interface ModelPreferences {
-  hints?: Array<{
-    name?: string;
-  }>;
-  costPriority?: number;  // 0-1, where 0 is most cost-sensitive
-  speedPriority?: number; // 0-1, where 0 is most speed-sensitive
-  intelligencePriority?: number; // 0-1, where 0 prioritizes speed/cost over intelligence
-}
-
-/**
- * Sampling request parameters (from server to client)
- */
-export interface CreateMessageParams {
-  messages: SamplingMessage[];
-  modelPreferences?: ModelPreferences;
-  systemPrompt?: string;
-  includeContext?: 'none' | 'thisServer' | 'allServers';
-  temperature?: number;
-  maxTokens: number;
-  stopSequences?: string[];
-  metadata?: Record<string, unknown>;
-}
-
-/**
- * Sampling response
- */
-export interface CreateMessageResult {
-  role: 'assistant';
-  content: {
-    type: string;
-    text?: string;
-    [key: string]: unknown;
-  };
-  model: string;
-  stopReason?: 'endTurn' | 'stopSequence' | 'maxTokens' | unknown;
-}
+// Re-export types for convenience
+export type {
+  CreateMessageParams,
+  CreateMessageResult,
+  ModelPreferences,
+  SamplingMessageContent,
+};
 
 /**
  * Sampling callback handler
@@ -230,6 +211,12 @@ export class McpSamplingManager extends EventEmitter {
 
   /**
    * Validate sampling parameters
+   *
+   * Validates according to MCP specification:
+   * - messages must be an array of message content objects
+   * - maxTokens is required and must be positive
+   * - model preferences must be in valid range (0-1)
+   * - includeContext must be one of the allowed values
    */
   private validateSamplingParams(params: CreateMessageParams): void {
     if (!params.messages || !Array.isArray(params.messages)) {
@@ -244,14 +231,24 @@ export class McpSamplingManager extends EventEmitter {
       throw new Error('Sampling params must include positive maxTokens');
     }
 
-    // Validate messages
-    for (const message of params.messages) {
-      if (!message.role || !['user', 'assistant'].includes(message.role)) {
-        throw new Error('Message must have role "user" or "assistant"');
+    // Validate messages (note: in MCP spec, messages is an array of content, not message objects)
+    for (const content of params.messages) {
+      if (!content || typeof content !== 'object') {
+        throw new Error('Message content must be an object');
       }
 
-      if (!message.content || typeof message.content !== 'object') {
-        throw new Error('Message must have content object');
+      if (!content.type || typeof content.type !== 'string') {
+        throw new Error('Message content must have a type field');
+      }
+    }
+
+    // Validate includeContext if present
+    if (params.includeContext) {
+      const validContexts = ['none', 'thisServer', 'allServers'];
+      if (!validContexts.includes(params.includeContext)) {
+        throw new Error(
+          `includeContext must be one of: ${validContexts.join(', ')}`
+        );
       }
     }
 
@@ -269,10 +266,23 @@ export class McpSamplingManager extends EventEmitter {
       validatePriority(speedPriority, 'speedPriority');
       validatePriority(intelligencePriority, 'intelligencePriority');
     }
+
+    // Validate temperature if present
+    if (params.temperature !== undefined) {
+      if (params.temperature < 0 || params.temperature > 1) {
+        throw new Error('temperature must be between 0 and 1');
+      }
+    }
   }
 
   /**
    * Validate sampling result
+   *
+   * Ensures the result conforms to MCP specification:
+   * - role must be 'assistant'
+   * - content must be a valid content object with type field
+   * - model must be a non-empty string
+   * - stopReason (if present) should be a known value
    */
   private validateSamplingResult(result: CreateMessageResult): void {
     if (!result || typeof result !== 'object') {
@@ -287,8 +297,24 @@ export class McpSamplingManager extends EventEmitter {
       throw new Error('Sampling result must have content object');
     }
 
+    if (!result.content.type || typeof result.content.type !== 'string') {
+      throw new Error('Sampling result content must have a type field');
+    }
+
     if (!result.model || typeof result.model !== 'string') {
       throw new Error('Sampling result must include model string');
+    }
+
+    // Validate stopReason if present
+    if (result.stopReason) {
+      const knownReasons = ['endTurn', 'stopSequence', 'maxTokens'];
+      if (!knownReasons.includes(result.stopReason)) {
+        // Warning only - spec allows custom stop reasons
+        this.emit('warning', {
+          message: `Unknown stopReason: ${result.stopReason}. Known values: ${knownReasons.join(', ')}`,
+          result,
+        });
+      }
     }
   }
 
@@ -399,6 +425,12 @@ export function createSamplingCallback(
 
 /**
  * Create a model preferences object with defaults
+ *
+ * Default values (0.5 for all) represent balanced preferences.
+ * Adjust based on your application's needs:
+ * - Higher costPriority: Prefer more expensive, capable models
+ * - Higher speedPriority: Prefer faster models
+ * - Higher intelligencePriority: Prefer more capable models
  */
 export function createModelPreferences(
   overrides?: Partial<ModelPreferences>
@@ -408,5 +440,50 @@ export function createModelPreferences(
     speedPriority: 0.5,
     intelligencePriority: 0.5,
     ...overrides,
+  };
+}
+
+/**
+ * Create a text message content object
+ *
+ * Helper for creating the most common content type
+ */
+export function createTextContent(text: string): SamplingMessageContent {
+  return {
+    type: 'text',
+    text,
+  };
+}
+
+/**
+ * Create a sampling request with sensible defaults
+ *
+ * @param messages - Array of message contents
+ * @param options - Optional configuration
+ * @returns CreateMessageParams ready to send
+ */
+export function createSamplingRequest(
+  messages: SamplingMessageContent[],
+  options?: {
+    systemPrompt?: string;
+    maxTokens?: number;
+    temperature?: number;
+    modelPreferences?: Partial<ModelPreferences>;
+    includeContext?: 'none' | 'thisServer' | 'allServers';
+    stopSequences?: string[];
+    metadata?: Record<string, unknown>;
+  }
+): CreateMessageParams {
+  return {
+    messages,
+    maxTokens: options?.maxTokens ?? 1024,
+    systemPrompt: options?.systemPrompt,
+    temperature: options?.temperature,
+    modelPreferences: options?.modelPreferences
+      ? createModelPreferences(options.modelPreferences)
+      : undefined,
+    includeContext: options?.includeContext ?? 'thisServer',
+    stopSequences: options?.stopSequences,
+    metadata: options?.metadata,
   };
 }

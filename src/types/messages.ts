@@ -86,6 +86,42 @@ export interface ImageSource {
 }
 
 /**
+ * A document content block containing base64-encoded PDF data.
+ *
+ * Supported format: PDF
+ *
+ * @example
+ * ```typescript
+ * const documentBlock: DocumentBlockParam = {
+ *   type: 'document',
+ *   source: {
+ *     type: 'base64',
+ *     media_type: 'application/pdf',
+ *     data: 'JVBERi0xLjQKJeLjz9MKMSAwIG9iago8PC...'
+ *   }
+ * };
+ * ```
+ */
+export interface DocumentBlockParam {
+  /** The type identifier for this content block */
+  type: 'document';
+  /** The document source data */
+  source: DocumentSource;
+}
+
+/**
+ * Document source data containing base64-encoded PDF.
+ */
+export interface DocumentSource {
+  /** The source type - currently only 'base64' is supported */
+  type: 'base64';
+  /** The MIME type of the document */
+  media_type: 'application/pdf';
+  /** Base64-encoded PDF data */
+  data: string;
+}
+
+/**
  * A tool use block indicating the model wants to call a tool.
  *
  * The assistant returns this when it needs to invoke a tool.
@@ -169,7 +205,7 @@ export type ContentBlock = TextBlock | ToolUseBlock;
 /**
  * Union type of all possible content blocks in user/input messages.
  */
-export type ContentBlockParam = TextBlockParam | ImageBlockParam | ToolUseBlockParam | ToolResultBlockParam;
+export type ContentBlockParam = TextBlockParam | ImageBlockParam | DocumentBlockParam | ToolUseBlockParam | ToolResultBlockParam;
 
 /**
  * Tool reference block (for file/resource references)
@@ -186,7 +222,7 @@ export interface ToolReferenceBlock {
  * This includes both response blocks and request blocks.
  * Use this for internal message processing and storage.
  */
-export type AnyContentBlock = TextBlock | ToolUseBlock | ImageBlockParam | ToolResultBlockParam | ToolReferenceBlock;
+export type AnyContentBlock = TextBlock | ToolUseBlock | ImageBlockParam | DocumentBlockParam | ToolResultBlockParam | ToolReferenceBlock;
 
 // ============ Message Types ============
 

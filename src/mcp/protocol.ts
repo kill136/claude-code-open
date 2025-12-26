@@ -265,6 +265,83 @@ export enum LogLevel {
   Emergency = 'emergency',
 }
 
+// ============ Sampling (采样) 类型定义 ============
+
+/**
+ * Sampling 消息内容
+ */
+export interface SamplingMessageContent {
+  type: string;
+  text?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Sampling 消息
+ */
+export interface SamplingMessage {
+  role: 'user' | 'assistant';
+  content: SamplingMessageContent;
+}
+
+/**
+ * 模型选择偏好
+ *
+ * 所有优先级值范围为 0-1:
+ * - 0 表示最低优先级
+ * - 1 表示最高优先级
+ */
+export interface ModelPreferences {
+  /** 模型建议提示 */
+  hints?: Array<{
+    name?: string;
+  }>;
+  /** 成本优先级 (0 = 最注重成本, 1 = 不考虑成本) */
+  costPriority?: number;
+  /** 速度优先级 (0 = 最注重速度, 1 = 不考虑速度) */
+  speedPriority?: number;
+  /** 智能优先级 (0 = 不需要高智能, 1 = 需要最高智能) */
+  intelligencePriority?: number;
+}
+
+/**
+ * Sampling/CreateMessage 请求参数
+ *
+ * 当 MCP 服务器需要 LLM 能力时发送此请求
+ */
+export interface CreateMessageParams {
+  /** 对话消息数组 */
+  messages: SamplingMessageContent[];
+  /** 模型选择偏好 */
+  modelPreferences?: ModelPreferences;
+  /** 系统提示词 */
+  systemPrompt?: string;
+  /** 上下文包含范围 */
+  includeContext?: 'none' | 'thisServer' | 'allServers';
+  /** 采样温度 (0-1) */
+  temperature?: number;
+  /** 最大生成 token 数 */
+  maxTokens: number;
+  /** 停止序列 */
+  stopSequences?: string[];
+  /** 元数据 */
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Sampling/CreateMessage 响应结果
+ */
+export interface CreateMessageResult {
+  /** 响应角色 (总是 'assistant') */
+  role: 'assistant';
+  /** 响应内容 */
+  content: SamplingMessageContent;
+  /** 使用的模型名称 */
+  model: string;
+  /** 停止原因 */
+  stopReason?: 'endTurn' | 'stopSequence' | 'maxTokens' | string;
+}
+
 /**
  * 设置日志级别参数
  */

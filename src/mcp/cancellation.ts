@@ -153,6 +153,12 @@ export class McpCancellationManager extends EventEmitter {
    *
    * Returns a cancellation token that can be used to track
    * and trigger cancellation.
+   *
+   * Options:
+   * - timeout: Automatically cancel after this many ms
+   * - abortController: Link to an AbortController
+   * - onCancel: Callback when cancelled
+   * - onTimeout: Callback specifically for timeout (called in addition to onCancel)
    */
   registerRequest(
     id: string | number,
@@ -162,6 +168,7 @@ export class McpCancellationManager extends EventEmitter {
       timeout?: number;
       abortController?: AbortController;
       onCancel?: (reason: CancellationReason) => void;
+      onTimeout?: () => void;
     }
   ): CancellationToken {
     const request: CancellableRequest = {
@@ -178,12 +185,22 @@ export class McpCancellationManager extends EventEmitter {
 
     // Set up timeout if specified
     if (options?.timeout) {
-      this.setupTimeout(id, options.timeout);
+      this.setupTimeout(id, options.timeout, options.onTimeout);
     }
 
     // Create cancellation token
     const token = new CancellationToken();
 
+    // Link AbortController if provided
+    if (options?.abortController) {
+      options.abortController.signal.addEventListener('abort', () => {
+        if (!token.isCancelled) {
+          token.cancel(CancellationReason.UserCancelled);
+        }
+      });
+    }
+
+    // When token is cancelled, cancel the request
     token.onCancelled((reason) => {
       this.cancelRequest(id, reason);
     });
@@ -337,8 +354,22 @@ export class McpCancellationManager extends EventEmitter {
   /**
    * Set up a timeout for a request
    */
-  private setupTimeout(id: string | number, timeout: number): void {
+  private setupTimeout(
+    id: string | number,
+    timeout: number,
+    onTimeout?: () => void
+  ): void {
     const timer = setTimeout(() => {
+      // Call timeout callback first if provided
+      if (onTimeout) {
+        try {
+          onTimeout();
+        } catch (error) {
+          this.emit('timeout:error', { id, error });
+        }
+      }
+
+      // Then cancel the request
       this.cancelRequest(id, CancellationReason.Timeout);
     }, timeout);
 
@@ -371,6 +402,53 @@ export class McpCancellationManager extends EventEmitter {
       requestId,
       ...(reason && { reason }),
     };
+  }
+
+  /**
+   * Cancel a request and send cancellation notification
+   *
+   * This is the main method to cancel a request. It:
+   * 1. Cancels the request locally
+   * 2. Returns the notification that should be sent to the server
+   *
+   * The caller is responsible for actually sending the notification.
+   */
+  cancelRequestWithNotification(
+    id: string | number,
+    reason: CancellationReason = CancellationReason.UserCancelled
+  ): { result: CancellationResult | null; notification: CancelledNotification | null } {
+    const result = this.cancelRequest(id, reason);
+
+    if (!result) {
+      return { result: null, notification: null };
+    }
+
+    const notification = this.createCancellationNotification(
+      id,
+      this.getCancellationReasonString(reason)
+    );
+
+    return { result, notification };
+  }
+
+  /**
+   * Convert CancellationReason to string for notification
+   */
+  private getCancellationReasonString(reason: CancellationReason): string {
+    switch (reason) {
+      case CancellationReason.UserCancelled:
+        return 'Request cancelled by user';
+      case CancellationReason.Timeout:
+        return 'Request timed out';
+      case CancellationReason.ServerRequest:
+        return 'Cancelled at server request';
+      case CancellationReason.Shutdown:
+        return 'Cancelled due to shutdown';
+      case CancellationReason.Error:
+        return 'Cancelled due to error';
+      default:
+        return 'Request cancelled';
+    }
   }
 
   // ============ Statistics ============
@@ -442,6 +520,65 @@ export class McpCancellationManager extends EventEmitter {
     this.requests.clear();
 
     this.emit('cleanup');
+  }
+
+  // ============ Utility Methods ============
+
+  /**
+   * Create a managed cancellable request
+   *
+   * This is a high-level helper that:
+   * 1. Registers the request
+   * 2. Returns token and notification sender
+   * 3. Automatically handles cleanup
+   *
+   * Example usage:
+   * ```ts
+   * const { token, sendNotification } = manager.createCancellableRequest(
+   *   requestId,
+   *   'myServer',
+   *   'tools/call',
+   *   { timeout: 30000 }
+   * );
+   *
+   * // Later, if cancelled:
+   * token.cancel(CancellationReason.UserCancelled);
+   * const notification = sendNotification();
+   * // Send notification to server...
+   * ```
+   */
+  createCancellableRequest(
+    id: string | number,
+    serverName: string,
+    method: string,
+    options?: {
+      timeout?: number;
+      abortController?: AbortController;
+      onCancel?: (reason: CancellationReason) => void;
+      onTimeout?: () => void;
+    }
+  ): {
+    token: CancellationToken;
+    sendNotification: () => CancelledNotification | null;
+    cleanup: () => void;
+  } {
+    const token = this.registerRequest(id, serverName, method, options);
+
+    return {
+      token,
+      sendNotification: () => {
+        if (!token.isCancelled || !token.reason) {
+          return null;
+        }
+        return this.createCancellationNotification(
+          id,
+          this.getCancellationReasonString(token.reason)
+        );
+      },
+      cleanup: () => {
+        this.unregisterRequest(id);
+      },
+    };
   }
 }
 

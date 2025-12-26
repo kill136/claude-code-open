@@ -162,18 +162,18 @@ Usage:
       let output = `[Image: ${filePath}]\n`;
       output += `Format: ${result.file.type}\n`;
       output += `Size: ${sizeKB} KB\n`;
-      output += `Estimated tokens: ${tokenEstimate}\n`;
 
       if (result.file.dimensions) {
         const { originalWidth, originalHeight, displayWidth, displayHeight } = result.file.dimensions;
         if (originalWidth && originalHeight) {
-          output += `Dimensions: ${originalWidth}x${originalHeight}`;
-          if (displayWidth !== originalWidth || displayHeight !== originalHeight) {
-            output += ` (compressed to ${displayWidth}x${displayHeight})`;
+          output += `Original dimensions: ${originalWidth}x${originalHeight}\n`;
+          if (displayWidth && displayHeight && (displayWidth !== originalWidth || displayHeight !== originalHeight)) {
+            output += `Display dimensions: ${displayWidth}x${displayHeight} (resized)\n`;
           }
-          output += '\n';
         }
       }
+
+      output += `Estimated tokens: ${tokenEstimate}`;
 
       return {
         success: true,
@@ -190,6 +190,10 @@ Usage:
 
   /**
    * 增强的 PDF 读取（使用媒体处理模块）
+   *
+   * 对应官方实现 (cli.js 第1027行附近):
+   * - 返回 PDF 数据结构
+   * - 添加 newMessages，将 PDF 作为 document 块发送给 Claude
    */
   private async readPdfEnhanced(filePath: string): Promise<FileResult> {
     try {
@@ -208,10 +212,27 @@ Usage:
       output += `Size: ${sizeMB} MB\n`;
       output += `Base64 length: ${result.file.base64.length} chars\n`;
 
+      // 关键：添加 newMessages，将 PDF 作为 document 发送给 Claude
+      // 这对应官方实现中的 newMessages 数组
       return {
         success: true,
         output,
         content: result.file.base64,
+        newMessages: [
+          {
+            role: 'user' as const,
+            content: [
+              {
+                type: 'document' as const,
+                source: {
+                  type: 'base64' as const,
+                  media_type: 'application/pdf' as const,
+                  data: result.file.base64,
+                },
+              },
+            ],
+          },
+        ],
       };
     } catch (error) {
       return {

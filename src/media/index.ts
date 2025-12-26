@@ -156,9 +156,9 @@ export function getMediaStats(): MediaStats {
     totalSvgs: 0,
     totalSize: 0,
     supportedFormats: [
-      ...(Array.from(SUPPORTED_IMAGE_FORMATS) as string[]),
-      ...(Array.from(PDF_EXTENSIONS) as string[]),
-      'svg',
+      'png', 'jpg', 'jpeg', 'gif', 'webp',  // Image formats
+      'pdf',  // PDF format
+      'svg',  // SVG format
     ],
   };
 }

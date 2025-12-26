@@ -18,7 +18,7 @@ import type { NotebookEditInput, ToolResult, ToolDefinition } from '../types/ind
 interface NotebookCell {
   id?: string;
   cell_type: 'code' | 'markdown' | 'raw';
-  source: string | string[];
+  source: string | string[]; // 官方使用字符串，但 Jupyter 规范允许两种格式
   metadata?: Record<string, unknown>;
   outputs?: unknown[];
   execution_count?: number | null;
@@ -139,37 +139,51 @@ Features:
         return { success: false, error: validationError };
       }
 
-      // 找到目标单元格
+      // 找到目标单元格索引
       let cellIndex = -1;
       if (cell_id !== undefined) {
         cellIndex = this.findCellIndex(notebook.cells, cell_id);
 
-        // 对于 insert 和 delete 模式，需要找到单元格
-        if (cellIndex === -1 && (edit_mode === 'replace' || edit_mode === 'delete')) {
+        // 如果按 ID 找不到，检查是否所有操作都需要有效的 cell_id
+        if (cellIndex === -1 && edit_mode !== 'insert') {
           return {
             success: false,
             error: `Cell not found with ID: ${cell_id}. Available cells: ${notebook.cells.length}`,
           };
         }
-      } else {
-        // 默认第一个单元格（仅用于 replace）
-        if (edit_mode === 'replace') {
-          cellIndex = 0;
+
+        // insert 模式：插入到找到的单元格之后（如果找到了）
+        if (edit_mode === 'insert' && cellIndex >= 0) {
+          cellIndex = cellIndex + 1;
         }
-        // insert 模式：如果没有 cell_id，插入到末尾
-        // delete 模式：必须指定 cell_id
-        if (edit_mode === 'delete') {
+      } else {
+        // 没有 cell_id 的情况
+        if (edit_mode === 'replace') {
+          cellIndex = 0; // replace 默认第一个单元格
+        } else if (edit_mode === 'delete') {
           return {
             success: false,
             error: 'cell_id is required for delete mode',
           };
         }
+        // insert 模式不需要 cell_id，会插入到末尾
       }
 
       // 执行编辑操作
       let resultMessage = '';
+      let actualEditMode = edit_mode;
+      let generatedCellId: string | undefined;
 
-      switch (edit_mode) {
+      // 特殊处理：如果 replace 的索引超出范围，自动转为 insert
+      if (actualEditMode === 'replace' && cellIndex >= notebook.cells.length) {
+        actualEditMode = 'insert';
+        if (!cell_type) {
+          // 如果没有指定 cell_type，默认为 code
+          input.cell_type = 'code';
+        }
+      }
+
+      switch (actualEditMode) {
         case 'replace': {
           if (cellIndex < 0 || cellIndex >= notebook.cells.length) {
             return {
@@ -181,8 +195,8 @@ Features:
           const cell = notebook.cells[cellIndex];
           const oldType = cell.cell_type;
 
-          // 更新源代码
-          cell.source = this.formatSource(new_source);
+          // 更新源代码（官方使用字符串，而非数组）
+          cell.source = new_source;
 
           // 如果指定了 cell_type，更新类型
           if (cell_type) {
@@ -192,38 +206,42 @@ Features:
           // 清除输出（对于 code 单元格）
           this.clearCellOutputs(cell);
 
+          // 保留原有的 cell ID（如果存在）
+          generatedCellId = cell.id;
+
           resultMessage = `Replaced cell ${cellIndex}${oldType !== cell.cell_type ? ` (changed type from ${oldType} to ${cell.cell_type})` : ''}`;
           break;
         }
 
         case 'insert': {
-          if (!cell_type) {
-            return {
-              success: false,
-              error: 'cell_type is required for insert mode',
-            };
-          }
+          const finalCellType = cell_type || 'code';
 
           const newCell: NotebookCell = {
-            cell_type,
-            source: this.formatSource(new_source),
+            cell_type: finalCellType,
+            source: new_source,
             metadata: {},
           };
 
           // 初始化 code 单元格的输出
-          if (cell_type === 'code') {
+          if (finalCellType === 'code') {
             newCell.outputs = [];
             newCell.execution_count = null;
           }
 
-          // 生成唯一 ID
-          newCell.id = this.generateCellId();
+          // 只在 nbformat 4.5+ 生成 ID
+          if (
+            notebook.nbformat > 4 ||
+            (notebook.nbformat === 4 && notebook.nbformat_minor >= 5)
+          ) {
+            newCell.id = this.generateCellId();
+            generatedCellId = newCell.id;
+          }
 
           // 确定插入位置
-          const insertIndex = cellIndex >= 0 ? cellIndex + 1 : notebook.cells.length;
+          const insertIndex = cellIndex >= 0 ? cellIndex : notebook.cells.length;
           notebook.cells.splice(insertIndex, 0, newCell);
 
-          resultMessage = `Inserted new ${cell_type} cell at position ${insertIndex}`;
+          resultMessage = `Inserted new ${finalCellType} cell at position ${insertIndex}`;
           break;
         }
 
@@ -249,7 +267,7 @@ Features:
           };
       }
 
-      // 写回文件（使用美化的 JSON 格式）
+      // 写回文件（使用美化的 JSON 格式，与官方一致：缩进 1 空格）
       fs.writeFileSync(notebook_path, JSON.stringify(notebook, null, 1) + '\n', 'utf-8');
 
       return {
@@ -354,19 +372,6 @@ Features:
     }
 
     return -1;
-  }
-
-  /**
-   * 格式化源代码为 Jupyter notebook 格式
-   * 将字符串转换为行数组，每行以换行符结尾（除了最后一行）
-   */
-  private formatSource(source: string): string[] {
-    if (!source) {
-      return [''];
-    }
-
-    const lines = source.split('\n');
-    return lines.map((line, i, arr) => (i < arr.length - 1 ? line + '\n' : line));
   }
 
   /**

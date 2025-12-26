@@ -18,6 +18,8 @@ const execAsync = promisify(exec);
 interface ShellState {
   process: ReturnType<typeof spawn>;
   output: string[];
+  outputFile: string;
+  outputStream?: fs.WriteStream;
   status: 'running' | 'completed' | 'failed';
   startTime: number;
   timeout?: NodeJS.Timeout;
@@ -27,6 +29,19 @@ interface ShellState {
 }
 
 const backgroundShells: Map<string, ShellState> = new Map();
+
+// 获取后台输出文件路径
+function getBackgroundOutputPath(shellId: string): string {
+  const homeDir = process.env.HOME || process.env.USERPROFILE || '/tmp';
+  const claudeDir = path.join(homeDir, '.claude', 'background');
+
+  // 确保目录存在
+  if (!fs.existsSync(claudeDir)) {
+    fs.mkdirSync(claudeDir, { recursive: true });
+  }
+
+  return path.join(claudeDir, `${shellId}.log`);
+}
 
 // 配置
 const MAX_OUTPUT_LENGTH = parseInt(process.env.BASH_MAX_OUTPUT_LENGTH || '30000', 10);
@@ -133,6 +148,8 @@ function cleanupTimedOutShells(): number {
     if (shell.maxRuntime && now - shell.startTime > shell.maxRuntime) {
       try {
         shell.process.kill('SIGTERM');
+        // 关闭输出流
+        shell.outputStream?.end();
         setTimeout(() => {
           if (shell.status === 'running') {
             shell.process.kill('SIGKILL');
@@ -378,6 +395,7 @@ Sandbox: ${isBubblewrapAvailable() ? 'Available (bubblewrap)' : 'Not available'}
     cleanupTimedOutShells();
 
     const id = `bash_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const outputFile = getBackgroundOutputPath(id);
 
     const proc = spawn('bash', ['-c', command], {
       cwd: process.cwd(),
@@ -385,9 +403,14 @@ Sandbox: ${isBubblewrapAvailable() ? 'Available (bubblewrap)' : 'Not available'}
       stdio: ['ignore', 'pipe', 'pipe'],
     });
 
+    // 创建输出文件流
+    const outputStream = fs.createWriteStream(outputFile, { flags: 'w' });
+
     const shellState: ShellState = {
       process: proc,
       output: [],
+      outputFile,
+      outputStream,
       status: 'running',
       startTime: Date.now(),
       maxRuntime: Math.min(maxRuntime, BACKGROUND_SHELL_MAX_RUNTIME),
@@ -418,7 +441,10 @@ Sandbox: ${isBubblewrapAvailable() ? 'Available (bubblewrap)' : 'Not available'}
       const dataStr = data.toString();
       shellState.outputSize += dataStr.length;
 
-      // 检查输出大小限制
+      // 写入文件
+      shellState.outputStream?.write(dataStr);
+
+      // 同时保存在内存中（用于 BashOutput 工具）
       if (shellState.outputSize < MAX_BACKGROUND_OUTPUT) {
         shellState.output.push(dataStr);
       } else if (shellState.output[shellState.output.length - 1] !== '[Output limit reached]') {
@@ -427,11 +453,16 @@ Sandbox: ${isBubblewrapAvailable() ? 'Available (bubblewrap)' : 'Not available'}
     });
 
     proc.stderr?.on('data', (data) => {
-      const dataStr = `STDERR: ${data.toString()}`;
+      const dataStr = data.toString();
+      const stderrStr = `STDERR: ${dataStr}`;
       shellState.outputSize += dataStr.length;
 
+      // 写入文件
+      shellState.outputStream?.write(stderrStr);
+
+      // 同时保存在内存中
       if (shellState.outputSize < MAX_BACKGROUND_OUTPUT) {
-        shellState.output.push(dataStr);
+        shellState.output.push(stderrStr);
       } else if (shellState.output[shellState.output.length - 1] !== '[Output limit reached]') {
         shellState.output.push('[Output limit reached - further output discarded]');
       }
@@ -442,6 +473,9 @@ Sandbox: ${isBubblewrapAvailable() ? 'Available (bubblewrap)' : 'Not available'}
       if (shellState.timeout) {
         clearTimeout(shellState.timeout);
       }
+
+      // 关闭输出文件流
+      shellState.outputStream?.end();
 
       // 记录审计日志
       const auditLog: AuditLog = {
@@ -460,7 +494,10 @@ Sandbox: ${isBubblewrapAvailable() ? 'Available (bubblewrap)' : 'Not available'}
 
     proc.on('error', (err) => {
       shellState.status = 'failed';
-      shellState.output.push(`ERROR: ${err.message}`);
+      const errorMsg = `ERROR: ${err.message}`;
+      shellState.output.push(errorMsg);
+      shellState.outputStream?.write(errorMsg + '\n');
+      shellState.outputStream?.end();
       if (shellState.timeout) {
         clearTimeout(shellState.timeout);
       }
@@ -468,10 +505,18 @@ Sandbox: ${isBubblewrapAvailable() ? 'Available (bubblewrap)' : 'Not available'}
 
     backgroundShells.set(id, shellState);
 
+    // 返回与官方一致的格式
+    const statusMsg = `<shell-id>${id}</shell-id>
+<output-file>${outputFile}</output-file>
+<status>running</status>
+<summary>Background command "${command.substring(0, 50)}${command.length > 50 ? '...' : ''}" started.</summary>
+Read the output file to retrieve the output. You can also use BashOutput tool with bash_id="${id}" for real-time incremental updates.`;
+
     return {
       success: true,
-      output: `Background process started with ID: ${id}\nMax runtime: ${shellState.maxRuntime}ms\nUse BashOutput tool to retrieve output.`,
-      bash_id: id,
+      output: statusMsg,
+      bash_id: id, // 保持向后兼容
+      shell_id: id, // 官方字段名
     };
   }
 }
@@ -563,6 +608,8 @@ Usage:
 
     try {
       shell.process.kill('SIGTERM');
+      // 关闭输出流
+      shell.outputStream?.end();
 
       // 等待一秒，如果还在运行则强制杀死
       await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -615,6 +662,8 @@ export function cleanupCompletedShells(): number {
       if (shell.timeout) {
         clearTimeout(shell.timeout);
       }
+      // 关闭输出流
+      shell.outputStream?.end();
       backgroundShells.delete(id);
       cleaned++;
     }
@@ -740,6 +789,8 @@ export function killAllBackgroundShells(): number {
       if (shell.timeout) {
         clearTimeout(shell.timeout);
       }
+      // 关闭输出流
+      shell.outputStream?.end();
       setTimeout(() => {
         if (shell.status === 'running') {
           shell.process.kill('SIGKILL');

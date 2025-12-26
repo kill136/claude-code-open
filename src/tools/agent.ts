@@ -256,20 +256,20 @@ Usage notes:
         },
         subagent_type: {
           type: 'string',
-          description: 'The type of specialized agent to use',
+          description: 'The type of specialized agent to use for this task',
         },
         model: {
           type: 'string',
           enum: ['sonnet', 'opus', 'haiku'],
-          description: 'Optional model to use for this agent',
+          description: 'Optional model to use for this agent. If not specified, inherits from parent. Prefer haiku for quick, straightforward tasks to minimize cost and latency.',
         },
         resume: {
           type: 'string',
-          description: 'Optional agent ID to resume from a previous execution',
+          description: 'Optional agent ID to resume from. If provided, the agent will continue from the previous execution transcript.',
         },
         run_in_background: {
           type: 'boolean',
-          description: 'Run agent in the background',
+          description: 'Set to true to run this agent in the background. Use TaskOutput to read the output later.',
         },
       },
       required: ['description', 'prompt', 'subagent_type'],
@@ -494,11 +494,11 @@ Usage notes:
         },
         timeout: {
           type: 'number',
-          description: 'Max wait time in ms (default 5000)',
+          description: 'Max wait time in ms',
         },
         show_history: {
           type: 'boolean',
-          description: 'Show detailed execution history',
+          description: 'Show detailed execution history (extension: not in official SDK)',
         },
       },
       required: ['task_id'],

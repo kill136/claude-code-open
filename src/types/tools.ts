@@ -594,7 +594,7 @@ export interface AskUserQuestionInput {
    * User answers collected by the permission component
    */
   answers?: {
-    [k: string]: string | string[];
+    [k: string]: string;
   };
 }
 

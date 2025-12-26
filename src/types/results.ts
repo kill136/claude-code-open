@@ -21,6 +21,23 @@ export interface ToolResult {
   output?: string;
   /** Error message if the tool execution failed */
   error?: string;
+  /**
+   * Optional additional messages to send to the model
+   * Used for sending media content (images, PDFs, etc.) that should be visible to Claude
+   * Each message contains content blocks (text, image, document, etc.)
+   */
+  newMessages?: Array<{
+    role: 'user';
+    content: Array<{
+      type: 'text' | 'image' | 'document';
+      text?: string;
+      source?: {
+        type: 'base64';
+        media_type: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp' | 'application/pdf';
+        data: string;
+      };
+    }>;
+  }>;
 }
 
 /**
@@ -64,8 +81,10 @@ export interface BashToolResult extends ToolResult {
   stdout?: string;
   /** Standard error output from the command */
   stderr?: string;
-  /** ID of the background shell (if run_in_background is true) */
+  /** ID of the background shell (if run_in_background is true) - legacy field */
   bash_id?: string;
+  /** ID of the background shell (if run_in_background is true) - official field name */
+  shell_id?: string;
   /** Command execution duration in milliseconds */
   duration?: number;
   /** Whether the command was sandboxed */

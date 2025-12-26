@@ -123,6 +123,14 @@ export class PermissionManager {
   private auditLogPath: string;
   private auditEnabled: boolean = false;
 
+  // 额外允许的工作目录（匹配官方 additionalWorkingDirectories）
+  private additionalDirectories: Map<string, { path: string; source: string }> = new Map();
+
+  // 规则存储（匹配官方 alwaysAllowRules, alwaysDenyRules, alwaysAskRules）
+  private alwaysAllowRules: Map<string, string[]> = new Map();
+  private alwaysDenyRules: Map<string, string[]> = new Map();
+  private alwaysAskRules: Map<string, string[]> = new Map();
+
   constructor(mode: PermissionMode = 'default') {
     this.mode = mode;
     this.configDir = process.env.CLAUDE_CONFIG_DIR ||
@@ -151,11 +159,25 @@ export class PermissionManager {
   }
 
   // 添加允许的目录
-  addAllowedDir(dir: string): void {
+  addAllowedDir(dir: string, source: string = 'session'): void {
     const resolved = path.resolve(dir);
     if (!this.allowedDirs.includes(resolved)) {
       this.allowedDirs.push(resolved);
     }
+    // 同时添加到额外目录映射（匹配官方）
+    this.additionalDirectories.set(resolved, { path: resolved, source });
+  }
+
+  // 移除允许的目录
+  removeAllowedDir(dir: string): void {
+    const resolved = path.resolve(dir);
+    this.allowedDirs = this.allowedDirs.filter(d => d !== resolved);
+    this.additionalDirectories.delete(resolved);
+  }
+
+  // 获取所有额外的目录
+  getAdditionalDirectories(): Map<string, { path: string; source: string }> {
+    return new Map(this.additionalDirectories);
   }
 
   // 检查路径是否在允许的目录内
@@ -170,6 +192,13 @@ export class PermissionManager {
 
     // 检查额外允许的目录
     for (const dir of this.allowedDirs) {
+      if (resolved.startsWith(dir)) {
+        return true;
+      }
+    }
+
+    // 检查 additionalDirectories
+    for (const [dir] of this.additionalDirectories) {
       if (resolved.startsWith(dir)) {
         return true;
       }
@@ -453,6 +482,54 @@ export class PermissionManager {
     this.rules.unshift(rule); // 新规则优先
   }
 
+  // 添加 allow/deny/ask 规则（匹配官方 API）
+  addPermissionRule(behavior: 'allow' | 'deny' | 'ask', destination: string, ruleValues: string[]): void {
+    const rulesMap = behavior === 'allow' ? this.alwaysAllowRules :
+                     behavior === 'deny' ? this.alwaysDenyRules :
+                     this.alwaysAskRules;
+
+    const existing = rulesMap.get(destination) || [];
+    rulesMap.set(destination, [...existing, ...ruleValues]);
+  }
+
+  // 替换规则（匹配官方 replaceRules）
+  replacePermissionRules(behavior: 'allow' | 'deny' | 'ask', destination: string, ruleValues: string[]): void {
+    const rulesMap = behavior === 'allow' ? this.alwaysAllowRules :
+                     behavior === 'deny' ? this.alwaysDenyRules :
+                     this.alwaysAskRules;
+
+    rulesMap.set(destination, ruleValues);
+  }
+
+  // 移除规则（匹配官方 removeRules）
+  removePermissionRule(behavior: 'allow' | 'deny' | 'ask', destination: string, ruleValues: string[]): void {
+    const rulesMap = behavior === 'allow' ? this.alwaysAllowRules :
+                     behavior === 'deny' ? this.alwaysDenyRules :
+                     this.alwaysAskRules;
+
+    const existing = rulesMap.get(destination) || [];
+    const filtered = existing.filter(rule => !ruleValues.includes(rule));
+
+    if (filtered.length === 0) {
+      rulesMap.delete(destination);
+    } else {
+      rulesMap.set(destination, filtered);
+    }
+  }
+
+  // 获取所有规则
+  getAllPermissionRules(): {
+    allow: Map<string, string[]>;
+    deny: Map<string, string[]>;
+    ask: Map<string, string[]>;
+  } {
+    return {
+      allow: new Map(this.alwaysAllowRules),
+      deny: new Map(this.alwaysDenyRules),
+      ask: new Map(this.alwaysAskRules),
+    };
+  }
+
   // 清除会话权限
   clearSessionPermissions(): void {
     this.sessionPermissions.clear();
@@ -498,6 +575,29 @@ export class PermissionManager {
       const settings = JSON.parse(fs.readFileSync(settingsFile, 'utf-8'));
       if (settings.permissions) {
         this.permissionConfig = settings.permissions;
+
+        // 加载 defaultMode（匹配官方）
+        if (settings.permissions.defaultMode) {
+          this.mode = settings.permissions.defaultMode as PermissionMode;
+        }
+
+        // 加载 additionalDirectories（匹配官方）
+        if (settings.permissions.additionalDirectories && Array.isArray(settings.permissions.additionalDirectories)) {
+          for (const dir of settings.permissions.additionalDirectories) {
+            this.addAllowedDir(dir, 'userSettings');
+          }
+        }
+
+        // 加载 allow/deny/ask 规则
+        if (settings.permissions.allow && Array.isArray(settings.permissions.allow)) {
+          this.alwaysAllowRules.set('userSettings', settings.permissions.allow);
+        }
+        if (settings.permissions.deny && Array.isArray(settings.permissions.deny)) {
+          this.alwaysDenyRules.set('userSettings', settings.permissions.deny);
+        }
+        if (settings.permissions.ask && Array.isArray(settings.permissions.ask)) {
+          this.alwaysAskRules.set('userSettings', settings.permissions.ask);
+        }
 
         // 配置审计日志
         if (this.permissionConfig.audit?.enabled) {
@@ -726,15 +826,23 @@ export class PermissionManager {
     return { ...this.permissionConfig };
   }
 
-  // 导出权限配置
+  // 导出权限配置（匹配官方结构）
   export(): object {
     return {
       mode: this.mode,
       rules: this.rules,
       rememberedPermissions: this.rememberedPermissions,
       allowedDirs: this.allowedDirs,
+      additionalWorkingDirectories: Array.from(this.additionalDirectories.entries()).map(([key, value]) => ({
+        key,
+        ...value,
+      })),
+      alwaysAllowRules: Object.fromEntries(this.alwaysAllowRules),
+      alwaysDenyRules: Object.fromEntries(this.alwaysDenyRules),
+      alwaysAskRules: Object.fromEntries(this.alwaysAskRules),
       permissionConfig: this.permissionConfig,
       auditEnabled: this.auditEnabled,
+      isBypassPermissionsModeAvailable: false, // 匹配官方，默认不可用
     };
   }
 }

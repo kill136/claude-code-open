@@ -130,26 +130,48 @@ const UserConfigSchema = z.object({
   // 工作目录
   defaultWorkingDir: z.string().optional(),
 
-  // 权限配置
+  // 权限配置（匹配官方结构）
   permissions: z.object({
+    // 默认权限模式（匹配官方 defaultMode）
+    defaultMode: z.enum(['default', 'bypassPermissions', 'dontAsk', 'acceptEdits', 'plan', 'delegate']).default('default').optional(),
+
+    // 向后兼容字段
     defaultLevel: z.enum(['accept', 'reject', 'ask']).default('ask').optional(),
-    autoApprove: z.array(z.string()).optional(), // 自动批准的工具
+    autoApprove: z.array(z.string()).optional(),
+
+    // allow/deny/ask 规则（匹配官方）
+    allow: z.array(z.string()).optional(),
+    deny: z.array(z.string()).optional(),
+    ask: z.array(z.string()).optional(),
+
+    // 工具级权限
     tools: z.object({
       allow: z.array(z.string()).optional(),
       deny: z.array(z.string()).optional(),
     }).optional(),
+
+    // 路径级权限（支持 glob patterns）
     paths: z.object({
       allow: z.array(z.string()).optional(),
       deny: z.array(z.string()).optional(),
     }).optional(),
+
+    // 命令级权限（支持 glob patterns）
     commands: z.object({
       allow: z.array(z.string()).optional(),
       deny: z.array(z.string()).optional(),
     }).optional(),
+
+    // 网络权限
     network: z.object({
       allow: z.array(z.string()).optional(),
       deny: z.array(z.string()).optional(),
     }).optional(),
+
+    // 额外允许的目录
+    additionalDirectories: z.array(z.string()).optional(),
+
+    // 审计日志
     audit: z.object({
       enabled: z.boolean().optional(),
       logFile: z.string().optional(),

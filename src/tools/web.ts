@@ -318,12 +318,17 @@ Usage notes:
   /**
    * 实际的 URL 抓取逻辑
    */
-  private async fetchUrl(url: string, followRedirect: boolean = false): Promise<{
+  private async fetchUrl(
+    url: string,
+    options: { originalUrl?: string; redirectCount?: number } = {}
+  ): Promise<{
     content: string;
     contentType: string;
     statusCode: number;
     redirectUrl?: string;
+    originalUrl?: string;
   }> {
+    const { originalUrl, redirectCount = 0 } = options;
     const proxy = this.getProxyConfig();
 
     try {
@@ -333,7 +338,7 @@ Usage notes:
           'User-Agent': 'Mozilla/5.0 (compatible; ClaudeCode/2.0)',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         },
-        maxRedirects: followRedirect ? 5 : 0,
+        maxRedirects: 0, // 手动处理重定向
         validateStatus: (status) => status < 400 || (status >= 300 && status < 400),
         proxy: proxy ? proxy : false,
       });
@@ -363,11 +368,18 @@ Usage notes:
         }
 
         const redirectUrl = this.resolveRedirectUrl(url, location);
+        const baseUrl = originalUrl || url;
 
-        // 检查是否同源
-        if (this.isSameOrigin(url, redirectUrl)) {
-          // 同源，自动跟随
-          return this.fetchUrl(redirectUrl, true);
+        // 检查是否同源（与原始 URL 比较）
+        if (this.isSameOrigin(baseUrl, redirectUrl)) {
+          // 同源，自动跟随重定向（最多5次）
+          if (redirectCount >= 5) {
+            throw new Error('Too many redirects (maximum 5)');
+          }
+          return this.fetchUrl(redirectUrl, {
+            originalUrl: baseUrl,
+            redirectCount: redirectCount + 1,
+          });
         } else {
           // 跨域，返回重定向信息
           return {
@@ -375,6 +387,7 @@ Usage notes:
             contentType: '',
             statusCode: err.response.status,
             redirectUrl,
+            originalUrl: baseUrl,
           };
         }
       }
@@ -433,12 +446,11 @@ Usage notes:
           success: false,
           error: `REDIRECT DETECTED: The URL redirects to a different host.
 
-Original URL: ${url}
+Original URL: ${result.originalUrl || url}
 Redirect URL: ${result.redirectUrl}
 Status: ${result.statusCode} ${statusText}
 
-To complete your request, I need to fetch content from the redirected URL.
-Please use WebFetch again with these parameters:
+To complete your request, I need to fetch content from the redirected URL. Please use WebFetch again with these parameters:
 - url: "${result.redirectUrl}"
 - prompt: "${prompt}"`,
         };

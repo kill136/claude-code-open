@@ -32,12 +32,16 @@ export class AskUserQuestionTool extends BaseTool<AskUserQuestionInput, ToolResu
   description = `Ask the user a question with predefined options to clarify requirements or get approval.
 
 Use this tool when you need to:
-- Clarify ambiguous requirements
-- Get user approval for a specific approach
-- Ask about implementation preferences
-- Confirm understanding of a task
+1. Gather user preferences or requirements
+2. Clarify ambiguous instructions
+3. Get decisions on implementation choices as you work
+4. Offer choices to the user about what direction to take
 
-Each question should have 2-4 options. An "Other" option allowing free-form input is automatically provided.`;
+Usage notes:
+- Users will always be able to select "Other" to provide custom text input
+- Use multiSelect: true to allow multiple answers to be selected for a question
+- If you recommend a specific option, make that the first option in the list and add "(Recommended)" at the end of the label
+- Each question should have 2-4 options`;
 
   getInputSchema(): ToolDefinition['inputSchema'] {
     return {

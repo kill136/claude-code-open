@@ -81,6 +81,9 @@ Usage:
   - Multiline matching: By default patterns match within single lines only. For cross-line patterns like \`struct \\{[\\s\\S]*?field\`, use \`multiline: true\`
 `;
 
+  // Directories to exclude from search
+  private excludedDirs = ['.git', '.svn', '.hg', '.bzr'];
+
   getInputSchema(): ToolDefinition['inputSchema'] {
     return {
       type: 'object',
@@ -132,7 +135,7 @@ Usage:
         },
         head_limit: {
           type: 'number',
-          description: 'Limit output to first N lines/entries, equivalent to "| head -N". Works across all output modes: content (limits output lines), files_with_matches (limits file paths), count (limits count entries). Defaults based on "cap" experiment value: 0 (unlimited), 20, or 100.',
+          description: 'Limit output to first N lines/entries, equivalent to "| head -N". Works across all output modes: content (limits output lines), files_with_matches (limits file paths), count (limits count entries). Defaults to 0 (unlimited).',
         },
         offset: {
           type: 'number',
@@ -161,26 +164,26 @@ Usage:
     } = input;
 
     try {
-      // 验证参数
-      if (offset < 0) {
-        return { success: false, error: 'offset must be non-negative' };
-      }
-      if (head_limit !== undefined && head_limit < 0) {
-        return { success: false, error: 'head_limit must be non-negative' };
-      }
-
-      // 上下文参数只在 content 模式下有效
-      if (output_mode !== 'content') {
-        if (beforeContext !== undefined || afterContext !== undefined || context !== undefined) {
-          return { success: false, error: 'Context options (-A/-B/-C) require output_mode: "content"' };
-        }
-        if (showLineNumbers !== true && showLineNumbers !== undefined) {
-          return { success: false, error: 'Line numbers (-n) require output_mode: "content"' };
-        }
-      }
-
       // 构建 ripgrep 命令
-      const args: string[] = [];
+      const args: string[] = ['--hidden'];
+
+      // 排除特定目录
+      for (const dir of this.excludedDirs) {
+        args.push('--glob', `!${dir}`);
+      }
+
+      // 限制每行最大列数
+      args.push('--max-columns', '500');
+
+      // 多行模式
+      if (multiline) {
+        args.push('-U', '--multiline-dotall');
+      }
+
+      // 大小写不敏感
+      if (ignoreCase) {
+        args.push('-i');
+      }
 
       // 输出模式
       if (output_mode === 'files_with_matches') {
@@ -189,56 +192,159 @@ Usage:
         args.push('-c');
       }
 
-      // 选项
-      if (ignoreCase) args.push('-i');
-      if (showLineNumbers && output_mode === 'content') args.push('-n');
-      if (multiline) {
-        args.push('-U', '--multiline-dotall');
+      // 行号 (仅在 content 模式下)
+      if (showLineNumbers && output_mode === 'content') {
+        args.push('-n');
       }
-      if (beforeContext && output_mode === 'content') args.push('-B', String(beforeContext));
-      if (afterContext && output_mode === 'content') args.push('-A', String(afterContext));
-      if (context && output_mode === 'content') args.push('-C', String(context));
-      if (globPattern) args.push('--glob', globPattern);
-      if (fileType) args.push('--type', fileType);
 
-      args.push('--', pattern, searchPath);
+      // 上下文行 (仅在 content 模式下)
+      if (output_mode === 'content') {
+        if (context !== undefined) {
+          args.push('-C', String(context));
+        } else {
+          if (beforeContext !== undefined) {
+            args.push('-B', String(beforeContext));
+          }
+          if (afterContext !== undefined) {
+            args.push('-A', String(afterContext));
+          }
+        }
+      }
 
-      const cmd = `rg ${args.map(a => `'${a}'`).join(' ')} 2>/dev/null || true`;
+      // Pattern (如果以 - 开头，需要使用 -e 前缀)
+      if (pattern.startsWith('-')) {
+        args.push('-e', pattern);
+      } else {
+        args.push(pattern);
+      }
+
+      // 文件类型
+      if (fileType) {
+        args.push('--type', fileType);
+      }
+
+      // Glob 模式 - 需要处理空格和逗号分割
+      if (globPattern) {
+        const globs: string[] = [];
+        const parts = globPattern.split(/\s+/);
+
+        for (const part of parts) {
+          if (part.includes('{') && part.includes('}')) {
+            // 保留 brace expansion 格式，如 "*.{ts,tsx}"
+            globs.push(part);
+          } else {
+            // 按逗号分割
+            globs.push(...part.split(',').filter(Boolean));
+          }
+        }
+
+        for (const g of globs.filter(Boolean)) {
+          args.push('--glob', g);
+        }
+      }
+
+      // 搜索路径
+      args.push(searchPath);
+
+      const cmd = `rg ${args.map(a => `'${a.replace(/'/g, "'\\''")}'`).join(' ')} 2>/dev/null || true`;
 
       let output = execSync(cmd, {
         maxBuffer: 50 * 1024 * 1024,
         encoding: 'utf-8',
       });
 
-      // 应用 offset 和 head_limit
-      // 这些参数在所有 output_mode 下都应该工作
-      if (offset > 0 || head_limit !== undefined) {
-        const lines = output.split('\n').filter(line => line.length > 0);
+      let lines = output.split('\n').filter(line => line.length > 0);
 
-        // 跳过前 offset 行
-        let processedLines = lines;
-        if (offset > 0) {
-          processedLines = lines.slice(offset);
-        }
+      // 对于 files_with_matches 模式，按修改时间排序
+      if (output_mode === 'files_with_matches' && lines.length > 0) {
+        const filesWithStats = await Promise.all(
+          lines.map(async file => {
+            try {
+              const stats = await fs.promises.stat(file);
+              return { file, mtime: stats.mtimeMs };
+            } catch {
+              return { file, mtime: 0 };
+            }
+          })
+        );
 
-        // 限制为前 head_limit 行
-        if (head_limit !== undefined && head_limit >= 0) {
-          processedLines = processedLines.slice(0, head_limit);
-        }
+        filesWithStats.sort((a, b) => {
+          const mtimeDiff = b.mtime - a.mtime;
+          if (mtimeDiff === 0) {
+            return a.file.localeCompare(b.file);
+          }
+          return mtimeDiff;
+        });
 
-        output = processedLines.join('\n');
+        lines = filesWithStats.map(item => item.file);
       }
 
-      const trimmedOutput = output.trim();
-      if (!trimmedOutput) {
+      // 对于 content 模式，将文件路径转换为相对路径
+      if (output_mode === 'content') {
+        lines = lines.map(line => {
+          const colonIndex = line.indexOf(':');
+          if (colonIndex > 0) {
+            const filePath = line.substring(0, colonIndex);
+            const rest = line.substring(colonIndex);
+            const relativePath = this.toRelativePath(filePath);
+            return relativePath + rest;
+          }
+          return line;
+        });
+      }
+
+      // 对于 count 模式，也转换文件路径
+      if (output_mode === 'count') {
+        lines = lines.map(line => {
+          const colonIndex = line.lastIndexOf(':');
+          if (colonIndex > 0) {
+            const filePath = line.substring(0, colonIndex);
+            const rest = line.substring(colonIndex);
+            const relativePath = this.toRelativePath(filePath);
+            return relativePath + rest;
+          }
+          return line;
+        });
+      }
+
+      // 对于 files_with_matches 模式，转换为相对路径
+      if (output_mode === 'files_with_matches') {
+        lines = lines.map(file => this.toRelativePath(file));
+      }
+
+      // 应用 offset 和 head_limit
+      lines = this.applyOffsetAndLimit(lines, head_limit, offset);
+
+      const result = lines.join('\n');
+      if (!result) {
         return { success: true, output: 'No matches found.' };
       }
 
-      return { success: true, output: trimmedOutput };
+      return { success: true, output: result };
     } catch (err) {
       // 如果 rg 不可用，回退到 grep
       return this.fallbackGrep(input);
     }
+  }
+
+  /**
+   * 将绝对路径转换为相对路径
+   * 如果相对路径以 ".." 开头，则返回绝对路径
+   */
+  private toRelativePath(absolutePath: string): string {
+    const cwd = process.cwd();
+    const relativePath = path.relative(cwd, absolutePath);
+    return relativePath.startsWith('..') ? absolutePath : relativePath;
+  }
+
+  /**
+   * 应用 offset 和 head_limit
+   */
+  private applyOffsetAndLimit(lines: string[], limit?: number, offset: number = 0): string[] {
+    if (limit === undefined) {
+      return lines.slice(offset);
+    }
+    return lines.slice(offset, offset + limit);
   }
 
   private fallbackGrep(input: GrepInput): ToolResult {
@@ -252,27 +358,28 @@ Usage:
 
     try {
       const flags = ignoreCase ? '-rni' : '-rn';
-      const cmd = `grep ${flags} '${pattern}' '${searchPath}' 2>/dev/null || true`;
+      const cmd = `grep ${flags} '${pattern.replace(/'/g, "'\\''")}' '${searchPath.replace(/'/g, "'\\''")}' 2>/dev/null || true`;
       let output = execSync(cmd, { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 });
 
-      // 应用 offset 和 head_limit（与主方法保持一致）
-      if (offset > 0 || head_limit !== undefined) {
-        const lines = output.split('\n').filter(line => line.length > 0);
+      let lines = output.split('\n').filter(line => line.length > 0);
 
-        let processedLines = lines;
-        if (offset > 0) {
-          processedLines = lines.slice(offset);
+      // 转换文件路径为相对路径
+      lines = lines.map(line => {
+        const colonIndex = line.indexOf(':');
+        if (colonIndex > 0) {
+          const filePath = line.substring(0, colonIndex);
+          const rest = line.substring(colonIndex);
+          const relativePath = this.toRelativePath(filePath);
+          return relativePath + rest;
         }
+        return line;
+      });
 
-        if (head_limit !== undefined && head_limit >= 0) {
-          processedLines = processedLines.slice(0, head_limit);
-        }
+      // 应用 offset 和 head_limit
+      lines = this.applyOffsetAndLimit(lines, head_limit, offset);
 
-        output = processedLines.join('\n');
-      }
-
-      const trimmedOutput = output.trim();
-      return { success: true, output: trimmedOutput || 'No matches found.' };
+      const result = lines.join('\n');
+      return { success: true, output: result || 'No matches found.' };
     } catch (err) {
       return { success: false, error: `Grep error: ${err}` };
     }

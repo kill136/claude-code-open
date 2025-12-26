@@ -35,9 +35,13 @@ export type HookEvent =
   | 'AfterHooks';          // Hooks 执行后（对应 action_after_hooks）
 
 /**
- * Hook 类型
+ * Hook 类型（对应官方 Claude Code CLI 支持的类型 + 扩展类型）
+ * - command: 执行 shell 命令（官方）
+ * - prompt: LLM 提示评估（官方）
+ * - agent: 代理验证器（官方）
+ * - url: HTTP 回调（扩展，用于远程集成）
  */
-export type HookType = 'command' | 'url';
+export type HookType = 'command' | 'prompt' | 'agent' | 'url';
 
 /**
  * Command Hook 配置
@@ -59,7 +63,41 @@ export interface CommandHookConfig {
 }
 
 /**
- * URL Hook 配置
+ * Prompt Hook 配置（使用 LLM 评估）
+ */
+export interface PromptHookConfig {
+  type: 'prompt';
+  /** LLM 提示模板 */
+  prompt: string;
+  /** 使用的模型（可选，默认使用当前会话模型） */
+  model?: string;
+  /** 超时时间（毫秒，默认 30000） */
+  timeout?: number;
+  /** 是否阻塞（等待完成，默认 true） */
+  blocking?: boolean;
+  /** 匹配条件（工具名或正则） */
+  matcher?: string;
+}
+
+/**
+ * Agent Hook 配置（代理验证器）
+ */
+export interface AgentHookConfig {
+  type: 'agent';
+  /** 代理类型或名称 */
+  agentType: string;
+  /** 代理配置 */
+  agentConfig?: Record<string, unknown>;
+  /** 超时时间（毫秒，默认 60000） */
+  timeout?: number;
+  /** 是否阻塞（等待完成，默认 true） */
+  blocking?: boolean;
+  /** 匹配条件（工具名或正则） */
+  matcher?: string;
+}
+
+/**
+ * URL Hook 配置（扩展类型，用于远程集成）
  */
 export interface UrlHookConfig {
   type: 'url';
@@ -80,7 +118,7 @@ export interface UrlHookConfig {
 /**
  * Hook 配置（联合类型）
  */
-export type HookConfig = CommandHookConfig | UrlHookConfig;
+export type HookConfig = CommandHookConfig | PromptHookConfig | AgentHookConfig | UrlHookConfig;
 
 /**
  * 旧版 Hook 配置（兼容性）
@@ -110,6 +148,12 @@ export interface HookResult {
   error?: string;
   blocked?: boolean;
   blockMessage?: string;
+  /** 异步钩子标识（支持后台执行） */
+  async?: boolean;
+  /** 钩子决策（用于 agent 类型） */
+  decision?: 'allow' | 'deny' | 'block';
+  /** 决策原因 */
+  reason?: string;
 }
 
 /**
@@ -226,6 +270,10 @@ function isValidHookConfig(config: any): config is HookConfig {
 
   if (config.type === 'command') {
     return typeof config.command === 'string';
+  } else if (config.type === 'prompt') {
+    return typeof config.prompt === 'string';
+  } else if (config.type === 'agent') {
+    return typeof config.agentType === 'string';
   } else if (config.type === 'url') {
     return typeof config.url === 'string';
   }
@@ -397,7 +445,83 @@ async function executeCommandHook(
 }
 
 /**
- * 执行 URL Hook
+ * 执行 Prompt Hook（使用 LLM 评估）
+ */
+async function executePromptHook(
+  hook: PromptHookConfig,
+  input: HookInput
+): Promise<HookResult> {
+  const timeout = hook.timeout || 30000;
+
+  try {
+    // 构建提示词，替换变量
+    let prompt = hook.prompt
+      .replace(/\{EVENT\}/g, input.event)
+      .replace(/\{TOOL_NAME\}/g, input.toolName || '')
+      .replace(/\{TOOL_INPUT\}/g, JSON.stringify(input.toolInput || {}))
+      .replace(/\{TOOL_OUTPUT\}/g, input.toolOutput || '')
+      .replace(/\{MESSAGE\}/g, input.message || '')
+      .replace(/\{SESSION_ID\}/g, input.sessionId || '');
+
+    // TODO: 集成 Anthropic API 调用
+    // 这里需要调用 Claude API 来评估提示
+    // 目前返回一个占位符实现
+    console.warn('[Prompt Hook] LLM evaluation not yet implemented');
+
+    return {
+      success: true,
+      output: JSON.stringify({
+        type: 'prompt_evaluation',
+        model: hook.model || 'claude-3-sonnet-20240229',
+        decision: 'allow',
+        message: 'Prompt hook evaluation not yet implemented',
+      }),
+      async: false,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err.message || 'Prompt hook evaluation failed',
+    };
+  }
+}
+
+/**
+ * 执行 Agent Hook（代理验证器）
+ */
+async function executeAgentHook(
+  hook: AgentHookConfig,
+  input: HookInput
+): Promise<HookResult> {
+  const timeout = hook.timeout || 60000;
+
+  try {
+    // TODO: 集成 Agent 系统调用
+    // 这里需要调用指定的 Agent 来验证操作
+    // 目前返回一个占位符实现
+    console.warn(`[Agent Hook] Agent validation not yet implemented for: ${hook.agentType}`);
+
+    return {
+      success: true,
+      output: JSON.stringify({
+        type: 'agent_validation',
+        agentType: hook.agentType,
+        decision: 'allow',
+        message: 'Agent hook validation not yet implemented',
+      }),
+      async: false,
+      decision: 'allow',
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err.message || 'Agent hook validation failed',
+    };
+  }
+}
+
+/**
+ * 执行 URL Hook（扩展功能，用于远程集成）
  */
 async function executeUrlHook(
   hook: UrlHookConfig,
@@ -486,6 +610,10 @@ async function executeUrlHook(
 async function executeHook(hook: HookConfig, input: HookInput): Promise<HookResult> {
   if (hook.type === 'command') {
     return executeCommandHook(hook, input);
+  } else if (hook.type === 'prompt') {
+    return executePromptHook(hook, input);
+  } else if (hook.type === 'agent') {
+    return executeAgentHook(hook, input);
   } else if (hook.type === 'url') {
     return executeUrlHook(hook, input);
   } else {
