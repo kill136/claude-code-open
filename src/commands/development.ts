@@ -177,48 +177,127 @@ We read all feedback and use it to improve Claude Code!`;
   },
 };
 
+// /pr - 创建 Pull Request (基于官方 v2.0.76 源码实现)
+export const prCommand: SlashCommand = {
+  name: 'pr',
+  aliases: ['pull-request', 'create-pr'],
+  description: 'Create a pull request for the current branch',
+  usage: '/pr [base-branch]',
+  category: 'development',
+  execute: (ctx: CommandContext): CommandResult => {
+    const { args } = ctx;
+    const baseBranch = args[0] || 'main';
+
+    // 基于官方源码的 PR 创建提示 (参考系统提示中的 "Creating pull requests" 部分)
+    const prPrompt = `I need to create a pull request for the current branch.
+
+Follow these steps carefully to create the PR:
+
+**Step 1: Gather Information (run these commands in parallel)**
+
+1. Run \`git status\` to see all untracked files and working directory state
+2. Run \`git diff\` to see both staged and unstaged changes
+3. Check if the current branch tracks a remote branch: \`git branch -vv\`
+4. Run \`git log --oneline ${baseBranch}..HEAD\` to see all commits since diverging from ${baseBranch}
+5. Run \`git diff ${baseBranch}...HEAD\` to understand the full diff
+
+**Step 2: Analyze and Draft PR**
+
+Based on the gathered information:
+- Analyze ALL commits that will be included in the PR (not just the latest one)
+- Understand the complete scope of changes
+- Draft a concise PR title (1 sentence, focused on the "why")
+- Draft a PR summary with 1-3 bullet points
+
+**Step 3: Push and Create PR (run in sequence)**
+
+1. Create new branch if needed (use current branch name or suggest one)
+2. Push to remote with -u flag if the branch isn't tracking a remote:
+   \`git push -u origin <branch-name>\`
+3. Create the PR using gh CLI with HEREDOC format:
+
+\`\`\`bash
+gh pr create --title "the pr title" --body "$(cat <<'EOF'
+## Summary
+<1-3 bullet points describing the changes>
+
+## Test plan
+- [ ] Verify the changes work as expected
+- [ ] Run existing tests
+- [ ] Manual testing steps if applicable
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+EOF
+)"
+\`\`\`
+
+**Important Notes:**
+- Base branch for this PR: ${baseBranch}
+- If there are uncommitted changes, ask whether to commit them first
+- If the PR already exists, show its URL instead
+- Return the PR URL when done so I can view it
+
+Begin by running the git commands to understand the current state of the branch.`;
+
+    ctx.ui.addMessage('user', prPrompt);
+    ctx.ui.addActivity('Creating pull request...');
+    return { success: true };
+  },
+};
+
 // /pr-comments - PR 评论
 export const prCommentsCommand: SlashCommand = {
   name: 'pr-comments',
-  aliases: ['pr'],
-  description: 'View or respond to PR comments',
+  aliases: ['view-pr-comments'],
+  description: 'View and respond to PR comments',
   usage: '/pr-comments [pr-number]',
   category: 'development',
   execute: (ctx: CommandContext): CommandResult => {
     const { args } = ctx;
     const prNumber = args[0];
 
-    const prInfo = `PR Comments:
+    if (!prNumber) {
+      // 没有提供 PR 编号，提示列出 PR
+      const listPrompt = `List the open pull requests for this repository.
 
-${prNumber ? `PR #${prNumber}` : 'Usage: /pr-comments <pr-number>'}
+Run: \`gh pr list\`
 
-Features:
-  - View PR comments
-  - Respond to reviews
-  - Address feedback
-  - Mark as resolved
+Then ask which PR's comments I'd like to view.`;
 
-Requirements:
-  - GitHub App installed (/install-github-app)
-  - Repository access
+      ctx.ui.addMessage('user', listPrompt);
+      return { success: true };
+    }
 
-Commands:
-  /pr-comments 123        - View comments on PR #123
-  /pr-comments 123 reply  - Reply to comments
+    // 基于官方源码的 PR 评论查看提示
+    const prCommentsPrompt = `I need to view the comments on PR #${prNumber}.
 
-Integration:
-  Claude can read PR comments and help you:
-  - Understand feedback
-  - Make suggested changes
-  - Write responses
+Follow these steps:
 
-Example workflow:
-  1. /pr-comments 123
-  2. Claude shows the comments
-  3. Ask Claude to address specific feedback
-  4. Claude makes changes and responds`;
+1. Use \`gh pr view ${prNumber} --json number,headRepository\` to get the PR number and repository info
+2. Use \`gh api /repos/{owner}/{repo}/issues/${prNumber}/comments\` to get PR-level comments
+3. Use \`gh api /repos/{owner}/{repo}/pulls/${prNumber}/comments\` to get review comments. Pay particular attention to the following fields: \`body\`, \`diff_hunk\`, \`path\`, \`line\`, etc. If the comment references some code, consider fetching it using eg \`gh api /repos/{owner}/{repo}/contents/{path}?ref={branch} | jq .content -r | base64 -d\`
+4. Parse and format all comments in a readable way
+5. Return ONLY the formatted comments, with no additional text
 
-    ctx.ui.addMessage('assistant', prInfo);
+Format the comments as:
+
+---
+**[Author]** commented on [date]:
+> [comment body]
+[If code review comment, show file path and line number]
+---
+
+Additional guidelines:
+1. Get the repository owner/name from \`gh repo view --json owner,name\`
+2. Include both PR-level and code review comments
+3. Preserve the threading/nesting of comment replies
+4. Show the file and line number context for code review comments
+5. Use jq to parse the JSON responses from the GitHub API
+
+Begin by getting the PR information.`;
+
+    ctx.ui.addMessage('user', prCommentsPrompt);
+    ctx.ui.addActivity(`Fetching comments for PR #${prNumber}...`);
     return { success: true };
   },
 };
@@ -853,6 +932,7 @@ Examples:
 export function registerDevelopmentCommands(): void {
   commandRegistry.register(reviewCommand);
   commandRegistry.register(feedbackCommand);
+  commandRegistry.register(prCommand);
   commandRegistry.register(prCommentsCommand);
   commandRegistry.register(securityReviewCommand);
   commandRegistry.register(releaseNotesCommand);

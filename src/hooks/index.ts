@@ -37,11 +37,17 @@ export type HookEvent =
 /**
  * Hook 类型（对应官方 Claude Code CLI 支持的类型 + 扩展类型）
  * - command: 执行 shell 命令（官方）
+ * - mcp: 调用 MCP 服务器工具（官方）
  * - prompt: LLM 提示评估（官方）
  * - agent: 代理验证器（官方）
  * - url: HTTP 回调（扩展，用于远程集成）
  */
-export type HookType = 'command' | 'prompt' | 'agent' | 'url';
+export type HookType = 'command' | 'mcp' | 'prompt' | 'agent' | 'url';
+
+/**
+ * 默认超时时间（毫秒）
+ */
+export const DEFAULT_HOOK_TIMEOUT = 30000;
 
 /**
  * Command Hook 配置
@@ -97,6 +103,25 @@ export interface AgentHookConfig {
 }
 
 /**
+ * MCP Hook 配置（调用 MCP 服务器工具）
+ */
+export interface McpHookConfig {
+  type: 'mcp';
+  /** MCP 服务器名称 */
+  server: string;
+  /** 要调用的工具名称 */
+  tool: string;
+  /** 工具参数（可选，会与 hook input 合并） */
+  toolArgs?: Record<string, unknown>;
+  /** 超时时间（毫秒，默认 30000） */
+  timeout?: number;
+  /** 是否阻塞（等待完成，默认 true） */
+  blocking?: boolean;
+  /** 匹配条件（工具名或正则） */
+  matcher?: string;
+}
+
+/**
  * URL Hook 配置（扩展类型，用于远程集成）
  */
 export interface UrlHookConfig {
@@ -118,7 +143,7 @@ export interface UrlHookConfig {
 /**
  * Hook 配置（联合类型）
  */
-export type HookConfig = CommandHookConfig | PromptHookConfig | AgentHookConfig | UrlHookConfig;
+export type HookConfig = CommandHookConfig | McpHookConfig | PromptHookConfig | AgentHookConfig | UrlHookConfig;
 
 /**
  * 旧版 Hook 配置（兼容性）

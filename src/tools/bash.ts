@@ -1,18 +1,147 @@
 /**
  * Bash 工具
  * 执行 shell 命令，支持沙箱隔离
+ * 跨平台支持: Windows (PowerShell/CMD), macOS, Linux
  */
 
-import { spawn, exec } from 'child_process';
+import { spawn, exec, ChildProcess, spawnSync } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
 import { BaseTool } from './base.js';
 import { executeInSandbox, isBubblewrapAvailable } from './sandbox.js';
 import { runPreToolUseHooks, runPostToolUseHooks } from '../hooks/index.js';
 import type { BashInput, BashResult, ToolDefinition } from '../types/index.js';
 
 const execAsync = promisify(exec);
+
+// ============================================================================
+// 跨平台支持
+// ============================================================================
+
+/** 平台检测 */
+const IS_WINDOWS = os.platform() === 'win32';
+const IS_WSL = os.platform() === 'linux' &&
+  fs.existsSync('/proc/version') &&
+  fs.readFileSync('/proc/version', 'utf-8').toLowerCase().includes('microsoft');
+
+/** Shell 配置接口 */
+interface ShellConfig {
+  shell: string;
+  args: string[];
+  isCmd: boolean;
+  isPowerShell: boolean;
+}
+
+/** 获取平台适配的 Shell 配置 */
+function getPlatformShell(): ShellConfig {
+  if (IS_WINDOWS) {
+    // Windows: 优先使用 PowerShell，回退到 cmd
+    try {
+      const result = spawnSync('powershell.exe', ['-Command', 'echo test'], {
+        encoding: 'utf-8',
+        timeout: 5000,
+        windowsHide: true,
+      });
+      if (result.status === 0) {
+        return {
+          shell: 'powershell.exe',
+          args: ['-NoProfile', '-NonInteractive', '-Command'],
+          isCmd: false,
+          isPowerShell: true,
+        };
+      }
+    } catch {
+      // PowerShell 不可用
+    }
+
+    // 回退到 cmd
+    const cmdPath = process.env.COMSPEC || 'cmd.exe';
+    return {
+      shell: cmdPath,
+      args: ['/c'],
+      isCmd: true,
+      isPowerShell: false,
+    };
+  }
+
+  // Unix 系统: 使用 bash 或 sh
+  const shell = process.env.SHELL || '/bin/bash';
+  return {
+    shell,
+    args: ['-c'],
+    isCmd: false,
+    isPowerShell: false,
+  };
+}
+
+/** 缓存的 Shell 配置 */
+let cachedShellConfig: ShellConfig | null = null;
+
+function getShellConfig(): ShellConfig {
+  if (!cachedShellConfig) {
+    cachedShellConfig = getPlatformShell();
+  }
+  return cachedShellConfig;
+}
+
+/** 获取平台适配的终止信号类型 */
+type TermSignal = 'SIGTERM' | 'SIGKILL' | 'SIGINT';
+
+/**
+ * 安全地终止进程（跨平台）
+ */
+function killProcessSafely(proc: ChildProcess, signal: TermSignal = 'SIGTERM'): boolean {
+  try {
+    if (IS_WINDOWS && proc.pid) {
+      // Windows: 使用 taskkill 终止进程树
+      try {
+        spawn('taskkill', ['/PID', String(proc.pid), '/T', '/F'], {
+          stdio: 'ignore',
+          windowsHide: true,
+        });
+        return true;
+      } catch {
+        // 回退到标准方法
+      }
+    }
+    proc.kill(signal);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 获取平台适配的 spawn 选项
+ */
+function getPlatformSpawnOptions(cwd: string): {
+  shell: string | boolean;
+  cwd: string;
+  env: NodeJS.ProcessEnv;
+  windowsHide?: boolean;
+  stdio: ['ignore', 'pipe', 'pipe'];
+} {
+  const options: {
+    shell: string | boolean;
+    cwd: string;
+    env: NodeJS.ProcessEnv;
+    windowsHide?: boolean;
+    stdio: ['ignore', 'pipe', 'pipe'];
+  } = {
+    shell: false,
+    cwd,
+    env: { ...process.env },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  };
+
+  if (IS_WINDOWS) {
+    options.windowsHide = true;
+  }
+
+  return options;
+}
 
 // 后台 shell 管理
 interface ShellState {
@@ -22,13 +151,32 @@ interface ShellState {
   outputStream?: fs.WriteStream;
   status: 'running' | 'completed' | 'failed';
   startTime: number;
+  endTime?: number;
   timeout?: NodeJS.Timeout;
   maxRuntime?: number;
   outputSize: number;
   command: string;
+  exitCode?: number;
+  description?: string;
+  // 用于增量读取输出
+  lastReadPosition: number;
 }
 
 const backgroundShells: Map<string, ShellState> = new Map();
+
+/**
+ * 获取后台 shell 信息（供 TaskOutput 工具使用）
+ */
+export function getBackgroundShell(shellId: string): ShellState | undefined {
+  return backgroundShells.get(shellId);
+}
+
+/**
+ * 检查 ID 是否是 shell ID
+ */
+export function isShellId(id: string): boolean {
+  return id.startsWith('bash_');
+}
 
 // 获取后台输出文件路径
 function getBackgroundOutputPath(shellId: string): string {
@@ -416,6 +564,7 @@ Sandbox: ${isBubblewrapAvailable() ? 'Available (bubblewrap)' : 'Not available'}
       maxRuntime: Math.min(maxRuntime, BACKGROUND_SHELL_MAX_RUNTIME),
       outputSize: 0,
       command,
+      lastReadPosition: 0,
     };
 
     // 设置超时清理
@@ -470,6 +619,9 @@ Sandbox: ${isBubblewrapAvailable() ? 'Available (bubblewrap)' : 'Not available'}
 
     proc.on('close', (code) => {
       shellState.status = code === 0 ? 'completed' : 'failed';
+      shellState.exitCode = code ?? undefined;
+      shellState.endTime = Date.now();
+
       if (shellState.timeout) {
         clearTimeout(shellState.timeout);
       }
@@ -521,15 +673,21 @@ Read the output file to retrieve the output. You can also use BashOutput tool wi
   }
 }
 
-export class BashOutputTool extends BaseTool<{ bash_id: string; filter?: string }, BashResult> {
+export class BashOutputTool extends BaseTool<
+  { bash_id: string; filter?: string; block?: boolean; timeout?: number },
+  BashResult
+> {
   name = 'BashOutput';
   description = `Retrieves output from a running or completed background bash shell.
 
 Usage:
-  - Takes a bash_id parameter identifying the shell
-  - Always returns only new output since the last check
-  - Returns stdout and stderr output along with shell status
-  - Supports optional regex filtering to show only lines matching a pattern`;
+  - Takes a bash_id (or shell_id) parameter identifying the shell
+  - Returns new output since the last check (incremental updates)
+  - Use block=true (default: false) to wait for task completion
+  - Use block=false for non-blocking check of current status
+  - timeout specifies max wait time in ms when blocking
+  - Supports optional regex filtering to show only lines matching a pattern
+  - Shell IDs can be found using the /tasks command`;
 
   getInputSchema(): ToolDefinition['inputSchema'] {
     return {
@@ -537,23 +695,57 @@ Usage:
       properties: {
         bash_id: {
           type: 'string',
-          description: 'The ID of the background shell',
+          description: 'The ID of the background shell (also accepts shell_id)',
         },
         filter: {
           type: 'string',
           description: 'Optional regex to filter output lines',
+        },
+        block: {
+          type: 'boolean',
+          description: 'Whether to wait for completion (default: false)',
+        },
+        timeout: {
+          type: 'number',
+          description: 'Max wait time in ms when blocking (default: 30000)',
         },
       },
       required: ['bash_id'],
     };
   }
 
-  async execute(input: { bash_id: string; filter?: string }): Promise<BashResult> {
+  async execute(input: {
+    bash_id: string;
+    filter?: string;
+    block?: boolean;
+    timeout?: number;
+  }): Promise<BashResult> {
     const shell = backgroundShells.get(input.bash_id);
     if (!shell) {
       return { success: false, error: `Shell ${input.bash_id} not found` };
     }
 
+    // 如果需要阻塞等待完成
+    if (input.block && shell.status === 'running') {
+      const maxTimeout = input.timeout || 30000;
+      const startTime = Date.now();
+
+      while (shell.status === 'running' && Date.now() - startTime < maxTimeout) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      if (shell.status === 'running') {
+        // 超时但仍在运行
+        return {
+          success: true,
+          output: `Shell ${input.bash_id} is still running after ${maxTimeout}ms timeout.\nUse block=false to check current output without waiting.`,
+          stdout: `Status: ${shell.status}`,
+          shell_id: input.bash_id,
+        };
+      }
+    }
+
+    // 读取新输出（增量）
     let output = shell.output.join('');
     // 清空已读取的输出
     shell.output.length = 0;
@@ -561,7 +753,10 @@ Usage:
     if (input.filter) {
       try {
         const regex = new RegExp(input.filter);
-        output = output.split('\n').filter((line) => regex.test(line)).join('\n');
+        output = output
+          .split('\n')
+          .filter((line) => regex.test(line))
+          .join('\n');
       } catch {
         return { success: false, error: `Invalid regex: ${input.filter}` };
       }
@@ -569,11 +764,37 @@ Usage:
 
     const duration = Date.now() - shell.startTime;
 
+    // 构建状态信息
+    const statusInfo = [];
+    statusInfo.push(`<shell-id>${input.bash_id}</shell-id>`);
+    statusInfo.push(`<status>${shell.status}</status>`);
+    statusInfo.push(`<duration>${duration}ms</duration>`);
+    statusInfo.push(`<output-file>${shell.outputFile}</output-file>`);
+
+    if (shell.exitCode !== undefined) {
+      statusInfo.push(`<exit-code>${shell.exitCode}</exit-code>`);
+    }
+
+    if (output.trim()) {
+      statusInfo.push(`<output>\n${output}\n</output>`);
+    } else {
+      statusInfo.push(`<output>(no new output)</output>`);
+    }
+
+    if (shell.status === 'completed') {
+      statusInfo.push(`<summary>Command completed successfully.</summary>`);
+    } else if (shell.status === 'failed') {
+      statusInfo.push(`<summary>Command failed with exit code ${shell.exitCode}.</summary>`);
+    } else {
+      statusInfo.push(`<summary>Command is still running. Use block=true to wait for completion.</summary>`);
+    }
+
     return {
       success: true,
-      output: output || '(no new output)',
-      exitCode: shell.status === 'completed' ? 0 : shell.status === 'failed' ? 1 : undefined,
-      stdout: `Status: ${shell.status}, Duration: ${duration}ms`,
+      output: statusInfo.join('\n'),
+      exitCode: shell.exitCode,
+      stdout: output,
+      shell_id: input.bash_id,
     };
   }
 }

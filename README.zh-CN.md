@@ -455,6 +455,11 @@ npx tsc --noEmit
 - **Glob** - 文件匹配
 - **Zod** - Schema 验证
 
+## 社区
+
+- **Discord:** [加入 Discord](https://discord.gg/hs5BWGjt)
+- **X (Twitter):** [@wangbingjie1989](https://x.com/wangbingjie1989)
+
 ## License
 
 本项目仅用于教育目的。原始 Claude Code 归 Anthropic PBC 所有。

@@ -58,6 +58,7 @@ const UserConfigSchema = z.object({
   // UI 配置
   theme: z.enum(['dark', 'light', 'auto']).default('auto'),
   verbose: z.boolean().default(false),
+  editMode: z.enum(['default', 'vim', 'emacs']).default('default'),
 
   // 终端配置（新增）
   terminal: z.object({
@@ -191,6 +192,7 @@ const DEFAULT_CONFIG: Partial<UserConfig> = {
   temperature: 1,
   theme: 'auto',
   verbose: false,
+  editMode: 'default',
   maxRetries: 3,
   enableTelemetry: false,
   disableFileCheckpointing: false,
@@ -316,60 +318,137 @@ function compareVersions(v1: string, v2: string): number {
 }
 
 // ============ 配置来源类型 ============
+// 官方优先级链（从低到高）:
+// 1. default (内置默认值)
+// 2. userSettings (~/.claude/settings.json)
+// 3. projectSettings (.claude/settings.json)
+// 4. localSettings (.claude/settings.local.json - 机器特定, 应添加到 .gitignore)
+// 5. envSettings (环境变量)
+// 6. flagSettings (命令行标志)
+// 7. policySettings (企业策略 - 最高优先级，强制覆盖)
 
 export type ConfigSource =
-  | 'default'
-  | 'userSettings'      // 用户全局配置 (~/.claude/settings.json)
-  | 'projectSettings'   // 项目配置 (./.claude/settings.json)
-  | 'localSettings'     // 本地配置 (./.claude/local.json, 机器特定, git忽略)
-  | 'policySettings'    // 策略配置 (组织策略, 最高优先级)
-  | 'envSettings'       // 环境变量
-  | 'flagSettings';     // 命令行标志
+  | 'default'           // 优先级 0 - 内置默认值
+  | 'userSettings'      // 优先级 1 - 用户全局配置 (~/.claude/settings.json)
+  | 'projectSettings'   // 优先级 2 - 项目配置 (.claude/settings.json)
+  | 'localSettings'     // 优先级 3 - 本地配置 (.claude/settings.local.json, 机器特定)
+  | 'envSettings'       // 优先级 4 - 环境变量
+  | 'flagSettings'      // 优先级 5 - 命令行标志
+  | 'policySettings'    // 优先级 6 - 企业策略（最高优先级，强制覆盖用户设置）
+  | 'plugin'            // 插件提供的配置
+  | 'built-in';         // 内置配置
+
+// 优先级映射
+export const CONFIG_SOURCE_PRIORITY: Record<ConfigSource, number> = {
+  'default': 0,
+  'userSettings': 1,
+  'projectSettings': 2,
+  'localSettings': 3,
+  'envSettings': 4,
+  'flagSettings': 5,
+  'policySettings': 6,  // 最高优先级
+  'plugin': 3,          // 与 localSettings 同级
+  'built-in': 0,        // 与 default 同级
+};
 
 export interface ConfigSourceInfo {
   source: ConfigSource;
   path?: string;
   priority: number;
+  exists?: boolean;     // 配置文件是否存在
+  loadedAt?: Date;      // 加载时间
 }
 
 export interface ConfigWithSource<T = any> {
   value: T;
   source: ConfigSource;
+  sourcePath?: string;  // 配置来源路径（如果适用）
+}
+
+// 配置项详细来源信息
+export interface ConfigKeySource {
+  key: string;
+  value: any;
+  source: ConfigSource;
+  sourcePath?: string;
+  overriddenBy?: ConfigSource[];  // 被哪些来源覆盖
+}
+
+// 企业策略配置接口
+export interface EnterprisePolicyConfig {
+  // 强制设置（不可被用户覆盖）
+  enforced?: Partial<UserConfig>;
+  // 默认设置（可被用户覆盖）
+  defaults?: Partial<UserConfig>;
+  // 禁用的功能
+  disabledFeatures?: string[];
+  // 允许的工具白名单
+  allowedTools?: string[];
+  // 禁止的工具黑名单
+  deniedTools?: string[];
+  // 策略元数据
+  metadata?: {
+    version?: string;
+    lastUpdated?: string;
+    organizationId?: string;
+    policyName?: string;
+  };
 }
 
 // ============ ConfigManager 增强版 ============
 
+export interface ConfigManagerOptions {
+  flagSettingsPath?: string;
+  workingDirectory?: string;
+  debugMode?: boolean;
+  cliFlags?: Partial<UserConfig>;  // 直接传入的 CLI 标志
+}
+
 export class ConfigManager {
   private globalConfigDir: string;
-  private userConfigFile: string;        // 用户配置 (~/.claude/settings.json)
-  private projectConfigFile: string;      // 项目配置 (./.claude/settings.json)
-  private localConfigFile: string;        // 本地配置 (./.claude/local.json)
-  private policyConfigFile: string;       // 策略配置 (~/.claude/policy.json)
-  private flagConfigFile?: string;        // 标志配置 (命令行指定)
+  private userConfigFile: string;         // 用户配置 (~/.claude/settings.json)
+  private projectConfigFile: string;      // 项目配置 (.claude/settings.json)
+  private localConfigFile: string;        // 本地配置 (.claude/settings.local.json) - 官方命名
+  private policyConfigFile: string;       // 企业策略配置 (~/.claude/managed_settings.json)
+  private flagConfigFile?: string;        // 标志配置文件 (命令行指定的配置文件)
 
   private mergedConfig: UserConfig;
   private configSources: Map<string, ConfigSource> = new Map(); // 记录每个配置项的来源
+  private configSourcePaths: Map<string, string> = new Map();   // 记录每个配置项的来源路径
+  private configHistory: Map<string, ConfigKeySource[]> = new Map(); // 记录配置项的覆盖历史
   private watchers: fs.FSWatcher[] = [];
   private reloadCallbacks: Array<(config: UserConfig) => void> = [];
+  private debugMode: boolean;
+  private cliFlags?: Partial<UserConfig>;
+  private enterprisePolicy?: EnterprisePolicyConfig;
+  private loadedSources: ConfigSourceInfo[] = [];
 
-  constructor(options?: { flagSettingsPath?: string }) {
+  constructor(options?: ConfigManagerOptions) {
+    this.debugMode = options?.debugMode ?? (process.env.CLAUDE_CODE_DEBUG === 'true');
+    this.cliFlags = options?.cliFlags;
+
+    const workingDir = options?.workingDirectory ?? process.cwd();
+
     // 全局配置目录
     this.globalConfigDir = process.env.CLAUDE_CONFIG_DIR ||
                            path.join(process.env.HOME || process.env.USERPROFILE || '~', '.claude');
 
-    // 用户配置文件 (旧名 globalConfigFile，现改为 userConfigFile)
+    // 用户配置文件 (~/.claude/settings.json)
     this.userConfigFile = path.join(this.globalConfigDir, 'settings.json');
 
-    // 策略配置文件 (组织策略，最高优先级)
-    this.policyConfigFile = path.join(this.globalConfigDir, 'policy.json');
+    // 企业策略配置文件 (~/.claude/managed_settings.json) - 官方命名
+    // 同时支持 policy.json 作为备选
+    const managedSettingsPath = path.join(this.globalConfigDir, 'managed_settings.json');
+    const policyJsonPath = path.join(this.globalConfigDir, 'policy.json');
+    this.policyConfigFile = fs.existsSync(managedSettingsPath) ? managedSettingsPath : policyJsonPath;
 
-    // 项目配置文件
-    this.projectConfigFile = path.join(process.cwd(), '.claude', 'settings.json');
+    // 项目配置文件 (.claude/settings.json)
+    this.projectConfigFile = path.join(workingDir, '.claude', 'settings.json');
 
-    // 本地配置文件 (机器特定，应添加到 .gitignore)
-    this.localConfigFile = path.join(process.cwd(), '.claude', 'local.json');
+    // 本地配置文件 (.claude/settings.local.json) - 官方命名，应添加到 .gitignore
+    this.localConfigFile = path.join(workingDir, '.claude', 'settings.local.json');
 
-    // 标志配置文件 (通过命令行指定)
+    // 标志配置文件 (通过命令行 --settings 指定)
     this.flagConfigFile = options?.flagSettingsPath;
 
     // 验证环境变量
@@ -377,6 +456,11 @@ export class ConfigManager {
 
     // 加载并合并配置
     this.mergedConfig = this.loadAndMergeConfig();
+
+    // 调试输出
+    if (this.debugMode) {
+      this.printDebugInfo();
+    }
   }
 
   /**
@@ -398,79 +482,298 @@ export class ConfigManager {
 
   /**
    * 加载并合并所有配置源
-   * 优先级：默认 < policySettings < userSettings < projectSettings < localSettings < envSettings < flagSettings
+   *
+   * 官方优先级链（从低到高）:
+   * 1. default - 内置默认值
+   * 2. userSettings - 用户全局配置 (~/.claude/settings.json)
+   * 3. projectSettings - 项目配置 (.claude/settings.json)
+   * 4. localSettings - 本地配置 (.claude/settings.local.json)
+   * 5. envSettings - 环境变量
+   * 6. flagSettings - 命令行标志
+   * 7. policySettings - 企业策略（最高优先级，强制覆盖）
    */
   private loadAndMergeConfig(): UserConfig {
     this.configSources.clear();
+    this.configSourcePaths.clear();
+    this.configHistory.clear();
+    this.loadedSources = [];
 
-    // 1. 默认配置
+    const loadTime = new Date();
+
+    // 1. 默认配置 (优先级 0)
     let config: any = { ...DEFAULT_CONFIG };
     this.trackConfigSource(config, 'default');
+    this.loadedSources.push({
+      source: 'default',
+      priority: CONFIG_SOURCE_PRIORITY.default,
+      exists: true,
+      loadedAt: loadTime,
+    });
 
-    // 2. 策略配置 (组织策略，第二优先级)
-    const policyConfig = this.loadConfigFile(this.policyConfigFile);
-    if (policyConfig) {
-      config = this.mergeConfig(config, policyConfig, 'policySettings');
+    // 2. 加载企业策略（如果存在）以获取默认值
+    this.enterprisePolicy = this.loadEnterprisePolicy();
+    if (this.enterprisePolicy?.defaults) {
+      // 企业策略的默认值会被用户设置覆盖
+      config = this.mergeConfig(config, this.enterprisePolicy.defaults, 'policySettings', this.policyConfigFile);
+      this.debugLog('Loaded enterprise policy defaults');
     }
 
-    // 3. 用户配置 (全局配置)
-    const userConfig = this.loadConfigFile(this.userConfigFile);
-    if (userConfig) {
-      config = this.mergeConfig(config, userConfig, 'userSettings');
-    }
-
-    // 4. 项目配置
-    const projectConfig = this.loadConfigFile(this.projectConfigFile);
-    if (projectConfig) {
-      config = this.mergeConfig(config, projectConfig, 'projectSettings');
-    }
-
-    // 5. 本地配置 (机器特定)
-    const localConfig = this.loadConfigFile(this.localConfigFile);
-    if (localConfig) {
-      config = this.mergeConfig(config, localConfig, 'localSettings');
-    }
-
-    // 6. 环境变量
-    const envConfig = getEnvConfig();
-    config = this.mergeConfig(config, envConfig, 'envSettings');
-
-    // 7. 标志配置 (命令行指定，最高优先级)
-    if (this.flagConfigFile) {
-      const flagConfig = this.loadConfigFile(this.flagConfigFile);
-      if (flagConfig) {
-        config = this.mergeConfig(config, flagConfig, 'flagSettings');
+    // 3. 用户配置 (~/.claude/settings.json) (优先级 1)
+    const userConfigExists = fs.existsSync(this.userConfigFile);
+    this.loadedSources.push({
+      source: 'userSettings',
+      path: this.userConfigFile,
+      priority: CONFIG_SOURCE_PRIORITY.userSettings,
+      exists: userConfigExists,
+      loadedAt: loadTime,
+    });
+    if (userConfigExists) {
+      const userConfig = this.loadConfigFile(this.userConfigFile);
+      if (userConfig) {
+        config = this.mergeConfig(config, userConfig, 'userSettings', this.userConfigFile);
+        this.debugLog(`Loaded user settings from ${this.userConfigFile}`);
       }
     }
 
-    // 8. 迁移配置
+    // 4. 项目配置 (.claude/settings.json) (优先级 2)
+    const projectConfigExists = fs.existsSync(this.projectConfigFile);
+    this.loadedSources.push({
+      source: 'projectSettings',
+      path: this.projectConfigFile,
+      priority: CONFIG_SOURCE_PRIORITY.projectSettings,
+      exists: projectConfigExists,
+      loadedAt: loadTime,
+    });
+    if (projectConfigExists) {
+      const projectConfig = this.loadConfigFile(this.projectConfigFile);
+      if (projectConfig) {
+        config = this.mergeConfig(config, projectConfig, 'projectSettings', this.projectConfigFile);
+        this.debugLog(`Loaded project settings from ${this.projectConfigFile}`);
+      }
+    }
+
+    // 5. 本地配置 (.claude/settings.local.json) (优先级 3)
+    const localConfigExists = fs.existsSync(this.localConfigFile);
+    this.loadedSources.push({
+      source: 'localSettings',
+      path: this.localConfigFile,
+      priority: CONFIG_SOURCE_PRIORITY.localSettings,
+      exists: localConfigExists,
+      loadedAt: loadTime,
+    });
+    if (localConfigExists) {
+      const localConfig = this.loadConfigFile(this.localConfigFile);
+      if (localConfig) {
+        config = this.mergeConfig(config, localConfig, 'localSettings', this.localConfigFile);
+        this.debugLog(`Loaded local settings from ${this.localConfigFile}`);
+      }
+    }
+
+    // 6. 环境变量 (优先级 4)
+    const envConfig = getEnvConfig();
+    const envKeys = Object.keys(envConfig).filter(k => (envConfig as any)[k] !== undefined);
+    if (envKeys.length > 0) {
+      config = this.mergeConfig(config, envConfig, 'envSettings');
+      this.loadedSources.push({
+        source: 'envSettings',
+        priority: CONFIG_SOURCE_PRIORITY.envSettings,
+        exists: true,
+        loadedAt: loadTime,
+      });
+      this.debugLog(`Loaded ${envKeys.length} settings from environment variables`);
+    }
+
+    // 7. CLI 标志配置 (优先级 5)
+    // 7a. 从配置文件加载（如果指定了 --settings）
+    if (this.flagConfigFile) {
+      const flagConfigExists = fs.existsSync(this.flagConfigFile);
+      this.loadedSources.push({
+        source: 'flagSettings',
+        path: this.flagConfigFile,
+        priority: CONFIG_SOURCE_PRIORITY.flagSettings,
+        exists: flagConfigExists,
+        loadedAt: loadTime,
+      });
+      if (flagConfigExists) {
+        const flagConfig = this.loadConfigFile(this.flagConfigFile);
+        if (flagConfig) {
+          config = this.mergeConfig(config, flagConfig, 'flagSettings', this.flagConfigFile);
+          this.debugLog(`Loaded flag settings from ${this.flagConfigFile}`);
+        }
+      }
+    }
+
+    // 7b. 直接传入的 CLI 标志（最高用户可控优先级）
+    if (this.cliFlags) {
+      const cliKeys = Object.keys(this.cliFlags).filter(k => (this.cliFlags as any)[k] !== undefined);
+      if (cliKeys.length > 0) {
+        config = this.mergeConfig(config, this.cliFlags, 'flagSettings');
+        this.debugLog(`Applied ${cliKeys.length} CLI flag overrides`);
+      }
+    }
+
+    // 8. 企业策略强制设置 (优先级 6 - 最高)
+    // 强制设置会覆盖所有用户配置
+    if (this.enterprisePolicy?.enforced) {
+      config = this.mergeConfig(config, this.enterprisePolicy.enforced, 'policySettings', this.policyConfigFile);
+      this.loadedSources.push({
+        source: 'policySettings',
+        path: this.policyConfigFile,
+        priority: CONFIG_SOURCE_PRIORITY.policySettings,
+        exists: true,
+        loadedAt: loadTime,
+      });
+      this.debugLog('Applied enterprise policy enforced settings (highest priority)');
+    }
+
+    // 9. 迁移配置
     config = migrateConfig(config);
 
-    // 9. 验证配置
+    // 10. 验证配置
     try {
       return UserConfigSchema.parse(config);
     } catch (error) {
-      console.warn('配置验证失败，使用默认值:', error);
+      console.warn('Config validation failed, using defaults:', error);
       return UserConfigSchema.parse(DEFAULT_CONFIG);
     }
   }
 
   /**
+   * 加载企业策略配置
+   */
+  private loadEnterprisePolicy(): EnterprisePolicyConfig | undefined {
+    try {
+      if (fs.existsSync(this.policyConfigFile)) {
+        const content = fs.readFileSync(this.policyConfigFile, 'utf-8');
+        const policy = JSON.parse(content);
+        this.debugLog(`Loaded enterprise policy from ${this.policyConfigFile}`);
+        return policy as EnterprisePolicyConfig;
+      }
+    } catch (error) {
+      this.debugLog(`Failed to load enterprise policy: ${error}`);
+    }
+    return undefined;
+  }
+
+  /**
+   * 调试日志
+   */
+  private debugLog(message: string): void {
+    if (this.debugMode) {
+      console.log(`[Config] ${message}`);
+    }
+  }
+
+  /**
+   * 打印调试信息
+   */
+  private printDebugInfo(): void {
+    console.log('\n=== Configuration Debug Info ===');
+    console.log('Loaded sources:');
+    for (const source of this.loadedSources) {
+      const status = source.exists ? 'OK' : 'NOT FOUND';
+      const pathInfo = source.path ? ` (${source.path})` : '';
+      console.log(`  [${source.priority}] ${source.source}${pathInfo}: ${status}`);
+    }
+
+    console.log('\nConfiguration key sources:');
+    const sources = this.getAllConfigSources();
+    for (const [key, source] of sources) {
+      const sourcePath = this.configSourcePaths.get(key);
+      const pathInfo = sourcePath ? ` (${sourcePath})` : '';
+      console.log(`  ${key}: ${source}${pathInfo}`);
+    }
+
+    if (this.enterprisePolicy) {
+      console.log('\nEnterprise policy:');
+      if (this.enterprisePolicy.enforced) {
+        console.log('  Enforced keys:', Object.keys(this.enterprisePolicy.enforced).join(', '));
+      }
+      if (this.enterprisePolicy.disabledFeatures?.length) {
+        console.log('  Disabled features:', this.enterprisePolicy.disabledFeatures.join(', '));
+      }
+    }
+
+    console.log('================================\n');
+  }
+
+  /**
    * 合并配置并追踪来源
    */
-  private mergeConfig(base: any, override: any, source: ConfigSource): any {
-    const merged = { ...base, ...override };
-    this.trackConfigSource(override, source);
+  private mergeConfig(base: any, override: any, source: ConfigSource, sourcePath?: string): any {
+    const merged = this.deepMerge(base, override);
+    this.trackConfigSource(override, source, sourcePath);
     return merged;
+  }
+
+  /**
+   * 深度合并对象
+   */
+  private deepMerge(base: any, override: any): any {
+    if (override === undefined) return base;
+    if (base === undefined) return override;
+    if (typeof override !== 'object' || override === null) return override;
+    if (typeof base !== 'object' || base === null) return override;
+    if (Array.isArray(override)) return override;
+
+    const result = { ...base };
+    for (const key of Object.keys(override)) {
+      if (override[key] !== undefined) {
+        if (typeof override[key] === 'object' && !Array.isArray(override[key]) && override[key] !== null) {
+          result[key] = this.deepMerge(base[key], override[key]);
+        } else {
+          result[key] = override[key];
+        }
+      }
+    }
+    return result;
   }
 
   /**
    * 追踪配置项来源
    */
-  private trackConfigSource(config: any, source: ConfigSource): void {
+  private trackConfigSource(config: any, source: ConfigSource, sourcePath?: string): void {
+    this.trackConfigSourceRecursive(config, source, sourcePath, '');
+  }
+
+  /**
+   * 递归追踪配置项来源
+   */
+  private trackConfigSourceRecursive(config: any, source: ConfigSource, sourcePath: string | undefined, prefix: string): void {
+    if (config === undefined || config === null) return;
+    if (typeof config !== 'object') return;
+
     for (const key of Object.keys(config)) {
-      if (config[key] !== undefined) {
-        this.configSources.set(key, source);
+      const fullKey = prefix ? `${prefix}.${key}` : key;
+      const value = config[key];
+
+      if (value !== undefined) {
+        // 记录当前来源
+        const previousSource = this.configSources.get(fullKey);
+
+        // 追踪覆盖历史
+        if (previousSource && previousSource !== source) {
+          const history = this.configHistory.get(fullKey) || [];
+          history.push({
+            key: fullKey,
+            value,
+            source,
+            sourcePath,
+            overriddenBy: previousSource ? [previousSource] : undefined,
+          });
+          this.configHistory.set(fullKey, history);
+        }
+
+        // 更新当前来源
+        this.configSources.set(fullKey, source);
+        if (sourcePath) {
+          this.configSourcePaths.set(fullKey, sourcePath);
+        }
+
+        // 递归处理嵌套对象
+        if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+          this.trackConfigSourceRecursive(value, source, sourcePath, fullKey);
+        }
       }
     }
   }
@@ -516,7 +819,8 @@ export class ConfigManager {
   }
 
   /**
-   * 保存到本地配置文件 (机器特定)
+   * 保存到本地配置文件 (.claude/settings.local.json)
+   * 此文件应添加到 .gitignore，用于机器特定的配置
    */
   saveLocal(config: Partial<UserConfig>): void {
     const localDir = path.dirname(this.localConfigFile);
@@ -524,8 +828,21 @@ export class ConfigManager {
       fs.mkdirSync(localDir, { recursive: true });
     }
 
+    // 检查配置项是否被企业策略强制
+    if (this.enterprisePolicy?.enforced) {
+      const enforcedKeys = Object.keys(this.enterprisePolicy.enforced);
+      const attemptedEnforcedKeys = Object.keys(config).filter(k => enforcedKeys.includes(k));
+      if (attemptedEnforcedKeys.length > 0) {
+        console.warn(`Cannot save the following settings locally - they are enforced by enterprise policy: ${attemptedEnforcedKeys.join(', ')}`);
+        // 移除被强制的配置项
+        for (const key of attemptedEnforcedKeys) {
+          delete (config as any)[key];
+        }
+      }
+    }
+
     const currentLocalConfig = this.loadConfigFile(this.localConfigFile) || {};
-    const newLocalConfig = { ...currentLocalConfig, ...config };
+    const newLocalConfig = this.deepMerge(currentLocalConfig, config);
 
     this.backupConfig(this.localConfigFile);
 
@@ -535,7 +852,46 @@ export class ConfigManager {
       'utf-8'
     );
 
+    // 确保 .gitignore 包含 settings.local.json
+    this.ensureGitignore(localDir);
+
     this.reload();
+  }
+
+  /**
+   * 确保 .gitignore 包含 settings.local.json
+   */
+  private ensureGitignore(claudeDir: string): void {
+    const projectRoot = path.dirname(claudeDir);
+    const gitignorePath = path.join(projectRoot, '.gitignore');
+
+    try {
+      let content = '';
+      if (fs.existsSync(gitignorePath)) {
+        content = fs.readFileSync(gitignorePath, 'utf-8');
+      }
+
+      const patterns = [
+        '.claude/settings.local.json',
+        '# Claude Code local settings (machine-specific)',
+      ];
+
+      const linesToAdd: string[] = [];
+      for (const pattern of patterns) {
+        if (!content.includes(pattern)) {
+          linesToAdd.push(pattern);
+        }
+      }
+
+      if (linesToAdd.length > 0) {
+        const newContent = content.trim() + '\n\n' + linesToAdd.join('\n') + '\n';
+        fs.writeFileSync(gitignorePath, newContent, 'utf-8');
+        this.debugLog(`Added settings.local.json to .gitignore`);
+      }
+    } catch (error) {
+      // 忽略 .gitignore 更新失败
+      this.debugLog(`Failed to update .gitignore: ${error}`);
+    }
   }
 
   /**
@@ -723,29 +1079,106 @@ export class ConfigManager {
    * 获取配置来源信息
    */
   getConfigSourceInfo(): ConfigSourceInfo[] {
-    const sources: ConfigSourceInfo[] = [
-      { source: 'default', priority: 0 },
-      { source: 'policySettings', path: this.policyConfigFile, priority: 1 },
-      { source: 'userSettings', path: this.userConfigFile, priority: 2 },
-      { source: 'projectSettings', path: this.projectConfigFile, priority: 3 },
-      { source: 'localSettings', path: this.localConfigFile, priority: 4 },
-      { source: 'envSettings', priority: 5 },
+    return [...this.loadedSources];
+  }
+
+  /**
+   * 获取所有可能的配置来源（包括未加载的）
+   */
+  getAllPossibleSources(): ConfigSourceInfo[] {
+    return [
+      { source: 'default', priority: CONFIG_SOURCE_PRIORITY.default, exists: true },
+      { source: 'userSettings', path: this.userConfigFile, priority: CONFIG_SOURCE_PRIORITY.userSettings, exists: fs.existsSync(this.userConfigFile) },
+      { source: 'projectSettings', path: this.projectConfigFile, priority: CONFIG_SOURCE_PRIORITY.projectSettings, exists: fs.existsSync(this.projectConfigFile) },
+      { source: 'localSettings', path: this.localConfigFile, priority: CONFIG_SOURCE_PRIORITY.localSettings, exists: fs.existsSync(this.localConfigFile) },
+      { source: 'envSettings', priority: CONFIG_SOURCE_PRIORITY.envSettings, exists: true },
+      { source: 'flagSettings', path: this.flagConfigFile, priority: CONFIG_SOURCE_PRIORITY.flagSettings, exists: this.flagConfigFile ? fs.existsSync(this.flagConfigFile) : false },
+      { source: 'policySettings', path: this.policyConfigFile, priority: CONFIG_SOURCE_PRIORITY.policySettings, exists: fs.existsSync(this.policyConfigFile) },
     ];
-
-    if (this.flagConfigFile) {
-      sources.push({ source: 'flagSettings', path: this.flagConfigFile, priority: 6 });
-    }
-
-    return sources;
   }
 
   /**
    * 获取配置项及其来源
    */
   getWithSource<K extends keyof UserConfig>(key: K): ConfigWithSource<UserConfig[K]> {
+    const keyStr = String(key);
     return {
       value: this.mergedConfig[key],
-      source: this.configSources.get(String(key)) || 'default',
+      source: this.configSources.get(keyStr) || 'default',
+      sourcePath: this.configSourcePaths.get(keyStr),
+    };
+  }
+
+  /**
+   * 获取配置项的覆盖历史
+   */
+  getConfigHistory(key: string): ConfigKeySource[] {
+    return this.configHistory.get(key) || [];
+  }
+
+  /**
+   * 获取所有配置项的详细来源信息
+   */
+  getAllConfigDetails(): ConfigKeySource[] {
+    const details: ConfigKeySource[] = [];
+    for (const [key, source] of this.configSources) {
+      details.push({
+        key,
+        value: this.getNestedValue(this.mergedConfig, key),
+        source,
+        sourcePath: this.configSourcePaths.get(key),
+        overriddenBy: this.getConfigHistory(key).map(h => h.source),
+      });
+    }
+    return details;
+  }
+
+  /**
+   * 获取嵌套值
+   */
+  private getNestedValue(obj: any, path: string): any {
+    const keys = path.split('.');
+    let current = obj;
+    for (const key of keys) {
+      if (current === undefined || current === null) return undefined;
+      current = current[key];
+    }
+    return current;
+  }
+
+  /**
+   * 检查配置项是否被企业策略强制
+   */
+  isEnforcedByPolicy(key: string): boolean {
+    if (!this.enterprisePolicy?.enforced) return false;
+    return key in this.enterprisePolicy.enforced;
+  }
+
+  /**
+   * 获取企业策略信息
+   */
+  getEnterprisePolicy(): EnterprisePolicyConfig | undefined {
+    return this.enterprisePolicy;
+  }
+
+  /**
+   * 检查功能是否被企业策略禁用
+   */
+  isFeatureDisabled(feature: string): boolean {
+    return this.enterprisePolicy?.disabledFeatures?.includes(feature) ?? false;
+  }
+
+  /**
+   * 获取配置文件路径
+   */
+  getConfigPaths(): Record<string, string> {
+    return {
+      userSettings: this.userConfigFile,
+      projectSettings: this.projectConfigFile,
+      localSettings: this.localConfigFile,
+      policySettings: this.policyConfigFile,
+      flagSettings: this.flagConfigFile || '',
+      globalConfigDir: this.globalConfigDir,
     };
   }
 

@@ -455,6 +455,11 @@ npx tsc --noEmit
 - **Glob** - File matching
 - **Zod** - Schema validation
 
+## Community
+
+- **Discord:** [Join our Discord](https://discord.gg/hs5BWGjt)
+- **X (Twitter):** [@wangbingjie1989](https://x.com/wangbingjie1989)
+
 ## License
 
 This project is for educational purposes only. Original Claude Code is owned by Anthropic PBC.

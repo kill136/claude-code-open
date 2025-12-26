@@ -6,9 +6,12 @@
 import { glob } from 'glob';
 import * as fs from 'fs';
 import * as path from 'path';
-import { execSync } from 'child_process';
+import { execSync, spawnSync } from 'child_process';
 import { BaseTool } from './base.js';
 import type { GlobInput, GrepInput, ToolResult, ToolDefinition } from '../types/index.js';
+
+// 检测当前平台
+const isWindows = process.platform === 'win32';
 
 export class GlobTool extends BaseTool<GlobInput, ToolResult> {
   name = 'Glob';
@@ -246,12 +249,26 @@ Usage:
       // 搜索路径
       args.push(searchPath);
 
-      const cmd = `rg ${args.map(a => `'${a.replace(/'/g, "'\\''")}'`).join(' ')} 2>/dev/null || true`;
+      // 使用 spawnSync 代替 execSync，实现跨平台兼容
+      let output: string;
+      try {
+        const result = spawnSync('rg', args, {
+          maxBuffer: 50 * 1024 * 1024,
+          encoding: 'utf-8',
+          shell: isWindows,  // Windows 上可能需要 shell
+          windowsHide: true, // Windows 隐藏命令窗口
+        });
 
-      let output = execSync(cmd, {
-        maxBuffer: 50 * 1024 * 1024,
-        encoding: 'utf-8',
-      });
+        // ripgrep 返回码: 0=找到匹配, 1=没有匹配, 2+=错误
+        if (result.error) {
+          throw result.error;
+        }
+
+        output = result.stdout || '';
+      } catch (err) {
+        // 如果 ripgrep 不可用，尝试回退
+        throw err;
+      }
 
       let lines = output.split('\n').filter(line => line.length > 0);
 

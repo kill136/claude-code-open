@@ -9,6 +9,7 @@ import { v4 as uuidv4 } from 'uuid';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { getBackgroundShell, isShellId } from './bash.js';
 
 // 代理类型定义
 export const AGENT_TYPES = {

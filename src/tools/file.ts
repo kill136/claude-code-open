@@ -1,6 +1,11 @@
 /**
  * 文件操作工具
  * Read, Write, Edit
+ *
+ * 对应官方实现 (cli.js):
+ * - m2A 函数: 智能字符串匹配，处理智能引号
+ * - lY2 函数: 字符串替换逻辑
+ * - GG1/VSA 函数: Edit 验证和执行
  */
 
 import * as fs from 'fs';
@@ -45,6 +50,206 @@ interface ExtendedFileEditInput extends FileEditInput {
   batch_edits?: BatchEdit[];
   show_diff?: boolean;
   require_confirmation?: boolean;
+}
+
+/**
+ * 全局文件读取跟踪器
+ * 用于验证在编辑文件之前是否已读取该文件
+ */
+class FileReadTracker {
+  private static instance: FileReadTracker;
+  private readFiles: Set<string> = new Set();
+
+  static getInstance(): FileReadTracker {
+    if (!FileReadTracker.instance) {
+      FileReadTracker.instance = new FileReadTracker();
+    }
+    return FileReadTracker.instance;
+  }
+
+  markAsRead(filePath: string): void {
+    // 规范化路径
+    const normalizedPath = path.resolve(filePath);
+    this.readFiles.add(normalizedPath);
+  }
+
+  hasBeenRead(filePath: string): boolean {
+    const normalizedPath = path.resolve(filePath);
+    return this.readFiles.has(normalizedPath);
+  }
+
+  clear(): void {
+    this.readFiles.clear();
+  }
+}
+
+// 导出跟踪器供外部使用
+export const fileReadTracker = FileReadTracker.getInstance();
+
+/**
+ * 智能引号字符映射
+ * 对应官方 cli.js 中的 RI5, _I5, jI5, TI5 常量
+ */
+const SMART_QUOTE_MAP: Record<string, string> = {
+  '\u2018': "'",  // 左单引号 '
+  '\u2019': "'",  // 右单引号 '
+  '\u201C': '"',  // 左双引号 "
+  '\u201D': '"',  // 右双引号 "
+};
+
+/**
+ * 将智能引号转换为普通引号
+ * 对应官方 cli.js 中的 cY2 函数
+ */
+function normalizeQuotes(str: string): string {
+  let result = str;
+  for (const [smart, normal] of Object.entries(SMART_QUOTE_MAP)) {
+    result = result.replaceAll(smart, normal);
+  }
+  return result;
+}
+
+/**
+ * 清理字符串中的尾部空白（保持行结构）
+ * 对应官方 cli.js 中的 VJ0 函数
+ */
+function cleanTrailingWhitespace(str: string): string {
+  const parts = str.split(/(\r\n|\n|\r)/);
+  let result = '';
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    if (part !== undefined) {
+      if (i % 2 === 0) {
+        // 文本部分，清理尾部空白
+        result += part.replace(/\s+$/, '');
+      } else {
+        // 换行符部分，保持原样
+        result += part;
+      }
+    }
+  }
+  return result;
+}
+
+/**
+ * 智能字符串匹配函数
+ * 对应官方 cli.js 中的 m2A 函数
+ *
+ * 功能：
+ * 1. 直接匹配
+ * 2. 智能引号转换后匹配
+ * 3. 返回实际匹配的字符串（保持原始格式）
+ */
+function findMatchingString(fileContents: string, searchString: string): string | null {
+  // 直接匹配
+  if (fileContents.includes(searchString)) {
+    return searchString;
+  }
+
+  // 尝试智能引号转换
+  const normalizedSearch = normalizeQuotes(searchString);
+  const normalizedContents = normalizeQuotes(fileContents);
+  const index = normalizedContents.indexOf(normalizedSearch);
+
+  if (index !== -1) {
+    // 返回原始文件中对应位置的字符串
+    return fileContents.substring(index, index + searchString.length);
+  }
+
+  return null;
+}
+
+/**
+ * 检测行号前缀模式
+ * Read 工具输出格式: "  123\tcode content"
+ * 即: 空格 + 行号 + 制表符 + 实际内容
+ */
+const LINE_NUMBER_PREFIX_PATTERN = /^(\s*\d+)\t/;
+
+/**
+ * 移除字符串中的行号前缀
+ * 用于处理从 Read 工具输出中复制的内容
+ */
+function stripLineNumberPrefixes(str: string): string {
+  return str.split('\n').map(line => {
+    const match = line.match(LINE_NUMBER_PREFIX_PATTERN);
+    if (match) {
+      // 移除行号前缀（包括制表符）
+      return line.substring(match[0].length);
+    }
+    return line;
+  }).join('\n');
+}
+
+/**
+ * 检测字符串是否包含行号前缀
+ */
+function hasLineNumberPrefixes(str: string): boolean {
+  const lines = str.split('\n');
+  // 检查是否有多行都包含行号前缀模式
+  let prefixCount = 0;
+  for (const line of lines) {
+    if (LINE_NUMBER_PREFIX_PATTERN.test(line)) {
+      prefixCount++;
+    }
+  }
+  // 如果超过一半的行有行号前缀，则认为需要处理
+  return prefixCount > 0 && prefixCount >= lines.length / 2;
+}
+
+/**
+ * 智能查找并匹配字符串
+ * 支持：
+ * 1. 直接匹配
+ * 2. 智能引号匹配
+ * 3. 行号前缀处理
+ * 4. 尾部换行处理
+ */
+function smartFindString(fileContents: string, searchString: string): string | null {
+  // 1. 直接匹配
+  let match = findMatchingString(fileContents, searchString);
+  if (match) return match;
+
+  // 2. 尝试移除行号前缀后匹配
+  if (hasLineNumberPrefixes(searchString)) {
+    const strippedSearch = stripLineNumberPrefixes(searchString);
+    match = findMatchingString(fileContents, strippedSearch);
+    if (match) return match;
+  }
+
+  // 3. 处理尾部换行
+  // 如果搜索字符串不以换行结尾，但文件中该位置后面有换行
+  if (!searchString.endsWith('\n') && fileContents.includes(searchString + '\n')) {
+    return searchString;
+  }
+
+  return null;
+}
+
+/**
+ * 执行字符串替换
+ * 对应官方 cli.js 中的 lY2 函数
+ */
+function replaceString(
+  content: string,
+  oldString: string,
+  newString: string,
+  replaceAll: boolean = false
+): string {
+  if (replaceAll) {
+    return content.replaceAll(oldString, newString);
+  }
+
+  // 处理空 new_string 的特殊情况
+  if (newString === '') {
+    // 如果 old_string 不以换行结尾，但在文件中后面跟着换行
+    // 则应该也删除那个换行
+    if (!oldString.endsWith('\n') && content.includes(oldString + '\n')) {
+      return content.replace(oldString + '\n', newString);
+    }
+  }
+
+  return content.replace(oldString, newString);
 }
 
 export class ReadTool extends BaseTool<FileReadInput, FileResult> {
@@ -138,6 +343,9 @@ Usage:
         const truncatedLine = line.length > 2000 ? line.substring(0, 2000) + '...' : line;
         return `${lineNum}\t${truncatedLine}`;
       }).join('\n');
+
+      // 标记文件已被读取（用于 Edit 工具验证）
+      fileReadTracker.markAsRead(file_path);
 
       return {
         success: true,
@@ -534,19 +742,32 @@ class FileBackup {
   }
 }
 
+/**
+ * Edit 验证错误码
+ * 对应官方 cli.js 中的 errorCode
+ */
+enum EditErrorCode {
+  STRING_NOT_FOUND = 8,
+  MULTIPLE_MATCHES = 9,
+  FILE_NOT_READ = 10,
+  INVALID_PATH = 11,
+}
+
 export class EditTool extends BaseTool<ExtendedFileEditInput, FileResult> {
   name = 'Edit';
-  description = `Performs exact string replacements in files with diff preview.
+  description = `Performs exact string replacements in files.
 
 Usage:
-- You must use Read tool at least once before editing
-- Preserve exact indentation as it appears in the file
-- The edit will FAIL if old_string is not unique
-- Use replace_all for replacing all occurrences
-- Use batch_edits for atomic multi-edit operations
-- Set show_diff=true to preview changes before applying`;
+- You must use your \`Read\` tool at least once in the conversation before editing. This tool will error if you attempt an edit without reading the file.
+- When editing text from Read tool output, ensure you preserve the exact indentation (tabs/spaces) as it appears AFTER the line number prefix. The line number prefix format is: spaces + line number + tab. Everything after that tab is the actual file content to match. Never include any part of the line number prefix in the old_string or new_string.
+- ALWAYS prefer editing existing files in the codebase. NEVER write new files unless explicitly required.
+- Only use emojis if the user explicitly requests it. Avoid adding emojis to files unless asked.
+- The edit will FAIL if \`old_string\` is not unique in the file. Either provide a larger string with more surrounding context to make it unique or use \`replace_all\` to change every instance of \`old_string\`.
+- Use \`replace_all\` for replacing and renaming strings across the file. This parameter is useful if you want to rename a variable for instance.`;
 
   private fileBackup = new FileBackup();
+  /** 是否强制要求先读取文件（可通过环境变量配置） */
+  private requireFileRead: boolean = process.env.CLAUDE_EDIT_REQUIRE_READ !== 'false';
 
   getInputSchema(): ToolDefinition['inputSchema'] {
     return {
@@ -562,7 +783,7 @@ Usage:
         },
         new_string: {
           type: 'string',
-          description: 'The text to replace it with',
+          description: 'The text to replace it with (must be different from old_string)',
         },
         replace_all: {
           type: 'boolean',
@@ -593,7 +814,7 @@ Usage:
           default: false,
         },
       },
-      required: ['file_path'],
+      required: ['file_path', 'old_string', 'new_string'],
     };
   }
 
@@ -609,7 +830,30 @@ Usage:
     } = input;
 
     try {
+      // 1. 验证路径是绝对路径
+      if (!path.isAbsolute(file_path)) {
+        return {
+          success: false,
+          error: `File path must be absolute. Received: ${file_path}`,
+          errorCode: EditErrorCode.INVALID_PATH,
+        };
+      }
+
+      // 2. 验证文件是否已被读取（如果启用了此检查）
+      if (this.requireFileRead && !fileReadTracker.hasBeenRead(file_path)) {
+        return {
+          success: false,
+          error: `You must read the file with the Read tool before editing it. File: ${file_path}`,
+          errorCode: EditErrorCode.FILE_NOT_READ,
+        };
+      }
+
+      // 3. 检查文件是否存在
       if (!fs.existsSync(file_path)) {
+        // 特殊情况：如果 old_string 为空，视为创建新文件
+        if (old_string === '' && new_string !== undefined) {
+          return this.createNewFile(file_path, new_string);
+        }
         return { success: false, error: `File not found: ${file_path}` };
       }
 
@@ -618,61 +862,88 @@ Usage:
         return { success: false, error: `Path is a directory: ${file_path}` };
       }
 
+      // 4. 读取原始内容
       const originalContent = fs.readFileSync(file_path, 'utf-8');
 
-      // 备份原始内容
+      // 5. 特殊情况：old_string 为空表示写入/覆盖整个文件
+      if (old_string === '') {
+        return this.writeEntireFile(file_path, new_string ?? '', originalContent, show_diff);
+      }
+
+      // 6. 备份原始内容
       this.fileBackup.backup(file_path, originalContent);
 
-      // 确定编辑操作列表
+      // 7. 确定编辑操作列表
       const edits: BatchEdit[] = batch_edits || [{ old_string: old_string!, new_string: new_string!, replace_all }];
 
-      // 验证所有编辑操作
+      // 8. 验证并执行所有编辑操作
       let currentContent = originalContent;
-      const validationErrors: string[] = [];
+      const appliedEdits: string[] = [];
 
       for (let i = 0; i < edits.length; i++) {
         const edit = edits[i];
 
-        if (!currentContent.includes(edit.old_string)) {
-          validationErrors.push(`Edit ${i + 1}: old_string not found in file`);
-          continue;
+        // 8.1 智能查找匹配字符串
+        const matchedString = smartFindString(currentContent, edit.old_string);
+
+        if (!matchedString) {
+          // 字符串未找到
+          return {
+            success: false,
+            error: `String to replace not found in file.\nString: ${edit.old_string}`,
+            errorCode: EditErrorCode.STRING_NOT_FOUND,
+          };
         }
 
-        // 如果不是 replace_all，检查唯一性
-        if (!edit.replace_all) {
-          const matches = currentContent.split(edit.old_string).length - 1;
-          if (matches > 1) {
-            validationErrors.push(
-              `Edit ${i + 1}: old_string appears ${matches} times. Use replace_all=true or provide more context.`
-            );
-            continue;
+        // 8.2 计算匹配次数
+        const matchCount = currentContent.split(matchedString).length - 1;
+
+        // 8.3 如果不是 replace_all，检查唯一性
+        if (matchCount > 1 && !edit.replace_all) {
+          return {
+            success: false,
+            error: `Found ${matchCount} matches of the string to replace, but replace_all is false. To replace all occurrences, set replace_all to true. To replace only one occurrence, please provide more context to uniquely identify the instance.\nString: ${edit.old_string}`,
+            errorCode: EditErrorCode.MULTIPLE_MATCHES,
+          };
+        }
+
+        // 8.4 检查 old_string 和 new_string 是否相同
+        if (matchedString === edit.new_string) {
+          continue; // 跳过无变化的编辑
+        }
+
+        // 8.5 检查是否会与之前的 new_string 冲突
+        for (const prevEdit of appliedEdits) {
+          if (matchedString !== '' && prevEdit.includes(matchedString)) {
+            return {
+              success: false,
+              error: `Cannot edit file: old_string is a substring of a new_string from a previous edit.\nold_string: ${matchedString}`,
+            };
           }
         }
 
-        // 应用编辑（用于验证后续编辑）
-        if (edit.replace_all) {
-          currentContent = currentContent.split(edit.old_string).join(edit.new_string);
-        } else {
-          currentContent = currentContent.replace(edit.old_string, edit.new_string);
-        }
+        // 8.6 应用编辑
+        currentContent = replaceString(currentContent, matchedString, edit.new_string, edit.replace_all);
+        appliedEdits.push(edit.new_string);
       }
 
-      if (validationErrors.length > 0) {
+      // 9. 检查是否有实际变化
+      if (currentContent === originalContent) {
         return {
           success: false,
-          error: `Validation failed:\n${validationErrors.join('\n')}`,
+          error: 'Original and edited file match exactly. No changes were made.',
         };
       }
 
       const modifiedContent = currentContent;
 
-      // 生成差异预览
+      // 10. 生成差异预览
       let diffPreview: DiffPreview | null = null;
       if (show_diff) {
         diffPreview = generateUnifiedDiff(file_path, originalContent, modifiedContent);
       }
 
-      // 检查是否需要确认
+      // 11. 检查是否需要确认
       if (require_confirmation) {
         return {
           success: false,
@@ -681,7 +952,7 @@ Usage:
         };
       }
 
-      // 执行实际的文件写入
+      // 12. 执行实际的文件写入
       try {
         fs.writeFileSync(file_path, modifiedContent, 'utf-8');
 
