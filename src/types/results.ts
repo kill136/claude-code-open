@@ -178,6 +178,10 @@ export interface EditToolResult extends ToolResult {
   deletions?: number;
   /** Whether replace_all was used */
   replaceAll?: boolean;
+  /** File content after edit */
+  content?: string;
+  /** Error code for edit failures (matches official CLI error codes: 8=STRING_NOT_FOUND, 9=MULTIPLE_MATCHES, 10=FILE_NOT_READ, 11=INVALID_PATH) */
+  errorCode?: number;
 }
 
 /**

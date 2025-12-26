@@ -11,7 +11,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { BaseTool } from './base.js';
-import type { FileReadInput, FileWriteInput, FileEditInput, FileResult, ToolDefinition } from '../types/index.js';
+import type { FileReadInput, FileWriteInput, FileEditInput, FileResult, EditToolResult, ToolDefinition } from '../types/index.js';
 import {
   readImageFile,
   readPdfFile,
@@ -753,7 +753,7 @@ enum EditErrorCode {
   INVALID_PATH = 11,
 }
 
-export class EditTool extends BaseTool<ExtendedFileEditInput, FileResult> {
+export class EditTool extends BaseTool<ExtendedFileEditInput, EditToolResult> {
   name = 'Edit';
   description = `Performs exact string replacements in files.
 
@@ -818,7 +818,7 @@ Usage:
     };
   }
 
-  async execute(input: ExtendedFileEditInput): Promise<FileResult> {
+  async execute(input: ExtendedFileEditInput): Promise<EditToolResult> {
     const {
       file_path,
       old_string,
@@ -993,6 +993,89 @@ Usage:
       return {
         success: false,
         error: `Error editing file: ${err}. Changes have been rolled back.`,
+      };
+    }
+  }
+
+  /**
+   * 创建新文件
+   * 当 old_string 为空且文件不存在时调用
+   */
+  private createNewFile(filePath: string, content: string): EditToolResult {
+    try {
+      // 确保父目录存在
+      const parentDir = path.dirname(filePath);
+      if (!fs.existsSync(parentDir)) {
+        fs.mkdirSync(parentDir, { recursive: true });
+      }
+
+      fs.writeFileSync(filePath, content, 'utf-8');
+
+      const lineCount = content.split('\n').length;
+      return {
+        success: true,
+        output: `Successfully created new file: ${filePath} (${lineCount} lines)`,
+        content,
+      };
+    } catch (err) {
+      return {
+        success: false,
+        error: `Error creating file: ${err}`,
+      };
+    }
+  }
+
+  /**
+   * 写入整个文件（覆盖现有内容）
+   * 当 old_string 为空且文件存在时调用
+   */
+  private writeEntireFile(
+    filePath: string,
+    newContent: string,
+    originalContent: string,
+    showDiff: boolean
+  ): EditToolResult {
+    try {
+      // 备份原始内容
+      this.fileBackup.backup(filePath, originalContent);
+
+      // 检查内容是否相同
+      if (newContent === originalContent) {
+        return {
+          success: false,
+          error: 'Original and new content match exactly. No changes were made.',
+        };
+      }
+
+      // 生成差异预览
+      let diffPreview: DiffPreview | null = null;
+      if (showDiff) {
+        diffPreview = generateUnifiedDiff(filePath, originalContent, newContent);
+      }
+
+      // 写入文件
+      fs.writeFileSync(filePath, newContent, 'utf-8');
+
+      // 构建输出消息
+      let output = `Successfully wrote to ${filePath}\n`;
+      if (diffPreview) {
+        output += '\n' + this.formatDiffOutput(diffPreview);
+      }
+
+      // 清除备份
+      this.fileBackup.clear();
+
+      return {
+        success: true,
+        output,
+        content: newContent,
+      };
+    } catch (err) {
+      // 写入失败，尝试回滚
+      this.fileBackup.restore(filePath);
+      return {
+        success: false,
+        error: `Error writing file: ${err}. Changes have been rolled back.`,
       };
     }
   }

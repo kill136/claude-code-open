@@ -29,6 +29,7 @@ export type {
   ToolResult,
   BashResult,
   FileResult,
+  EditToolResult,
   GrepResult,
 } from './results.js';
 
