@@ -29,6 +29,18 @@
     "test:e2e:basic": "tsx tests/e2e/cli-basic.test.ts",
     "test:e2e:session": "tsx tests/e2e/cli-session.test.ts",
     "test:e2e:tools": "tsx tests/e2e/cli-tools.test.ts",
+    "test:feature": "vitest tests --reporter=verbose",
+    "test:feature:cli": "vitest tests/cli --reporter=verbose",
+    "test:feature:tools": "vitest tests/tools --reporter=verbose",
+    "test:feature:mcp": "vitest tests/mcp --reporter=verbose",
+    "test:feature:session": "vitest tests/session --reporter=verbose",
+    "test:feature:permission": "vitest tests/permission --reporter=verbose",
+    "test:feature:hooks": "vitest tests/hooks --reporter=verbose",
+    "test:feature:config": "vitest tests/config --reporter=verbose",
+    "test:feature:ide": "vitest tests/ide --reporter=verbose",
+    "test:feature:plugin": "vitest tests/plugin --reporter=verbose",
+    "test:feature:ui": "vitest tests/ui --reporter=verbose",
+    "test:compare": "vitest tests --reporter=verbose --env=compare",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
