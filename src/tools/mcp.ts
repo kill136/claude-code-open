@@ -62,7 +62,7 @@ const mcpServers: Map<string, McpServerState> = new Map();
 let messageId = 1;
 
 // 配置常量
-const MCP_TIMEOUT = 30000; // 30 秒超时
+const MCP_TIMEOUT = parseInt(process.env.MCP_TIMEOUT || '30000', 10); // 默认 30 秒超时
 const RESOURCE_CACHE_TTL = 60000; // 资源缓存 1 分钟
 const HEALTH_CHECK_INTERVAL = 30000; // 健康检查间隔 30 秒
 const MAX_RECONNECT_ATTEMPTS = 3; // 最大重连次数

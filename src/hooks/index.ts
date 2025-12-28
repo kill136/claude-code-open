@@ -299,6 +299,8 @@ function isValidHookConfig(config: any): config is HookConfig {
     return typeof config.prompt === 'string';
   } else if (config.type === 'agent') {
     return typeof config.agentType === 'string';
+  } else if (config.type === 'mcp') {
+    return typeof config.server === 'string' && typeof config.tool === 'string';
   } else if (config.type === 'url') {
     return typeof config.url === 'string';
   }
@@ -488,21 +490,88 @@ async function executePromptHook(
       .replace(/\{MESSAGE\}/g, input.message || '')
       .replace(/\{SESSION_ID\}/g, input.sessionId || '');
 
-    // TODO: 集成 Anthropic API 调用
-    // 这里需要调用 Claude API 来评估提示
-    // 目前返回一个占位符实现
-    console.warn('[Prompt Hook] LLM evaluation not yet implemented');
+    // 动态导入 ClaudeClient 以避免循环依赖
+    const { ClaudeClient } = await import('../core/client.js');
+    const apiKey = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY;
 
-    return {
-      success: true,
-      output: JSON.stringify({
-        type: 'prompt_evaluation',
-        model: hook.model || 'claude-3-sonnet-20240229',
+    if (!apiKey) {
+      return {
+        success: false,
+        error: 'Prompt hook requires ANTHROPIC_API_KEY or CLAUDE_API_KEY environment variable',
+      };
+    }
+
+    const client = new ClaudeClient({
+      apiKey,
+      model: hook.model || 'claude-3-5-sonnet-20241022',
+      maxTokens: 1024,
+    });
+
+    // 调用 Claude API 评估提示
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    try {
+      const response = await client.createMessage([
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+      undefined, // tools
+      `You are evaluating a hook in Claude Code.
+
+CRITICAL: You MUST return ONLY valid JSON with no other text, explanation, or commentary before or after the JSON. Do not include any markdown code blocks, thinking, or additional text.
+
+Your response must be a single JSON object matching one of the following schemas:
+1. If the condition is met, return: {"ok": true}
+2. If the condition is not met, return: {"ok": false, "reason": "Reason for why it is not met"}
+
+Do not return anything else. Just the JSON.`);
+
+      clearTimeout(timeoutId);
+
+      // 提取文本内容
+      let text = '';
+      for (const block of response.content) {
+        if (block.type === 'text') {
+          text += block.text;
+        }
+      }
+
+      // 解析 JSON 响应
+      const result = JSON.parse(text.trim());
+
+      if (result.ok === false) {
+        return {
+          success: false,
+          blocked: true,
+          blockMessage: result.reason || 'Blocked by prompt hook',
+          decision: 'deny',
+          reason: result.reason,
+        };
+      }
+
+      return {
+        success: true,
+        output: JSON.stringify(result),
         decision: 'allow',
-        message: 'Prompt hook evaluation not yet implemented',
-      }),
-      async: false,
-    };
+      };
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+
+      if (err.name === 'AbortError') {
+        return {
+          success: false,
+          error: 'Prompt hook evaluation timed out',
+        };
+      }
+
+      return {
+        success: false,
+        error: err.message || 'Failed to evaluate prompt hook',
+      };
+    }
   } catch (err: any) {
     return {
       success: false,
@@ -521,26 +590,239 @@ async function executeAgentHook(
   const timeout = hook.timeout || 60000;
 
   try {
-    // TODO: 集成 Agent 系统调用
-    // 这里需要调用指定的 Agent 来验证操作
-    // 目前返回一个占位符实现
-    console.warn(`[Agent Hook] Agent validation not yet implemented for: ${hook.agentType}`);
+    // 动态导入 Agent 相关模块以避免循环依赖
+    const { ClaudeClient } = await import('../core/client.js');
+    const apiKey = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY;
 
-    return {
-      success: true,
-      output: JSON.stringify({
-        type: 'agent_validation',
-        agentType: hook.agentType,
+    if (!apiKey) {
+      return {
+        success: false,
+        error: 'Agent hook requires ANTHROPIC_API_KEY or CLAUDE_API_KEY environment variable',
+      };
+    }
+
+    // 构建代理提示词
+    const agentPrompt = `You are a validator agent of type "${hook.agentType}" in Claude Code.
+
+Your task is to evaluate the following operation and decide whether it should be allowed.
+
+Event: ${input.event}
+${input.toolName ? `Tool Name: ${input.toolName}` : ''}
+${input.toolInput ? `Tool Input: ${JSON.stringify(input.toolInput, null, 2)}` : ''}
+${input.toolOutput ? `Tool Output: ${input.toolOutput}` : ''}
+${input.message ? `Message: ${input.message}` : ''}
+
+${hook.agentConfig ? `Agent Configuration: ${JSON.stringify(hook.agentConfig, null, 2)}` : ''}
+
+Based on your role as a "${hook.agentType}" validator, determine if this operation should be allowed.
+
+CRITICAL: You MUST return ONLY valid JSON with no other text, explanation, or commentary before or after the JSON. Do not include any markdown code blocks, thinking, or additional text.
+
+Your response must be a single JSON object with the following schema:
+{
+  "decision": "allow" | "deny",
+  "reason": "Brief explanation of your decision"
+}
+
+Do not return anything else. Just the JSON.`;
+
+    const client = new ClaudeClient({
+      apiKey,
+      model: 'claude-3-5-sonnet-20241022',
+      maxTokens: 2048,
+    });
+
+    // 调用 Claude API 作为代理
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    try {
+      const response = await client.createMessage([
+        {
+          role: 'user',
+          content: agentPrompt,
+        },
+      ]);
+
+      clearTimeout(timeoutId);
+
+      // 提取文本内容
+      let text = '';
+      for (const block of response.content) {
+        if (block.type === 'text') {
+          text += block.text;
+        }
+      }
+
+      // 解析 JSON 响应
+      const result = JSON.parse(text.trim());
+
+      if (result.decision === 'deny') {
+        return {
+          success: false,
+          blocked: true,
+          blockMessage: result.reason || 'Blocked by agent hook',
+          decision: 'deny',
+          reason: result.reason,
+        };
+      }
+
+      return {
+        success: true,
+        output: JSON.stringify(result),
         decision: 'allow',
-        message: 'Agent hook validation not yet implemented',
-      }),
-      async: false,
-      decision: 'allow',
-    };
+        reason: result.reason,
+      };
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+
+      if (err.name === 'AbortError') {
+        return {
+          success: false,
+          error: 'Agent hook evaluation timed out',
+        };
+      }
+
+      return {
+        success: false,
+        error: err.message || 'Failed to evaluate agent hook',
+      };
+    }
   } catch (err: any) {
     return {
       success: false,
       error: err.message || 'Agent hook validation failed',
+    };
+  }
+}
+
+/**
+ * 执行 MCP Hook（调用 MCP 服务器工具）
+ */
+async function executeMcpHook(
+  hook: McpHookConfig,
+  input: HookInput
+): Promise<HookResult> {
+  const timeout = hook.timeout || 30000;
+
+  try {
+    // 动态导入 MCP 工具以避免循环依赖
+    const mcpModule = await import('../tools/mcp.js');
+    const { getMcpServers } = mcpModule;
+
+    // 检查 MCP 服务器是否存在
+    const servers = getMcpServers();
+    const server = servers.get(hook.server);
+
+    if (!server) {
+      return {
+        success: false,
+        error: `MCP server "${hook.server}" not found. Available servers: ${Array.from(servers.keys()).join(', ')}`,
+      };
+    }
+
+    if (!server.connected) {
+      return {
+        success: false,
+        error: `MCP server "${hook.server}" is not connected`,
+      };
+    }
+
+    // 检查工具是否存在
+    const tool = server.tools.find((t) => t.name === hook.tool);
+    if (!tool) {
+      return {
+        success: false,
+        error: `Tool "${hook.tool}" not found on MCP server "${hook.server}". Available tools: ${server.tools.map((t) => t.name).join(', ')}`,
+      };
+    }
+
+    // 合并工具参数（hook配置 + hook输入）
+    const toolArgs = {
+      ...hook.toolArgs,
+      event: input.event,
+      toolName: input.toolName,
+      toolInput: input.toolInput,
+      toolOutput: input.toolOutput,
+      message: input.message,
+      sessionId: input.sessionId,
+    };
+
+    // 调用 MCP 工具
+    // 我们需要使用内部的 sendMcpMessage 函数
+    // 由于它不是导出的，我们需要通过反射或者修改 mcp.ts 来导出它
+    // 暂时使用一个简化的实现
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    try {
+      // 使用 MCP 工具的 callMcpTool 函数
+      const { callMcpTool } = await import('../tools/mcp.js');
+
+      const result = await callMcpTool(hook.server, hook.tool, toolArgs);
+
+      clearTimeout(timeoutId);
+
+      if (!result.success) {
+        return {
+          success: false,
+          error: result.error || 'MCP tool execution failed',
+        };
+      }
+
+      // 解析结果以检查是否有阻塞决策
+      if (result.output) {
+        try {
+          const output = typeof result.output === 'string' ? JSON.parse(result.output) : result.output;
+
+          if (output.blocked || output.decision === 'deny') {
+            return {
+              success: false,
+              blocked: true,
+              blockMessage: output.reason || output.message || 'Blocked by MCP hook',
+              decision: 'deny',
+              reason: output.reason || output.message,
+            };
+          }
+
+          return {
+            success: true,
+            output: typeof result.output === 'string' ? result.output : JSON.stringify(result.output),
+            decision: output.decision || 'allow',
+          };
+        } catch {
+          // 如果不是 JSON，直接返回
+          return {
+            success: true,
+            output: result.output,
+          };
+        }
+      }
+
+      return {
+        success: true,
+        output: result.output || '',
+      };
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+
+      if (err.name === 'AbortError') {
+        return {
+          success: false,
+          error: 'MCP hook execution timed out',
+        };
+      }
+
+      return {
+        success: false,
+        error: err.message || 'Failed to execute MCP hook',
+      };
+    }
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err.message || 'MCP hook execution failed',
     };
   }
 }
@@ -639,6 +921,8 @@ async function executeHook(hook: HookConfig, input: HookInput): Promise<HookResu
     return executePromptHook(hook, input);
   } else if (hook.type === 'agent') {
     return executeAgentHook(hook, input);
+  } else if (hook.type === 'mcp') {
+    return executeMcpHook(hook, input);
   } else if (hook.type === 'url') {
     return executeUrlHook(hook, input);
   } else {

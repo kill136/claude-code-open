@@ -406,15 +406,26 @@ export class ClaudeClient {
   async *createMessageStream(
     messages: Message[],
     tools?: ToolDefinition[],
-    systemPrompt?: string
+    systemPrompt?: string,
+    options?: {
+      enableThinking?: boolean;
+      thinkingBudget?: number;
+    }
   ): AsyncGenerator<{
-    type: 'text' | 'tool_use_start' | 'tool_use_delta' | 'stop' | 'usage' | 'error';
+    type: 'text' | 'thinking' | 'tool_use_start' | 'tool_use_delta' | 'stop' | 'usage' | 'error';
     text?: string;
+    thinking?: string;
     id?: string;
     name?: string;
     input?: string;
     stopReason?: string;
-    usage?: { inputTokens: number; outputTokens: number };
+    usage?: {
+      inputTokens: number;
+      outputTokens: number;
+      cacheReadTokens?: number;
+      cacheCreationTokens?: number;
+      thinkingTokens?: number;
+    };
     error?: string;
   }> {
     let stream: any;
@@ -424,6 +435,16 @@ export class ClaudeClient {
         console.log('[ClaudeClient] Starting message stream...');
         console.log(`[ClaudeClient] Model: ${this.model}, MaxTokens: ${this.maxTokens}`);
         console.log(`[ClaudeClient] Messages: ${messages.length}, Tools: ${tools?.length || 0}`);
+      }
+
+      // 准备 Extended Thinking 参数
+      const thinkingParams = options?.enableThinking
+        ? thinkingManager.getThinkingParams(this.model)
+        : {};
+
+      // 如果指定了思考预算，覆盖默认值
+      if (options?.thinkingBudget && thinkingParams.thinking) {
+        thinkingParams.thinking.budget_tokens = options.thinkingBudget;
       }
 
       stream = this.client.messages.stream({
@@ -439,6 +460,7 @@ export class ClaudeClient {
           description: t.description,
           input_schema: t.inputSchema,
         })) as any,
+        ...thinkingParams,
       });
     } catch (error: any) {
       console.error('[ClaudeClient] Failed to create stream:', error.message);
@@ -448,6 +470,9 @@ export class ClaudeClient {
 
     let inputTokens = 0;
     let outputTokens = 0;
+    let cacheReadTokens = 0;
+    let cacheCreationTokens = 0;
+    let thinkingTokens = 0;
 
     try {
       for await (const event of stream) {
@@ -455,6 +480,9 @@ export class ClaudeClient {
           const delta = event.delta as any;
           if (delta.type === 'text_delta') {
             yield { type: 'text', text: delta.text };
+          } else if (delta.type === 'thinking_delta') {
+            // Extended Thinking delta
+            yield { type: 'thinking', thinking: delta.thinking };
           } else if (delta.type === 'input_json_delta') {
             yield { type: 'tool_use_delta', input: delta.partial_json };
           }
@@ -462,6 +490,11 @@ export class ClaudeClient {
           const block = event.content_block as any;
           if (block.type === 'tool_use') {
             yield { type: 'tool_use_start', id: block.id, name: block.name };
+          } else if (block.type === 'thinking') {
+            // Extended Thinking block started
+            if (this.debug) {
+              console.log('[ClaudeClient] Extended Thinking block started');
+            }
           }
         } else if (event.type === 'message_delta') {
           const delta = event as any;
@@ -472,12 +505,33 @@ export class ClaudeClient {
           const msg = (event as any).message;
           if (msg?.usage) {
             inputTokens = msg.usage.input_tokens || 0;
+            cacheReadTokens = msg.usage.cache_read_input_tokens || 0;
+            cacheCreationTokens = msg.usage.cache_creation_input_tokens || 0;
           }
         } else if (event.type === 'message_stop') {
-          this.updateUsage({ inputTokens, outputTokens });
+          // 从最终消息中获取 thinking_tokens
+          const finalMessage = await stream.finalMessage();
+          if (finalMessage?.usage) {
+            thinkingTokens = (finalMessage.usage as any).thinking_tokens || 0;
+          }
+
+          this.updateUsage({
+            inputTokens,
+            outputTokens,
+            cacheReadTokens,
+            cacheCreationTokens,
+            thinkingTokens,
+          });
+
           yield {
             type: 'usage',
-            usage: { inputTokens, outputTokens },
+            usage: {
+              inputTokens,
+              outputTokens,
+              cacheReadTokens,
+              cacheCreationTokens,
+              thinkingTokens,
+            },
           };
           yield { type: 'stop' };
         } else if (event.type === 'error') {

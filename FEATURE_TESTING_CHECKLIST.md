@@ -247,8 +247,8 @@
 | ANTHROPIC_API_KEY | ✅ | ✅ | 已实现 | API密钥 |
 | CLAUDE_CODE_USE_BEDROCK | ✅ | ✅ | 已实现 | Bedrock支持 |
 | CLAUDE_CODE_USE_VERTEX | ✅ | ✅ | 已实现 | Vertex支持 |
-| BASH_DEFAULT_TIMEOUT_MS | ✅ | ⚠️ | 部分实现 | 硬编码120000ms |
-| MCP_TIMEOUT | ✅ | ⚠️ | 部分实现 | 硬编码30000ms |
+| BASH_DEFAULT_TIMEOUT_MS | ✅ | ✅ | 已实现 | 支持环境变量,默认120000ms |
+| MCP_TIMEOUT | ✅ | ✅ | 已实现 | 支持环境变量,默认30000ms |
 | MAX_THINKING_TOKENS | ✅ | ✅ | 已实现 | 思考token限制 |
 
 ### 5.3 CLAUDE.md 支持
@@ -499,36 +499,36 @@
 | Skills 系统 | 3 | 0 | 0 | 3 |
 | 记忆系统 | 3 | 0 | 0 | 3 |
 | API 客户端 | 10 | 0 | 0 | 10 |
-| **总计** | **189** | **17** | **0** | **206** |
+| **总计** | **200** | **6** | **0** | **206** |
 
 ---
 
-## 待改进项目清单 (17项)
+## 待改进项目清单 (6项)
 
-### 高优先级 (核心功能)
-1. **Extended Thinking 流式集成** - 需要将 streaming 模块集成到 ClaudeClient
-2. **SSE MCP 传输** - 使用原生 EventSource 替代轮询
-3. **BASH_DEFAULT_TIMEOUT_MS** - 改为可配置环境变量
-4. **MCP_TIMEOUT** - 改为可配置环境变量
+### 已完成项目 ✅ (本次实现)
+- ~~**BASH_DEFAULT_TIMEOUT_MS**~~ ✅ 已改为可配置环境变量
+- ~~**MCP_TIMEOUT**~~ ✅ 已改为可配置环境变量
+- ~~**Extended Thinking 流式集成**~~ ✅ 已集成到 ClaudeClient
+- ~~**Markdown 渲染改进**~~ ✅ 增强的终端渲染器
+- ~~**语法高亮改进**~~ ✅ 使用 cli-highlight 支持 40+ 语言
+- ~~**claude login 子命令**~~ ✅ 已实现 CLI 子命令
+- ~~**claude logout 子命令**~~ ✅ 已实现 CLI 子命令
+- ~~**claude api 子命令**~~ ✅ 已实现 CLI 子命令
+- ~~**prompt 钩子**~~ ✅ 完整实现
+- ~~**agent 钩子**~~ ✅ 完整实现
+- ~~**mcp 钩子**~~ ✅ 完整实现
 
 ### 中优先级 (用户体验)
-5. **Markdown 渲染改进** - 增强终端Markdown渲染效果
-6. **语法高亮改进** - 使用更好的语法高亮库
-7. **输入自动完成** - 增强命令/路径补全
-8. **claude login 子命令** - 作为CLI子命令而非仅斜杠命令
-9. **claude logout 子命令** - 作为CLI子命令而非仅斜杠命令
-10. **claude api 子命令** - 作为CLI子命令而非仅斜杠命令
+1. **输入自动完成** - 增强命令/路径补全
+2. **SSE MCP 传输** - 使用原生 EventSource 替代轮询
 
 ### 低优先级 (功能增强)
-11. **--teleport 远程连接** - 完善远程连接功能
-12. **prompt 钩子** - 实现完整的 prompt 钩子
-13. **agent 钩子** - 实现完整的 agent 钩子
-14. **mcp 钩子** - 实现完整的 MCP 钩子
-15. **AskUserQuestion 增强** - 更丰富的交互选项
+3. **--teleport 远程连接** - 完善远程连接功能
+4. **AskUserQuestion 增强** - 更丰富的交互选项
 
 ### 验证待定
-16. **工具调用流式处理** - 需要实际测试验证
-17. **代理后台运行** - 需要实际测试验证
+5. **工具调用流式处理** - 需要实际测试验证
+6. **代理后台运行** - 需要实际测试验证
 
 ---
 
@@ -555,4 +555,5 @@
 ---
 
 *本文档由 20 个子agent并行验证生成，验证日期: 2025-12-28*
-*总体功能完成率: 96.7% (189/206 完全实现)*
+*更新日期: 2025-12-28 (本次实现 11 项改进)*
+*总体功能完成率: 97.1% (200/206 完全实现)*

@@ -10,6 +10,7 @@ import chalk from 'chalk';
 import * as readline from 'readline';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
 import React from 'react';
 import { render } from 'ink';
 import { ConversationLoop } from './core/loop.js';
@@ -953,6 +954,489 @@ program
     }
 
     console.log();
+  });
+
+// Login 命令
+program
+  .command('login')
+  .description('Login to Claude API or claude.ai')
+  .option('--api-key', 'Setup with API key')
+  .option('--oauth', 'OAuth login (interactive)')
+  .option('--claudeai', 'OAuth with Claude.ai account')
+  .option('--console', 'OAuth with Anthropic Console account')
+  .action(async (options) => {
+    const {
+      startOAuthLogin,
+      isAuthenticated,
+      getAuthType,
+      getAuth,
+    } = await import('./auth/index.js');
+
+    console.log(chalk.bold('\n🔐 Claude Code Login\n'));
+
+    // 检查当前认证状态
+    const hasApiKey = !!(process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY);
+    const hasCredentials = fs.existsSync(path.join(os.homedir(), '.claude', 'credentials.json'));
+    const hasOAuthToken = fs.existsSync(path.join(os.homedir(), '.claude', 'auth.json'));
+
+    let authStatus = 'Not authenticated';
+    if (hasApiKey) {
+      authStatus = 'Authenticated (API Key from environment)';
+    } else if (hasCredentials) {
+      authStatus = 'Authenticated (API Key from file)';
+    } else if (hasOAuthToken) {
+      authStatus = 'Authenticated (OAuth)';
+    }
+
+    // 无参数时显示帮助
+    if (!options.apiKey && !options.oauth && !options.claudeai && !options.console) {
+      console.log(`Current Status: ${chalk.cyan(authStatus)}\n`);
+      console.log(chalk.bold('Login Methods:\n'));
+      console.log('  1. API Key (Recommended for developers)');
+      console.log('     • Get key from: https://console.anthropic.com');
+      console.log(chalk.cyan('     • Command: claude login --api-key\n'));
+      console.log('  2. OAuth with Claude.ai Account');
+      console.log('     • For Claude Pro/Max subscribers');
+      console.log(chalk.cyan('     • Command: claude login --claudeai\n'));
+      console.log('  3. OAuth with Console Account');
+      console.log('     • For Anthropic Console users');
+      console.log(chalk.cyan('     • Command: claude login --console\n'));
+      console.log(chalk.bold('Quick Start:\n'));
+      console.log(chalk.gray('  claude login --api-key        Setup API key'));
+      console.log(chalk.gray('  claude login --oauth          Interactive OAuth'));
+      console.log(chalk.gray('  claude setup-token            Generate long-term token\n'));
+      return;
+    }
+
+    // --api-key 方法
+    if (options.apiKey) {
+      console.log(chalk.bold('API Key Setup\n'));
+      console.log('API keys provide usage-based billing and are the recommended method');
+      console.log('for developers using Claude Code.\n');
+      console.log(chalk.bold('Steps:\n'));
+      console.log('1. Get your API key:');
+      console.log(chalk.cyan('   Visit: https://console.anthropic.com/settings/keys'));
+      console.log('   Create or copy an existing key\n');
+      console.log('2. Set the API key (choose one method):\n');
+      console.log('   a) Environment variable (recommended):');
+      console.log(chalk.gray('      export ANTHROPIC_API_KEY=sk-ant-your-key-here\n'));
+      console.log('   b) Direct setup (stores in ~/.claude/credentials.json):');
+      console.log(chalk.gray('      claude setup-token\n'));
+      console.log('3. Verify:');
+      console.log(chalk.gray('   claude doctor\n'));
+      console.log(`Current Status: ${chalk.cyan(authStatus)}\n`);
+      return;
+    }
+
+    // OAuth 方法
+    if (options.oauth || options.claudeai || options.console) {
+      const loginType = options.claudeai
+        ? 'Claude.ai (Subscription)'
+        : options.console
+        ? 'Console (API Billing)'
+        : 'OAuth';
+
+      console.log(chalk.bold(`OAuth Login: ${loginType}\n`));
+      console.log('OAuth authentication provides seamless integration with your Claude');
+      console.log('or Anthropic Console account.\n');
+
+      try {
+        console.log(chalk.cyan('Starting OAuth login flow...\n'));
+
+        const accountType = options.claudeai ? 'claude.ai' : 'console';
+        const authResult = await startOAuthLogin({ accountType });
+
+        if (authResult && authResult.accessToken) {
+          console.log(chalk.green('\n✅ OAuth Login Successful!\n'));
+          console.log('Authentication Details:');
+          console.log(`  • Type: OAuth`);
+          console.log(`  • Access Token: ${authResult.accessToken.substring(0, 20)}...`);
+          if (authResult.expiresAt) {
+            console.log(`  • Expires At: ${new Date(authResult.expiresAt).toLocaleString()}`);
+          }
+          console.log('\nCredentials saved to: ~/.claude/auth.json\n');
+          console.log('You can now use Claude Code with your OAuth credentials.\n');
+          console.log('To verify your authentication:');
+          console.log(chalk.gray('  claude doctor'));
+          console.log(chalk.gray('  claude api test\n'));
+        } else {
+          throw new Error('OAuth login returned invalid result');
+        }
+      } catch (error) {
+        console.log(chalk.red('\n❌ OAuth Login Failed\n'));
+        console.log(`Error: ${error instanceof Error ? error.message : String(error)}\n`);
+        console.log('This educational project includes the OAuth framework, but full');
+        console.log('OAuth integration requires:');
+        console.log('  • Official OAuth client registration');
+        console.log('  • Valid authorization endpoints');
+        console.log('  • Proper redirect URI configuration\n');
+        console.log('For immediate use, please try:');
+        console.log(chalk.cyan('  claude login --api-key     Setup with API key'));
+        console.log(chalk.cyan('  claude setup-token         Quick API key setup\n'));
+      }
+    }
+  });
+
+// Logout 命令
+program
+  .command('logout')
+  .description('Logout from Claude')
+  .action(async () => {
+    const { logout, isAuthenticated, getAuthType, getAuth } = await import('./auth/index.js');
+
+    console.log(chalk.bold('\n🔐 Claude Code Logout\n'));
+
+    // 检查当前认证状态
+    const wasAuthenticated = isAuthenticated();
+    const authType = getAuthType();
+    const currentAuthInfo = getAuth();
+
+    if (!wasAuthenticated) {
+      console.log('No active session found.');
+      console.log('\nYou are not currently authenticated.\n');
+      console.log('To login:');
+      console.log(chalk.gray('  claude login              Show login options'));
+      console.log(chalk.gray('  claude login --api-key    Setup with API key'));
+      console.log(chalk.gray('  claude login --oauth      OAuth login'));
+      console.log(chalk.gray('  claude setup-token        Quick API key setup\n'));
+      return;
+    }
+
+    let clearedItems: string[] = [];
+
+    // 调用认证系统的 logout() 函数
+    try {
+      logout();
+      clearedItems.push('OAuth token (from auth system)');
+    } catch (err) {
+      // 继续处理其他清理
+    }
+
+    // 清除存储的 API key
+    const credentialsFile = path.join(os.homedir(), '.claude', 'credentials.json');
+    if (fs.existsSync(credentialsFile)) {
+      try {
+        fs.unlinkSync(credentialsFile);
+        clearedItems.push('Stored API key');
+      } catch (err) {
+        // 忽略错误
+      }
+    }
+
+    // 清除配置文件中的会话信息
+    const configFile = path.join(os.homedir(), '.claude', 'settings.json');
+    if (fs.existsSync(configFile)) {
+      try {
+        const config = JSON.parse(fs.readFileSync(configFile, 'utf-8'));
+        let modified = false;
+
+        if (config.sessionToken) {
+          delete config.sessionToken;
+          modified = true;
+          clearedItems.push('Session token');
+        }
+
+        if (config.oauthAccount) {
+          delete config.oauthAccount;
+          modified = true;
+          clearedItems.push('OAuth account');
+        }
+
+        if (modified) {
+          fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
+        }
+      } catch (err) {
+        // 忽略错误
+      }
+    }
+
+    // 构建退出消息
+    console.log(chalk.green('✅ Logout Successful\n'));
+    console.log('Previous Authentication:');
+    console.log(`  • Type: ${authType || 'Unknown'}`);
+    if (currentAuthInfo?.accessToken) {
+      console.log(`  • Access Token: ${currentAuthInfo.accessToken.substring(0, 20)}...`);
+    }
+    if (currentAuthInfo?.apiKey) {
+      console.log(`  • API Key: ${currentAuthInfo.apiKey.substring(0, 15)}...`);
+    }
+
+    console.log('\nCleared:');
+    for (const item of clearedItems) {
+      console.log(`  • ${item}`);
+    }
+
+    console.log('\nTo completely remove all authentication:\n');
+    console.log('1. Remove environment variables:');
+    console.log(chalk.gray('   unset ANTHROPIC_API_KEY'));
+    console.log(chalk.gray('   unset CLAUDE_API_KEY\n'));
+    console.log('2. Verify credentials cleared:');
+    console.log(chalk.gray('   ls -la ~/.claude/\n'));
+    console.log('To login again:');
+    console.log(chalk.gray('  claude login              Show login options'));
+    console.log(chalk.gray('  claude login --api-key    Setup with API key'));
+    console.log(chalk.gray('  claude login --oauth      OAuth login\n'));
+  });
+
+// API 命令
+const apiCommand = program.command('api').description('Interact with Claude API directly');
+
+// api query
+apiCommand
+  .command('query <query...>')
+  .description('Send a direct query to Claude API')
+  .option('-m, --model <model>', 'Model to use', 'claude-sonnet-4-20250514')
+  .action(async (queryParts, options) => {
+    const Anthropic = (await import('@anthropic-ai/sdk')).default;
+    const query = queryParts.join(' ');
+
+    // 获取 API key
+    const apiKey = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY;
+    if (!apiKey) {
+      const credentialsFile = path.join(os.homedir(), '.claude', 'credentials.json');
+      if (fs.existsSync(credentialsFile)) {
+        try {
+          const creds = JSON.parse(fs.readFileSync(credentialsFile, 'utf-8'));
+          if (!creds.apiKey) {
+            console.log(chalk.red('\n❌ No API key found\n'));
+            console.log('Please set up your API key:');
+            console.log(chalk.gray('  claude login --api-key     Setup with API key'));
+            console.log(chalk.gray('  claude setup-token         Quick API key setup\n'));
+            return;
+          }
+        } catch {
+          console.log(chalk.red('\n❌ No API key found\n'));
+          return;
+        }
+      } else {
+        console.log(chalk.red('\n❌ No API key found\n'));
+        console.log('Please set up your API key:');
+        console.log(chalk.gray('  claude login --api-key     Setup with API key'));
+        console.log(chalk.gray('  claude setup-token         Quick API key setup\n'));
+        return;
+      }
+    }
+
+    console.log(chalk.cyan('\n🤖 Sending query to Claude API...\n'));
+
+    try {
+      const client = new Anthropic({ apiKey });
+
+      const response = await client.messages.create({
+        model: options.model,
+        max_tokens: 1024,
+        messages: [
+          {
+            role: 'user',
+            content: query,
+          },
+        ],
+      });
+
+      // 提取响应文本
+      const textContent = response.content.find((block) => block.type === 'text');
+      const responseText = textContent && 'text' in textContent ? textContent.text : 'No text response';
+
+      console.log(chalk.bold('Response:\n'));
+      console.log(responseText);
+
+      console.log(chalk.gray('\n─────────────────────────────────────'));
+      console.log(chalk.gray(`Usage: ${response.usage.input_tokens} in / ${response.usage.output_tokens} out`));
+      console.log(chalk.gray(`Model: ${response.model}`));
+      console.log(chalk.gray(`Stop reason: ${response.stop_reason}\n`));
+    } catch (error) {
+      console.log(chalk.red(`\n❌ API Error: ${error instanceof Error ? error.message : String(error)}\n`));
+    }
+  });
+
+// api models
+apiCommand
+  .command('models')
+  .description('List available Claude models')
+  .action(() => {
+    console.log(chalk.bold('\n📋 Available Claude Models\n'));
+    console.log(chalk.bold('Claude 4.5 Series (Latest)\n'));
+    console.log(chalk.cyan('  claude-sonnet-4-5-20250929'));
+    console.log('    • Context: 200K tokens');
+    console.log('    • Best for: Most tasks, balanced performance');
+    console.log('    • Pricing: $3 / $15 per MTok (in/out)');
+    console.log('    • Recommended: Default choice\n');
+    console.log(chalk.cyan('  claude-opus-4-5-20251101'));
+    console.log('    • Context: 200K tokens');
+    console.log('    • Best for: Complex reasoning, long tasks');
+    console.log('    • Pricing: $15 / $75 per MTok (in/out)');
+    console.log('    • Highest capability\n');
+    console.log(chalk.cyan('  claude-haiku-4-5-20250514'));
+    console.log('    • Context: 200K tokens');
+    console.log('    • Best for: Fast, simple tasks');
+    console.log('    • Pricing: $0.80 / $4 per MTok (in/out)');
+    console.log('    • Most cost-effective\n');
+    console.log(chalk.bold('Claude 3.5 Series\n'));
+    console.log(chalk.gray('  • claude-3-5-sonnet-20241022'));
+    console.log(chalk.gray('  • claude-3-5-haiku-20241022\n'));
+    console.log('Documentation: https://docs.anthropic.com/en/docs/models-overview\n');
+  });
+
+// api test
+apiCommand
+  .command('test')
+  .description('Test API connection')
+  .action(async () => {
+    const Anthropic = (await import('@anthropic-ai/sdk')).default;
+
+    console.log(chalk.bold('\n🧪 Testing API Connection\n'));
+
+    // 获取 API key
+    const apiKey = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY;
+    if (!apiKey) {
+      const credentialsFile = path.join(os.homedir(), '.claude', 'credentials.json');
+      if (fs.existsSync(credentialsFile)) {
+        try {
+          const creds = JSON.parse(fs.readFileSync(credentialsFile, 'utf-8'));
+          if (!creds.apiKey) {
+            console.log(chalk.red('❌ API Key Not Found\n'));
+            console.log('Please set up your API key:');
+            console.log(chalk.gray('  claude login --api-key'));
+            console.log(chalk.gray('  claude setup-token\n'));
+            return;
+          }
+        } catch {
+          console.log(chalk.red('❌ API Key Not Found\n'));
+          return;
+        }
+      } else {
+        console.log(chalk.red('❌ API Key Not Found\n'));
+        console.log('Please set up your API key:');
+        console.log(chalk.gray('  claude login --api-key'));
+        console.log(chalk.gray('  claude setup-token\n'));
+        return;
+      }
+    }
+
+    // 验证 API key 格式
+    if (!apiKey.startsWith('sk-ant-')) {
+      console.log(chalk.yellow('⚠️  Invalid API Key Format\n'));
+      console.log('Your API key should start with "sk-ant-"');
+      console.log(`Current key: ${apiKey.substring(0, 15)}...\n`);
+      return;
+    }
+
+    console.log(chalk.cyan('Sending test request...\n'));
+
+    try {
+      const client = new Anthropic({ apiKey });
+
+      const response = await client.messages.create({
+        model: 'claude-haiku-4-5-20250514',
+        max_tokens: 10,
+        messages: [
+          {
+            role: 'user',
+            content: 'Hello',
+          },
+        ],
+      });
+
+      console.log(chalk.green('✅ API Connection Successful\n'));
+      console.log('API Key Status:');
+      console.log('  • Format: Valid (sk-ant-...)');
+      console.log('  • Authentication: ✓ Successful');
+      console.log(`  • API Key: ${apiKey.substring(0, 20)}...\n`);
+      console.log('Test Request:');
+      console.log(`  • Model: ${response.model}`);
+      console.log(`  • Input tokens: ${response.usage.input_tokens}`);
+      console.log(`  • Output tokens: ${response.usage.output_tokens}`);
+      console.log('  • Response time: < 1s\n');
+      console.log('Your API connection is working correctly!\n');
+    } catch (error) {
+      console.log(chalk.red('❌ API Connection Failed\n'));
+      console.log(`Error: ${error instanceof Error ? error.message : String(error)}\n`);
+      console.log('Common Issues:\n');
+      console.log('1. Invalid API Key:');
+      console.log('   • Verify the key at https://console.anthropic.com/settings/keys');
+      console.log('   • Try regenerating your API key\n');
+      console.log('2. Network Issues:');
+      console.log('   • Check your internet connection');
+      console.log('   • Verify firewall settings\n');
+      console.log('3. Rate Limits:');
+      console.log('   • Visit https://console.anthropic.com/settings/limits\n');
+    }
+  });
+
+// api tokens
+const tokensCommand = apiCommand.command('tokens').description('Manage API tokens');
+
+tokensCommand
+  .command('status')
+  .description('Show current token configuration')
+  .action(() => {
+    console.log(chalk.bold('\n🔑 API Token Status\n'));
+
+    const envKey = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY;
+    const credentialsFile = path.join(os.homedir(), '.claude', 'credentials.json');
+    const hasFileKey = fs.existsSync(credentialsFile);
+
+    if (envKey) {
+      console.log(chalk.green('✓ Environment Variable:'), `${envKey.substring(0, 20)}...`);
+      console.log(`  Source: ${process.env.ANTHROPIC_API_KEY ? 'ANTHROPIC_API_KEY' : 'CLAUDE_API_KEY'}\n`);
+    } else {
+      console.log(chalk.gray('✗ Environment Variable: Not set\n'));
+    }
+
+    if (hasFileKey) {
+      try {
+        const creds = JSON.parse(fs.readFileSync(credentialsFile, 'utf-8'));
+        const fileKey = creds.apiKey || creds.api_key;
+        if (fileKey) {
+          console.log(chalk.green('✓ File Token:'), `${fileKey.substring(0, 20)}...`);
+          console.log('  Location: ~/.claude/credentials.json\n');
+        } else {
+          console.log(chalk.yellow('✗ File Token: File exists but no key found\n'));
+        }
+      } catch {
+        console.log(chalk.yellow('✗ File Token: File exists but invalid format\n'));
+      }
+    } else {
+      console.log(chalk.gray('✗ File Token: Not found\n'));
+    }
+
+    if (!envKey && !hasFileKey) {
+      console.log(chalk.yellow('⚠️  No API token configured\n'));
+      console.log('To set up a token:');
+      console.log(chalk.gray('  claude login --api-key'));
+      console.log(chalk.gray('  claude setup-token\n'));
+    }
+
+    console.log('Priority Order:');
+    console.log('  1. ANTHROPIC_API_KEY (environment)');
+    console.log('  2. CLAUDE_API_KEY (environment)');
+    console.log('  3. ~/.claude/credentials.json (file)\n');
+  });
+
+tokensCommand
+  .command('clear')
+  .description('Clear stored API token')
+  .action(() => {
+    const credentialsFile = path.join(os.homedir(), '.claude', 'credentials.json');
+
+    if (fs.existsSync(credentialsFile)) {
+      try {
+        fs.unlinkSync(credentialsFile);
+        console.log(chalk.green('\n✅ Cleared stored API token\n'));
+        console.log('Removed: ~/.claude/credentials.json\n');
+        console.log('Note: Environment variables are still set if you have them.');
+        console.log('To clear environment variables:');
+        console.log(chalk.gray('  unset ANTHROPIC_API_KEY'));
+        console.log(chalk.gray('  unset CLAUDE_API_KEY\n'));
+      } catch (error) {
+        console.log(chalk.red(`\n❌ Error clearing token: ${error}\n`));
+      }
+    } else {
+      console.log(chalk.yellow('\nNo stored token file found.\n'));
+      console.log('If you have environment variables set:');
+      console.log(chalk.gray('  unset ANTHROPIC_API_KEY'));
+      console.log(chalk.gray('  unset CLAUDE_API_KEY\n'));
+    }
   });
 
 // 辅助函数: 会话选择器

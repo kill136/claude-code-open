@@ -193,7 +193,7 @@ function getBackgroundOutputPath(shellId: string): string {
 
 // 配置
 const MAX_OUTPUT_LENGTH = parseInt(process.env.BASH_MAX_OUTPUT_LENGTH || '30000', 10);
-const DEFAULT_TIMEOUT = 120000;
+const DEFAULT_TIMEOUT = parseInt(process.env.BASH_DEFAULT_TIMEOUT_MS || '120000', 10); // 默认 2 分钟
 const MAX_TIMEOUT = 600000;
 const MAX_BACKGROUND_OUTPUT = 10 * 1024 * 1024; // 10MB per background shell
 const MAX_BACKGROUND_SHELLS = parseInt(process.env.BASH_MAX_BACKGROUND_SHELLS || '10', 10);

@@ -1,0 +1,137 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "type": "comment",
+        "description": "使用 prompt 钩子验证 Bash 命令的安全性"
+      },
+      {
+        "type": "prompt",
+        "prompt": "你是一个安全审计员。请检查这个 Bash 命令是否安全：\n\n命令: {TOOL_INPUT}\n\n如果命令安全（不会删除文件、不会修改系统配置、不会访问敏感数据），返回 {\"ok\": true}。\n如果命令可能有危险，返回 {\"ok\": false, \"reason\": \"具体的安全风险说明\"}。",
+        "matcher": "Bash",
+        "blocking": true,
+        "timeout": 30000
+      },
+      {
+        "type": "comment",
+        "description": "使用 agent 钩子验证文件操作"
+      },
+      {
+        "type": "agent",
+        "agentType": "file-operation-validator",
+        "agentConfig": {
+          "maxFileSize": 10485760,
+          "allowedExtensions": [".txt", ".md", ".json", ".js", ".ts"],
+          "protectedPaths": ["/etc", "/usr", "/bin"]
+        },
+        "matcher": "/^(Write|Edit|MultiEdit)$/",
+        "blocking": true,
+        "timeout": 60000
+      },
+      {
+        "type": "comment",
+        "description": "使用 MCP 钩子调用外部验证服务"
+      },
+      {
+        "type": "mcp",
+        "server": "security-validator",
+        "tool": "validate-tool-execution",
+        "toolArgs": {
+          "checkLevel": "strict",
+          "allowedTools": ["Read", "Glob", "Grep"]
+        },
+        "blocking": true,
+        "timeout": 30000
+      }
+    ],
+    "PostToolUse": [
+      {
+        "type": "comment",
+        "description": "记录所有工具执行"
+      },
+      {
+        "type": "command",
+        "command": "echo",
+        "args": ["[$(date)] Tool executed: $TOOL_NAME"],
+        "blocking": false
+      },
+      {
+        "type": "comment",
+        "description": "使用 MCP 钩子记录审计日志"
+      },
+      {
+        "type": "mcp",
+        "server": "audit-logger",
+        "tool": "log-tool-execution",
+        "toolArgs": {
+          "category": "tool-execution",
+          "severity": "info"
+        },
+        "blocking": false,
+        "timeout": 10000
+      },
+      {
+        "type": "comment",
+        "description": "使用 URL 钩子发送 WebHook 通知"
+      },
+      {
+        "type": "url",
+        "url": "https://webhook.example.com/tool-executed",
+        "method": "POST",
+        "headers": {
+          "Authorization": "Bearer YOUR_TOKEN_HERE"
+        },
+        "blocking": false,
+        "timeout": 5000
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "type": "comment",
+        "description": "检查用户输入是否包含敏感信息"
+      },
+      {
+        "type": "prompt",
+        "prompt": "检查以下用户输入是否包含敏感信息（如密码、API密钥、个人身份信息）：\n\n{MESSAGE}\n\n如果没有敏感信息，返回 {\"ok\": true}。\n如果包含敏感信息，返回 {\"ok\": false, \"reason\": \"发现敏感信息类型\"}。",
+        "blocking": true,
+        "timeout": 20000
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "type": "comment",
+        "description": "工具执行失败时发送通知"
+      },
+      {
+        "type": "url",
+        "url": "https://alerts.example.com/tool-failure",
+        "method": "POST",
+        "blocking": false
+      }
+    ],
+    "SessionStart": [
+      {
+        "type": "comment",
+        "description": "会话开始时的初始化钩子"
+      },
+      {
+        "type": "command",
+        "command": "echo",
+        "args": ["[$(date)] Session started: $SESSION_ID"],
+        "blocking": false
+      }
+    ],
+    "SessionEnd": [
+      {
+        "type": "comment",
+        "description": "会话结束时的清理钩子"
+      },
+      {
+        "type": "command",
+        "command": "echo",
+        "args": ["[$(date)] Session ended: $SESSION_ID"],
+        "blocking": false
+      }
+    ]
+  }
+}

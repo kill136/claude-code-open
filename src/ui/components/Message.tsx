@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import type { ContentBlock, ToolUseBlock, ToolResultBlockParam, AnyContentBlock } from '../../types/messages.js';
+import { parseMarkdown, renderBlock, type MarkdownBlock } from '../markdown-renderer.js';
 
 export interface MessageProps {
   role: 'user' | 'assistant' | 'system' | 'error';
@@ -18,130 +19,15 @@ export interface MessageProps {
   onComplete?: () => void; // 流式渲染完成回调
 }
 
-// 解析 Markdown 为纯文本（移除语法标记，保留结构）
-function parseMarkdownForTerminal(markdown: string): {
-  type: 'text' | 'code' | 'heading' | 'list';
-  content: string;
-  language?: string;
-  level?: number;
-}[] {
-  const blocks: {
-    type: 'text' | 'code' | 'heading' | 'list';
-    content: string;
-    language?: string;
-    level?: number;
-  }[] = [];
+// 渲染 Markdown 块组件
+const MarkdownBlockComponent: React.FC<{ block: MarkdownBlock }> = ({ block }) => {
+  const rendered = renderBlock(block);
 
-  // 解析代码块
-  const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
-  let lastIndex = 0;
-  let match;
-
-  while ((match = codeBlockRegex.exec(markdown)) !== null) {
-    // 添加代码块之前的文本
-    if (match.index > lastIndex) {
-      const text = markdown.slice(lastIndex, match.index).trim();
-      if (text) {
-        blocks.push(...parseTextBlocks(text));
-      }
-    }
-
-    // 添加代码块
-    blocks.push({
-      type: 'code',
-      content: match[2],
-      language: match[1] || 'text',
-    });
-
-    lastIndex = match.index + match[0].length;
-  }
-
-  // 添加剩余文本
-  if (lastIndex < markdown.length) {
-    const text = markdown.slice(lastIndex).trim();
-    if (text) {
-      blocks.push(...parseTextBlocks(text));
-    }
-  }
-
-  return blocks;
-}
-
-// 解析文本块（标题、列表等）
-function parseTextBlocks(text: string): {
-  type: 'text' | 'heading' | 'list';
-  content: string;
-  level?: number;
-}[] {
-  const blocks: {
-    type: 'text' | 'heading' | 'list';
-    content: string;
-    level?: number;
-  }[] = [];
-  const lines = text.split('\n');
-
-  for (const line of lines) {
-    // 标题
-    const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
-    if (headingMatch) {
-      blocks.push({
-        type: 'heading',
-        content: headingMatch[2],
-        level: headingMatch[1].length,
-      });
-      continue;
-    }
-
-    // 列表项
-    const listMatch = line.match(/^[\s]*[-*+]\s+(.+)$/);
-    if (listMatch) {
-      blocks.push({
-        type: 'list',
-        content: listMatch[1],
-      });
-      continue;
-    }
-
-    // 普通文本
-    if (line.trim()) {
-      blocks.push({
-        type: 'text',
-        content: line,
-      });
-    }
-  }
-
-  return blocks;
-}
-
-// 代码块组件
-const CodeBlock: React.FC<{ content: string; language?: string }> = ({
-  content,
-  language,
-}) => {
+  // 渲染的内容已经包含 ANSI 颜色代码，直接显示
   return (
-    <Box flexDirection="column" marginTop={1} marginBottom={1}>
-      {language && (
-        <Box marginBottom={0}>
-          <Text color="cyan" dimColor>
-            {language}
-          </Text>
-        </Box>
-      )}
-      <Box
-        borderStyle="single"
-        borderColor="gray"
-        paddingX={1}
-        paddingY={0}
-        flexDirection="column"
-      >
-        {content.split('\n').map((line, i) => (
-          <Text key={i} color="yellow">
-            {line}
-          </Text>
-        ))}
-      </Box>
-    </Box>
+    <Text>
+      {rendered}
+    </Text>
   );
 };
 
@@ -310,9 +196,6 @@ export const Message: React.FC<MessageProps> = ({
     );
   }
 
-  // 解析 Markdown 内容
-  const blocks = parseMarkdownForTerminal(displayedContent);
-
   // 用户消息 - 简洁样式
   if (isUser) {
     return (
@@ -330,72 +213,30 @@ export const Message: React.FC<MessageProps> = ({
     );
   }
 
-  // 助手消息 - 官方风格：使用 • 前缀
+  // 解析 Markdown 内容
+  const blocks = parseMarkdown(displayedContent);
+
+  // 助手消息 - 使用增强的 Markdown 渲染
   return (
     <Box flexDirection="column" marginY={1}>
-      {/* 消息头部 - 只在有多行内容时显示 */}
-      {blocks.length > 1 && (
-        <Box>
-          <Text bold color="green">Claude</Text>
-          {timestamp && (
-            <Text color="gray" dimColor> {getTimeString()}</Text>
-          )}
-          {isStreaming && (
-            <Text color="gray" dimColor> ⋯</Text>
-          )}
-        </Box>
-      )}
+      {/* 消息头部 */}
+      <Box>
+        <Text bold color="green">
+          {getRoleLabel()}
+        </Text>
+        {timestamp && (
+          <Text color="gray" dimColor> {getTimeString()}</Text>
+        )}
+        {isStreaming && (
+          <Text color="gray" dimColor> ⋯</Text>
+        )}
+      </Box>
 
-      {/* 消息内容 */}
-      <Box flexDirection="column" marginLeft={blocks.length > 1 ? 2 : 0}>
-        {blocks.map((block, index) => {
-          switch (block.type) {
-            case 'code':
-              return (
-                <CodeBlock
-                  key={index}
-                  content={block.content}
-                  language={block.language}
-                />
-              );
-            case 'heading':
-              return (
-                <Box key={index} marginTop={1} marginBottom={0}>
-                  <Text bold color="white">
-                    {block.content}
-                  </Text>
-                </Box>
-              );
-            case 'list':
-              return (
-                <Box key={index}>
-                  <Text>• </Text>
-                  <Text>{block.content}</Text>
-                </Box>
-              );
-            case 'text':
-              // 第一行使用 • 前缀（官方风格）
-              if (index === 0 && blocks.length === 1) {
-                return (
-                  <Box key={index}>
-                    <Text color="white">• </Text>
-                    <Text color={isError ? 'red' : undefined}>
-                      {block.content}
-                    </Text>
-                  </Box>
-                );
-              }
-              return (
-                <Box key={index}>
-                  <Text color={isError ? 'red' : undefined}>
-                    {block.content}
-                  </Text>
-                </Box>
-              );
-            default:
-              return null;
-          }
-        })}
+      {/* 消息内容 - 使用增强的 Markdown 渲染 */}
+      <Box flexDirection="column">
+        {blocks.map((block, index) => (
+          <MarkdownBlockComponent key={index} block={block} />
+        ))}
       </Box>
 
       {/* 复制提示 */}

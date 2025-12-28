@@ -160,7 +160,11 @@ export class ConversationLoop {
         response = await this.client.createMessage(
           this.session.getMessages(),
           this.tools,
-          systemPrompt
+          systemPrompt,
+          {
+            enableThinking: this.options.thinking?.enabled,
+            thinkingBudget: this.options.thinking?.budgetTokens,
+          }
         );
       } catch (apiError: any) {
         console.error(chalk.red(`[Loop] API call failed: ${apiError.message}`));
@@ -168,6 +172,15 @@ export class ConversationLoop {
           console.error(chalk.red('[Loop] Full error:'), apiError);
         }
         throw apiError;
+      }
+
+      // 处理 Extended Thinking 结果
+      if (response.thinking) {
+        if (this.options.thinking?.showThinking || this.options.verbose) {
+          console.log(chalk.gray('\n[Extended Thinking]'));
+          console.log(chalk.gray(response.thinking.thinking));
+          console.log(chalk.gray(`[Thinking tokens: ${response.thinking.thinkingTokens}, time: ${response.thinking.thinkingTimeMs}ms]`));
+        }
       }
 
       // 处理响应内容
@@ -233,13 +246,16 @@ export class ConversationLoop {
         {
           inputTokens: response.usage.inputTokens,
           outputTokens: response.usage.outputTokens,
-          cacheReadInputTokens: 0,
-          cacheCreationInputTokens: 0,
+          cacheReadInputTokens: response.usage.cacheReadTokens || 0,
+          cacheCreationInputTokens: response.usage.cacheCreationTokens || 0,
           webSearchRequests: 0,
         },
         modelConfig.calculateCost(resolvedModel, {
           inputTokens: response.usage.inputTokens,
           outputTokens: response.usage.outputTokens,
+          cacheReadTokens: response.usage.cacheReadTokens,
+          cacheCreationTokens: response.usage.cacheCreationTokens,
+          thinkingTokens: response.usage.thinkingTokens,
         }),
         0,
         0
@@ -319,11 +335,20 @@ Guidelines:
         for await (const event of this.client.createMessageStream(
           this.session.getMessages(),
           this.tools,
-          systemPrompt
+          systemPrompt,
+          {
+            enableThinking: this.options.thinking?.enabled,
+            thinkingBudget: this.options.thinking?.budgetTokens,
+          }
         )) {
           if (event.type === 'text') {
             yield { type: 'text', content: event.text };
             assistantContent.push({ type: 'text', text: event.text });
+          } else if (event.type === 'thinking') {
+            // Extended Thinking content - can be yielded or logged
+            if (this.options.thinking?.showThinking || this.options.verbose) {
+              yield { type: 'text', content: `[Thinking: ${event.thinking}]` };
+            }
           } else if (event.type === 'tool_use_start') {
             currentToolId = event.id || '';
             toolCalls.set(currentToolId, { name: event.name || '', input: '' });

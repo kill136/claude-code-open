@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { Box, Text } from 'ink';
 import { Spinner } from './Spinner.js';
+import { highlightCode, highlightJSON, smartHighlight } from '../utils/syntaxHighlight.js';
 
 interface ToolCallProps {
   name: string;
@@ -18,11 +19,11 @@ interface ToolCallProps {
 }
 
 /**
- * 格式化 JSON 对象为可读的多行字符串
+ * 格式化 JSON 对象为可读的多行字符串（带语法高亮）
  */
 function formatJSON(obj: unknown, indent: number = 2): string {
   try {
-    return JSON.stringify(obj, null, indent);
+    return highlightJSON(obj, indent > 0);
   } catch {
     return String(obj);
   }
@@ -113,7 +114,7 @@ function extractDiffSections(output: string): DiffSection[] {
 }
 
 /**
- * 渲染 Diff 视图
+ * 渲染 Diff 视图（带语法高亮）
  */
 const DiffView: React.FC<{ output: string }> = ({ output }) => {
   const sections = extractDiffSections(output);
@@ -279,7 +280,7 @@ const InputDisplay: React.FC<{ input: Record<string, unknown>; toolName: string 
 };
 
 /**
- * 格式化输出内容
+ * 格式化输出内容（带智能语法高亮）
  */
 const OutputDisplay: React.FC<{ output: string; expanded: boolean; onToggle: () => void }> = ({
   output,
@@ -295,19 +296,41 @@ const OutputDisplay: React.FC<{ output: string; expanded: boolean; onToggle: () 
     return <DiffView output={output} />;
   }
 
-  // 普通文本输出
-  const displayLines = expanded ? lines : lines.slice(0, 10);
+  // 检测是否为代码（JSON、XML、HTML 等）
+  const isCode = React.useMemo(() => {
+    const trimmed = output.trim();
+    return (
+      // JSON
+      ((trimmed.startsWith('{') || trimmed.startsWith('[')) &&
+       (trimmed.endsWith('}') || trimmed.endsWith(']'))) ||
+      // XML/HTML
+      trimmed.startsWith('<') ||
+      // 代码特征
+      /^(import|export|function|class|def|package|fn|const|let|var)\s+/m.test(output)
+    );
+  }, [output]);
+
+  // 如果是代码，使用智能高亮
+  const displayContent = React.useMemo(() => {
+    if (isCode) {
+      return smartHighlight(output);
+    }
+    return output;
+  }, [output, isCode]);
+
+  const displayLines = (isCode ? displayContent : output).split('\n');
+  const linesToShow = expanded ? displayLines : displayLines.slice(0, 10);
 
   return (
     <Box flexDirection="column" marginLeft={2}>
-      {displayLines.map((line, idx) => (
-        <Text key={idx} color="gray" dimColor>
+      {linesToShow.map((line, idx) => (
+        <Text key={idx} color={isCode ? undefined : "gray"} dimColor={!isCode}>
           {line.length > 120 ? line.substring(0, 120) + '...' : line}
         </Text>
       ))}
       {isTruncated && !expanded && (
         <Text color="blue" dimColor>
-          ... {lines.length - 10} more lines (press Enter to expand)
+          ... {displayLines.length - 10} more lines (press Enter to expand)
         </Text>
       )}
     </Box>
