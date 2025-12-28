@@ -205,18 +205,66 @@ program
     if (options.teleport) {
       try {
         console.log(chalk.cyan(`Connecting to remote session: ${options.teleport}...`));
-        // 这里会在后续实现中添加远程会话连接逻辑
-        // 目前先作为会话恢复的一个变体处理
-        const session = Session.load(options.teleport);
-        if (!session) {
-          console.log(chalk.yellow(`Remote session ${options.teleport} not found or not accessible`));
-          console.log(chalk.gray('Starting new session instead...'));
+
+        // 动态导入 teleport 模块
+        const { connectToRemoteSession, validateSessionRepository } = await import('./teleport/index.js');
+
+        // 获取远程服务器 URL（可以从环境变量或配置获取）
+        const ingressUrl = process.env.CLAUDE_TELEPORT_URL;
+        const authToken = process.env.CLAUDE_TELEPORT_TOKEN;
+
+        if (!ingressUrl) {
+          console.log(chalk.yellow('Warning: No CLAUDE_TELEPORT_URL environment variable set.'));
+          console.log(chalk.gray('Attempting to connect using local session...'));
+
+          // 尝试从本地加载会话
+          const session = Session.load(options.teleport);
+          if (session) {
+            console.log(chalk.green(`Loaded local session: ${options.teleport}`));
+          } else {
+            console.log(chalk.yellow(`Session ${options.teleport} not found locally.`));
+            console.log(chalk.gray('Starting new session instead...'));
+          }
         } else {
+          // 连接到远程会话
+          const remoteSession = await connectToRemoteSession(
+            options.teleport,
+            ingressUrl,
+            authToken
+          );
+
           console.log(chalk.green(`Connected to remote session: ${options.teleport}`));
+          console.log(chalk.gray(`Remote URL: ${ingressUrl}`));
+
+          // 监听远程会话事件
+          remoteSession.on('message', (message) => {
+            if (options.verbose) {
+              console.log(chalk.dim(`[Remote] ${JSON.stringify(message)}`));
+            }
+          });
+
+          remoteSession.on('disconnected', () => {
+            console.log(chalk.yellow('Remote session disconnected'));
+          });
+
+          remoteSession.on('error', (error) => {
+            console.error(chalk.red(`Remote session error: ${error.message}`));
+          });
+
+          // 在程序退出时断开连接
+          process.on('SIGINT', async () => {
+            console.log(chalk.yellow('\nDisconnecting from remote session...'));
+            await remoteSession.disconnect();
+            process.exit(0);
+          });
         }
       } catch (err) {
-        console.log(chalk.red(`Failed to connect to remote session: ${err}`));
+        console.log(chalk.red(`Failed to connect to remote session: ${err instanceof Error ? err.message : err}`));
         console.log(chalk.gray('Starting new session instead...'));
+
+        if (options.verbose && err instanceof Error) {
+          console.error(chalk.dim(err.stack));
+        }
       }
     }
 

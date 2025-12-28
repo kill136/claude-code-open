@@ -12,6 +12,12 @@
  * - 每个问题支持 2-4 个选项
  * - 选项包含 label 和 description
  *
+ * 增强特性（实现层面）:
+ * - 默认值支持 (defaultIndex) - 自动选中指定选项
+ * - 超时处理 (timeout) - 超时后自动使用默认值或当前选中项
+ * - 输入验证 (validator) - 自定义验证函数验证用户输入
+ * - 空输入保护 - 自动拒绝空的自定义输入
+ *
  * 官方 schema:
  * {
  *   questions: [{
@@ -21,9 +27,58 @@
  *       label: string,
  *       description: string
  *     }],
- *     multiSelect: boolean
+ *     multiSelect: boolean,
+ *     // 增强字段（可选，实现层面）
+ *     defaultIndex?: number,  // 默认选中的选项索引 (0-based)
+ *     timeout?: number,       // 超时时间（毫秒）
+ *     validator?: (input: string) => { valid: boolean; message?: string }
  *   }]
  * }
+ *
+ * 使用示例:
+ * ```typescript
+ * // 带默认值的问题
+ * {
+ *   question: "Which framework should we use?",
+ *   header: "Framework",
+ *   options: [
+ *     { label: "React (Recommended)", description: "Popular UI library" },
+ *     { label: "Vue", description: "Progressive framework" }
+ *   ],
+ *   multiSelect: false,
+ *   defaultIndex: 0  // 默认选中 React
+ * }
+ *
+ * // 带超时的问题
+ * {
+ *   question: "Continue with default settings?",
+ *   header: "Settings",
+ *   options: [
+ *     { label: "Yes", description: "Use default configuration" },
+ *     { label: "No", description: "Customize settings" }
+ *   ],
+ *   multiSelect: false,
+ *   defaultIndex: 0,
+ *   timeout: 10000  // 10秒后自动选择默认值
+ * }
+ *
+ * // 带验证器的问题
+ * {
+ *   question: "Enter project name",
+ *   header: "Project",
+ *   options: [
+ *     { label: "my-app", description: "Default name" },
+ *     { label: "Other", description: "Custom name" }
+ *   ],
+ *   multiSelect: false,
+ *   validator: (input) => {
+ *     if (!/^[a-z0-9-]+$/.test(input)) {
+ *       return { valid: false, message: "Only lowercase letters, numbers, and hyphens allowed" };
+ *     }
+ *     return { valid: true };
+ *   }
+ * }
+ * ```
  */
 
 import * as readline from 'readline';
@@ -41,6 +96,10 @@ interface Question {
   header: string;
   options: QuestionOption[];
   multiSelect: boolean;
+  // 增强功能（实现层面）
+  defaultIndex?: number; // 默认选中的选项索引
+  timeout?: number; // 超时时间（毫秒）
+  validator?: (input: string) => { valid: boolean; message?: string }; // 自定义验证器
 }
 
 // 最大 header 长度
@@ -228,14 +287,50 @@ Usage notes:
     questionNum: number,
     totalQuestions: number
   ): Promise<string> {
-    let currentIndex = 0;
+    // 应用默认值
+    let currentIndex = question.defaultIndex !== undefined &&
+                       question.defaultIndex >= 0 &&
+                       question.defaultIndex < options.length
+                       ? question.defaultIndex
+                       : 0;
     const selectedIndices = new Set<number>();
+
+    // 如果是多选模式且设置了默认值，预先选中
+    if (question.multiSelect && question.defaultIndex !== undefined &&
+        question.defaultIndex >= 0 && question.defaultIndex < options.length) {
+      selectedIndices.add(question.defaultIndex);
+    }
+
     let isFirstRender = true;
+    let timeoutId: NodeJS.Timeout | null = null;
+    let isTimedOut = false;
 
     // 显示问题头部
     this.displayQuestionHeader(question, questionNum, totalQuestions);
 
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
+      // 设置超时（如果配置了）
+      if (question.timeout && question.timeout > 0) {
+        timeoutId = setTimeout(() => {
+          isTimedOut = true;
+          cleanup();
+          console.log(chalk.yellow(`\n  Timeout after ${question.timeout}ms. Using default selection.`));
+
+          // 超时时使用当前选中项或默认值
+          if (question.multiSelect && selectedIndices.size > 0) {
+            const selectedLabels: string[] = [];
+            for (const idx of Array.from(selectedIndices).sort((a, b) => a - b)) {
+              if (idx < options.length - 1) {
+                selectedLabels.push(options[idx].label);
+              }
+            }
+            resolve(selectedLabels.join(', '));
+          } else {
+            resolve(options[currentIndex].label);
+          }
+        }, question.timeout);
+      }
+
       // 设置原始模式
       if (process.stdin.setRawMode) {
         process.stdin.setRawMode(true);
@@ -278,14 +373,32 @@ Usage notes:
 
         // 显示提示
         console.log();
+        let helpText = '';
         if (question.multiSelect) {
-          console.log(chalk.dim('  [Up/Down]: Navigate | [Space]: Toggle selection | [Enter]: Confirm | [1-9]: Quick toggle'));
+          helpText = '[Up/Down]: Navigate | [Space]: Toggle selection | [Enter]: Confirm | [1-9]: Quick toggle';
         } else {
-          console.log(chalk.dim('  [Up/Down]: Navigate | [Enter]: Select | [1-9]: Quick select'));
+          helpText = '[Up/Down]: Navigate | [Enter]: Select | [1-9]: Quick select';
         }
+
+        // 添加超时提示
+        if (question.timeout && question.timeout > 0) {
+          const seconds = (question.timeout / 1000).toFixed(0);
+          helpText += ` | Timeout: ${seconds}s`;
+        }
+
+        // 添加默认值提示
+        if (question.defaultIndex !== undefined && question.defaultIndex >= 0 && question.defaultIndex < options.length) {
+          helpText += ` | Default: ${options[question.defaultIndex].label}`;
+        }
+
+        console.log(chalk.dim('  ' + helpText));
       };
 
       const cleanup = () => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
         if (process.stdin.setRawMode) {
           process.stdin.setRawMode(false);
         }
@@ -311,7 +424,7 @@ Usage notes:
           for (const idx of Array.from(selectedIndices).sort((a, b) => a - b)) {
             if (idx === options.length - 1) {
               // "Other" 选项 - 获取自定义输入
-              const custom = await this.getCustomInput();
+              const custom = await this.getCustomInput(question);
               if (custom) {
                 selectedLabels.push(custom);
               }
@@ -324,7 +437,7 @@ Usage notes:
           // 单选模式
           if (currentIndex === options.length - 1) {
             // "Other" 选项 - 获取自定义输入
-            result = await this.getCustomInput();
+            result = await this.getCustomInput(question);
           } else {
             result = options[currentIndex].label;
           }
@@ -438,11 +551,18 @@ Usage notes:
           if (idx >= 1 && idx < options.length) {
             selected.push(options[idx - 1].label);
           } else if (idx === options.length) {
-            // "Other" 选项
-            const custom = await askQuestion(chalk.blue('Enter custom response: '));
+            // "Other" 选项 - 使用带验证的输入方法
+            rl.close();
+            const custom = await this.getCustomInput(question);
             if (custom) {
               selected.push(custom);
             }
+            // 重新创建 readline 接口（如果需要继续）
+            const newRl = readline.createInterface({
+              input: process.stdin,
+              output: process.stdout,
+            });
+            Object.assign(rl, newRl);
           }
         }
 
@@ -456,10 +576,24 @@ Usage notes:
         if (idx >= 1 && idx < options.length) {
           result = options[idx - 1].label;
         } else if (idx === options.length) {
-          // "Other" 选项
-          result = await askQuestion(chalk.blue('Enter custom response: '));
+          // "Other" 选项 - 使用带验证的输入方法
+          rl.close();
+          result = await this.getCustomInput(question);
         } else {
-          result = response; // 直接使用输入
+          // 如果输入不是有效的数字，尝试作为自定义输入处理（带验证）
+          rl.close();
+          // 先验证输入
+          if (question.validator) {
+            const validation = question.validator(response);
+            if (!validation.valid) {
+              console.log(chalk.red(`  Error: ${validation.message || 'Invalid input'}`));
+              result = await this.getCustomInput(question);
+            } else {
+              result = response;
+            }
+          } else {
+            result = response;
+          }
         }
 
         console.log(chalk.green(`  Selected: ${result}\n`));
@@ -489,19 +623,49 @@ Usage notes:
   }
 
   /**
-   * 获取自定义输入
+   * 获取自定义输入（带验证）
    */
-  private async getCustomInput(): Promise<string> {
+  private async getCustomInput(question?: Question): Promise<string> {
     const rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout,
     });
 
-    return new Promise((resolve) => {
-      rl.question(chalk.blue('  Enter custom response: '), (answer) => {
-        rl.close();
-        resolve(answer.trim());
+    const askForInput = (): Promise<string> => {
+      return new Promise((resolve) => {
+        rl.question(chalk.blue('  Enter custom response: '), async (answer) => {
+          const trimmed = answer.trim();
+
+          // 基础验证：不能为空
+          if (!trimmed) {
+            console.log(chalk.red('  Error: Response cannot be empty. Please try again.'));
+            const retry = await askForInput();
+            resolve(retry);
+            return;
+          }
+
+          // 自定义验证器
+          if (question?.validator) {
+            const validation = question.validator(trimmed);
+            if (!validation.valid) {
+              const message = validation.message || 'Invalid input. Please try again.';
+              console.log(chalk.red(`  Error: ${message}`));
+              const retry = await askForInput();
+              resolve(retry);
+              return;
+            }
+          }
+
+          resolve(trimmed);
+        });
       });
-    });
+    };
+
+    try {
+      const result = await askForInput();
+      return result;
+    } finally {
+      rl.close();
+    }
   }
 }

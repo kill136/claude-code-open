@@ -1,67 +1,15 @@
 /**
  * Input 组件
  * 用户输入框 - 仿官方 Claude Code 风格
- * 支持斜杠命令自动补全
+ * 支持斜杠命令、文件路径、@mention 自动补全
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
+import { getCompletions, applyCompletion, type CompletionItem } from '../autocomplete/index.js';
 
 // 官方 claude 颜色
 const CLAUDE_COLOR = '#D77757';
-
-// 命令定义
-interface CommandInfo {
-  name: string;
-  description: string;
-  aliases?: string[];
-}
-
-// 所有可用命令列表 (简化版)
-const ALL_COMMANDS: CommandInfo[] = [
-  { name: 'add-dir', description: 'Add a new working directory', aliases: ['add'] },
-  { name: 'agents', description: 'Manage agent configurations' },
-  { name: 'bug', description: 'Report a bug or issue' },
-  { name: 'chrome', description: 'Claude in Chrome (Beta) settings' },
-  { name: 'clear', description: 'Clear conversation history' },
-  { name: 'compact', description: 'Compact context to save tokens', aliases: ['c'] },
-  { name: 'config', description: 'View or edit configuration' },
-  { name: 'context', description: 'Show current context window usage', aliases: ['ctx'] },
-  { name: 'cost', description: 'Show API cost and spending information' },
-  { name: 'doctor', description: 'Run diagnostics to check for issues' },
-  { name: 'exit', description: 'Exit Claude Code', aliases: ['quit', 'q'] },
-  { name: 'export', description: 'Export conversation to file' },
-  { name: 'feedback', description: 'Send feedback about Claude Code' },
-  { name: 'files', description: 'List files in the current directory or context', aliases: ['ls'] },
-  { name: 'help', description: 'Show help and available commands', aliases: ['?', 'h'] },
-  { name: 'hooks', description: 'Manage hook configurations' },
-  { name: 'ide', description: 'IDE integration settings' },
-  { name: 'init', description: 'Initialize CLAUDE.md configuration file' },
-  { name: 'install', description: 'Install MCP server' },
-  { name: 'login', description: 'Log in to Anthropic account' },
-  { name: 'logout', description: 'Log out from current account' },
-  { name: 'mcp', description: 'Manage MCP servers' },
-  { name: 'memory', description: 'View or edit memory/instructions' },
-  { name: 'model', description: 'Switch or view current model', aliases: ['m'] },
-  { name: 'permissions', description: 'View or change permission mode', aliases: ['perms'] },
-  { name: 'plan', description: 'Enter planning mode for complex tasks' },
-  { name: 'plugin', description: 'Manage plugins' },
-  { name: 'pr-comments', description: 'View or respond to PR comments', aliases: ['pr'] },
-  { name: 'release-notes', description: 'Show recent release notes and changes', aliases: ['changelog', 'whats-new'] },
-  { name: 'resume', description: 'Resume a previous session', aliases: ['r'] },
-  { name: 'review', description: 'Request a code review', aliases: ['code-review', 'cr'] },
-  { name: 'rewind', description: 'Rewind conversation to a previous state' },
-  { name: 'security-review', description: 'Run a security review on code', aliases: ['security', 'sec'] },
-  { name: 'status', description: 'Show current session status' },
-  { name: 'stickers', description: 'Fun stickers and reactions' },
-  { name: 'tasks', description: 'Show running background tasks' },
-  { name: 'terminal-setup', description: 'Terminal setup instructions' },
-  { name: 'theme', description: 'Change color theme' },
-  { name: 'todos', description: 'Show or manage the current todo list', aliases: ['todo'] },
-  { name: 'usage', description: 'Show usage statistics' },
-  { name: 'version', description: 'Show version information', aliases: ['v'] },
-  { name: 'vim', description: 'Toggle vim keybindings' },
-];
 
 interface InputProps {
   prompt?: string;
@@ -82,7 +30,9 @@ export const Input: React.FC<InputProps> = ({
   const [cursor, setCursor] = useState(0);
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
-  const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
+  const [selectedCompletionIndex, setSelectedCompletionIndex] = useState(0);
+  const [completions, setCompletions] = useState<CompletionItem[]>([]);
+  const [completionType, setCompletionType] = useState<'command' | 'file' | 'mention' | 'none'>('none');
 
   // Vim 模式支持
   const [vimModeEnabled, setVimModeEnabled] = useState(process.env.CLAUDE_CODE_VIM_MODE === 'true');
@@ -107,31 +57,27 @@ export const Input: React.FC<InputProps> = ({
     return () => clearInterval(interval);
   }, [vimModeEnabled]);
 
-  // 检测是否在输入斜杠命令
-  const isTypingCommand = value.startsWith('/');
-  const commandQuery = isTypingCommand ? value.slice(1).toLowerCase() : '';
-
-  // 过滤匹配的命令
-  const filteredCommands = useMemo(() => {
-    if (!isTypingCommand) return [];
-    if (commandQuery === '') return ALL_COMMANDS.slice(0, 10); // 显示前10个命令
-
-    return ALL_COMMANDS.filter(cmd => {
-      const matchesName = cmd.name.toLowerCase().startsWith(commandQuery);
-      const matchesAlias = cmd.aliases?.some(alias =>
-        alias.toLowerCase().startsWith(commandQuery)
-      );
-      return matchesName || matchesAlias;
-    }).slice(0, 10);
-  }, [isTypingCommand, commandQuery]);
-
-  // 显示命令列表
-  const showCommandList = isTypingCommand && filteredCommands.length > 0;
-
-  // 重置选择索引当命令列表变化时
+  // 获取自动补全建议
   useEffect(() => {
-    setSelectedCommandIndex(0);
-  }, [commandQuery]);
+    const fetchCompletions = async () => {
+      const result = await getCompletions({
+        fullText: value,
+        cursorPosition: cursor,
+        cwd: process.cwd(),
+        enableFileCompletion: true,
+        enableMentionCompletion: true,
+      });
+
+      setCompletions(result.items);
+      setCompletionType(result.type);
+      setSelectedCompletionIndex(0);
+    };
+
+    fetchCompletions();
+  }, [value, cursor]);
+
+  // 显示补全列表
+  const showCompletionList = completions.length > 0 && completionType !== 'none';
 
   // Vim 辅助函数
   const saveToUndoStack = () => {
@@ -195,26 +141,35 @@ export const Input: React.FC<InputProps> = ({
         return;
       }
 
-      // 在命令列表显示时的特殊处理
-      if (showCommandList && !vimNormalMode) {
+      // 在补全列表显示时的特殊处理
+      if (showCompletionList && !vimNormalMode) {
         if (key.upArrow) {
-          setSelectedCommandIndex(prev =>
-            prev > 0 ? prev - 1 : filteredCommands.length - 1
+          setSelectedCompletionIndex(prev =>
+            prev > 0 ? prev - 1 : completions.length - 1
           );
           return;
         }
         if (key.downArrow) {
-          setSelectedCommandIndex(prev =>
-            prev < filteredCommands.length - 1 ? prev + 1 : 0
+          setSelectedCompletionIndex(prev =>
+            prev < completions.length - 1 ? prev + 1 : 0
           );
           return;
         }
         if (key.tab) {
-          // Tab 补全选中的命令
-          const selectedCommand = filteredCommands[selectedCommandIndex];
-          if (selectedCommand) {
-            setValue('/' + selectedCommand.name + ' ');
-            setCursor(selectedCommand.name.length + 2);
+          // Tab 补全选中的项
+          const selectedCompletion = completions[selectedCompletionIndex];
+          if (selectedCompletion) {
+            // 应用补全
+            const startPos = completionType === 'command' ? 0 :
+              (value.lastIndexOf(' ', cursor - 1) + 1);
+            const result = applyCompletion(
+              value,
+              selectedCompletion,
+              startPos,
+              cursor
+            );
+            setValue(result.newText);
+            setCursor(result.newCursor);
           }
           return;
         }
@@ -280,7 +235,7 @@ export const Input: React.FC<InputProps> = ({
           setCursor(prev => Math.min(value.length - 1, prev + 1));
           return;
         }
-        if (input === 'j' && !showCommandList) {
+        if (input === 'j' && !showCompletionList) {
           // j - 历史记录向下
           if (history.length > 0 && historyIndex < history.length - 1) {
             const newIndex = historyIndex + 1;
@@ -290,7 +245,7 @@ export const Input: React.FC<InputProps> = ({
           }
           return;
         }
-        if (input === 'k' && !showCommandList) {
+        if (input === 'k' && !showCompletionList) {
           // k - 历史记录向上
           if (historyIndex > 0) {
             const newIndex = historyIndex - 1;
@@ -509,7 +464,7 @@ export const Input: React.FC<InputProps> = ({
         setCursor((prev) => Math.max(0, prev - 1));
       } else if (key.rightArrow) {
         setCursor((prev) => Math.min(value.length, prev + 1));
-      } else if (key.upArrow && !showCommandList) {
+      } else if (key.upArrow && !showCompletionList) {
         // 历史记录向上
         if (history.length > 0 && historyIndex < history.length - 1) {
           const newIndex = historyIndex + 1;
@@ -517,7 +472,7 @@ export const Input: React.FC<InputProps> = ({
           setValue(history[newIndex]);
           setCursor(history[newIndex].length);
         }
-      } else if (key.downArrow && !showCommandList) {
+      } else if (key.downArrow && !showCompletionList) {
         // 历史记录向下
         if (historyIndex > 0) {
           const newIndex = historyIndex - 1;
@@ -568,22 +523,24 @@ export const Input: React.FC<InputProps> = ({
 
   return (
     <Box flexDirection="column">
-      {/* 斜杠命令列表 */}
-      {showCommandList && (
+      {/* 补全建议列表 */}
+      {showCompletionList && (
         <Box flexDirection="column" marginBottom={1}>
-          {filteredCommands.map((cmd, index) => (
-            <Box key={cmd.name}>
+          {completions.map((item, index) => (
+            <Box key={`${item.type}-${item.label}-${index}`}>
               <Text
-                backgroundColor={index === selectedCommandIndex ? 'gray' : undefined}
-                color={index === selectedCommandIndex ? 'white' : undefined}
+                backgroundColor={index === selectedCompletionIndex ? 'gray' : undefined}
+                color={index === selectedCompletionIndex ? 'white' : undefined}
               >
-                <Text color={CLAUDE_COLOR} bold={index === selectedCommandIndex}>
-                  /{cmd.name}
+                <Text color={CLAUDE_COLOR} bold={index === selectedCompletionIndex}>
+                  {item.label}
                 </Text>
-                {cmd.aliases && cmd.aliases.length > 0 && (
-                  <Text dimColor> ({cmd.aliases.join(', ')})</Text>
+                {item.aliases && item.aliases.length > 0 && (
+                  <Text dimColor> ({item.aliases.join(', ')})</Text>
                 )}
-                <Text dimColor> - {cmd.description}</Text>
+                {item.description && (
+                  <Text dimColor> - {item.description}</Text>
+                )}
               </Text>
             </Box>
           ))}
