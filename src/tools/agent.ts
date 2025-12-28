@@ -474,11 +474,12 @@ Usage notes:
 
 export class TaskOutputTool extends BaseTool<{ task_id: string; block?: boolean; timeout?: number; show_history?: boolean }, ToolResult> {
   name = 'TaskOutput';
-  description = `Get output and status from a background task.
+  description = `Get output and status from a background task (Agent or Bash).
 
 Usage notes:
+- Supports both Agent tasks and Bash background shells
 - Use block parameter to wait for task completion
-- Use show_history to see detailed execution history
+- Use show_history to see detailed execution history (Agent only)
 - Agent state is automatically persisted and can be resumed`;
 
   getInputSchema(): ToolDefinition['inputSchema'] {
@@ -507,6 +508,18 @@ Usage notes:
   }
 
   async execute(input: { task_id: string; block?: boolean; timeout?: number; show_history?: boolean }): Promise<ToolResult> {
+    // 检查是否是 Bash shell ID
+    if (isShellId(input.task_id)) {
+      const shell = getBackgroundShell(input.task_id);
+      if (!shell) {
+        return { success: false, error: `Task ${input.task_id} not found` };
+      }
+
+      // 委托给 Bash shell 处理逻辑
+      return this.handleBashTask(input.task_id, shell, input.block, input.timeout);
+    }
+
+    // 处理 Agent 任务
     const agent = getBackgroundAgent(input.task_id);
     if (!agent) {
       return { success: false, error: `Task ${input.task_id} not found` };
@@ -585,6 +598,86 @@ Usage notes:
       output.push('\n=== Status ===');
       output.push('Agent is paused.');
       output.push(`Use resume parameter with agent ID ${agent.id} to continue execution.`);
+    }
+
+    return {
+      success: true,
+      output: output.join('\n'),
+    };
+  }
+
+  /**
+   * 处理 Bash 后台任务
+   */
+  private async handleBashTask(
+    taskId: string,
+    shell: any,
+    block?: boolean,
+    timeout?: number
+  ): Promise<ToolResult> {
+    // 如果需要阻塞等待完成
+    if (block && shell.status === 'running') {
+      const maxTimeout = timeout || 30000;
+      const startTime = Date.now();
+
+      while (shell.status === 'running' && Date.now() - startTime < maxTimeout) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        // 重新获取 shell 状态
+        const updatedShell = getBackgroundShell(taskId);
+        if (updatedShell && updatedShell.status !== 'running') {
+          break;
+        }
+      }
+
+      if (shell.status === 'running') {
+        // 超时但仍在运行
+        return {
+          success: true,
+          output: `Bash task ${taskId} is still running after ${maxTimeout}ms timeout.\nUse block=false to check current output without waiting.`,
+        };
+      }
+    }
+
+    // 构建输出信息
+    const output = [];
+    output.push(`=== Bash Task ${taskId} ===`);
+    output.push(`Command: ${shell.command}`);
+    output.push(`Status: ${shell.status}`);
+    output.push(`Started: ${new Date(shell.startTime).toISOString()}`);
+
+    const duration = Date.now() - shell.startTime;
+    if (shell.endTime) {
+      output.push(`Ended: ${new Date(shell.endTime).toISOString()}`);
+      output.push(`Duration: ${((shell.endTime - shell.startTime) / 1000).toFixed(2)}s`);
+    } else {
+      output.push(`Duration: ${(duration / 1000).toFixed(2)}s (running)`);
+    }
+
+    if (shell.exitCode !== undefined) {
+      output.push(`Exit Code: ${shell.exitCode}`);
+    }
+
+    output.push(`Output File: ${shell.outputFile}`);
+
+    // 读取输出
+    const shellOutput = shell.output.join('');
+    if (shellOutput.trim()) {
+      output.push('\n=== Output ===');
+      output.push(shellOutput);
+    } else {
+      output.push('\n=== Output ===');
+      output.push('(no output yet)');
+    }
+
+    if (shell.status === 'completed') {
+      output.push('\n=== Status ===');
+      output.push('Command completed successfully.');
+    } else if (shell.status === 'failed') {
+      output.push('\n=== Status ===');
+      output.push(`Command failed with exit code ${shell.exitCode}.`);
+    } else if (shell.status === 'running') {
+      output.push('\n=== Status ===');
+      output.push('Command is still running. Use block=true to wait for completion.');
     }
 
     return {

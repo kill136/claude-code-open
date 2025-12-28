@@ -53,6 +53,7 @@
     "cheerio": "^1.0.0",
     "cli-highlight": "^2.1.11",
     "commander": "^12.0.0",
+    "eventsource": "^4.1.0",
     "file-type": "^18.0.0",
     "glob": "^10.3.0",
     "http-proxy-agent": "^7.0.2",
@@ -75,6 +76,7 @@
   },
   "devDependencies": {
     "@anthropic-ai/claude-code": "^2.0.76",
+    "@types/eventsource": "^1.1.15",
     "@types/node": "^20.19.27",
     "@types/react": "^18.2.0",
     "@types/shell-quote": "^1.7.5",

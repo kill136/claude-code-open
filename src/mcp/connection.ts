@@ -14,7 +14,12 @@ import { EventEmitter } from 'events';
 import { spawn, ChildProcess } from 'child_process';
 import { v4 as uuidv4 } from 'uuid';
 import axios, { AxiosInstance } from 'axios';
+import { createRequire } from 'module';
 import { WebSocketConnection } from './websocket-connection.js';
+
+// Import EventSource for Node.js (CommonJS module)
+const require = createRequire(import.meta.url);
+const EventSource = require('eventsource');
 
 // ============ Type Definitions ============
 
@@ -216,11 +221,12 @@ export class StdioConnection extends EventEmitter implements McpTransport {
 
 /**
  * Server-Sent Events (SSE) based MCP connection
+ * Uses native EventSource for real-time event streaming
  */
 export class SseConnection extends EventEmitter implements McpTransport {
   private url: string;
   private headers: Record<string, string>;
-  private eventSource?: any; // EventSource type
+  private eventSource?: any; // EventSource instance
   private httpClient: AxiosInstance;
   private connected: boolean = false;
 
@@ -239,39 +245,55 @@ export class SseConnection extends EventEmitter implements McpTransport {
 
     return new Promise((resolve, reject) => {
       try {
-        // Note: In Node.js, we would typically use a library like 'eventsource'
-        // For now, we'll use polling as a fallback
-        this.connected = true;
-        this.startPolling();
-        this.emit('connect');
-        resolve();
+        // Create EventSource connection for SSE streaming
+        const eventSourceUrl = `${this.url}/events`;
+
+        // EventSource options with custom headers
+        const eventSourceInitDict = {
+          headers: this.headers,
+        };
+
+        this.eventSource = new EventSource(eventSourceUrl, eventSourceInitDict);
+
+        // Handle connection open
+        this.eventSource.onopen = () => {
+          this.connected = true;
+          this.emit('connect');
+          resolve();
+        };
+
+        // Handle incoming messages
+        this.eventSource.onmessage = (event: MessageEvent) => {
+          try {
+            const message: McpMessage = JSON.parse(event.data);
+            this.emit('message', message);
+          } catch (err) {
+            this.emit('parse-error', err, event.data);
+          }
+        };
+
+        // Handle errors
+        this.eventSource.onerror = (err) => {
+          if (!this.connected) {
+            // Connection failed during initial connect
+            reject(new Error('Failed to establish SSE connection'));
+          } else {
+            // Connection error after successful connect
+            this.emit('error', err);
+          }
+        };
+
+        // Set a timeout for initial connection
+        setTimeout(() => {
+          if (!this.connected) {
+            this.disconnect();
+            reject(new Error('SSE connection timeout'));
+          }
+        }, 10000);
       } catch (err) {
         reject(err);
       }
     });
-  }
-
-  private startPolling(): void {
-    // Simple polling implementation
-    // In production, use a proper SSE library
-    const poll = async () => {
-      if (!this.connected) return;
-
-      try {
-        const response = await this.httpClient.get('/events');
-        if (response.data) {
-          this.emit('message', response.data);
-        }
-      } catch (err) {
-        this.emit('error', err);
-      }
-
-      if (this.connected) {
-        setTimeout(poll, 1000);
-      }
-    };
-
-    poll();
   }
 
   async send(message: McpMessage): Promise<void> {
@@ -280,10 +302,12 @@ export class SseConnection extends EventEmitter implements McpTransport {
     }
 
     try {
+      // Send messages via HTTP POST (SSE is unidirectional)
       const response = await this.httpClient.post('/messages', message);
-      if (response.data) {
-        this.emit('message', response.data);
-      }
+
+      // Response handling is done through SSE events
+      // No need to emit message here as it will come through EventSource
+      return;
     } catch (err) {
       throw new Error(`Failed to send message: ${err}`);
     }
@@ -300,15 +324,23 @@ export class SseConnection extends EventEmitter implements McpTransport {
 
   async disconnect(): Promise<void> {
     this.connected = false;
+
     if (this.eventSource) {
+      // Remove event listeners to prevent memory leaks
+      this.eventSource.onopen = null;
+      this.eventSource.onmessage = null;
+      this.eventSource.onerror = null;
+
+      // Close the EventSource connection
       this.eventSource.close();
       this.eventSource = undefined;
     }
+
     this.emit('disconnect');
   }
 
   isConnected(): boolean {
-    return this.connected;
+    return this.connected && this.eventSource?.readyState === EventSource.OPEN;
   }
 }
 

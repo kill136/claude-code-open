@@ -391,8 +391,11 @@ export class MessageReplay {
 // ========== 导出增强的流式处理模块 ==========
 
 // T333: SSE 解析器
-export {
+export type {
   SSEEvent,
+} from './sse.js';
+
+export {
   SSEDecoder,
   NewlineDecoder,
   parseSSEStream,
@@ -400,7 +403,7 @@ export {
 } from './sse.js';
 
 // T334-T342: 增强的消息流处理
-export {
+export type {
   StreamEventType,
   DeltaType,
   ContentBlockType,
@@ -411,6 +414,9 @@ export {
   MessageState,
   StreamOptions,
   StreamCallbacks,
+} from './message-stream.js';
+
+export {
   parseTolerantJSON,
   EnhancedMessageStream,
 } from './message-stream.js';
