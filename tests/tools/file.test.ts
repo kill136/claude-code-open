@@ -230,14 +230,26 @@ describe('EditTool', () => {
   let editTool: EditTool;
   let testDir: string;
   let testFile: string;
+  let originalEnv: string | undefined;
 
   beforeEach(() => {
+    // Disable file read requirement for unit tests
+    originalEnv = process.env.CLAUDE_EDIT_REQUIRE_READ;
+    process.env.CLAUDE_EDIT_REQUIRE_READ = 'false';
+
     editTool = new EditTool();
     testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'edit-test-'));
     testFile = path.join(testDir, 'test.txt');
   });
 
   afterEach(() => {
+    // Restore original environment variable
+    if (originalEnv !== undefined) {
+      process.env.CLAUDE_EDIT_REQUIRE_READ = originalEnv;
+    } else {
+      delete process.env.CLAUDE_EDIT_REQUIRE_READ;
+    }
+
     if (fs.existsSync(testDir)) {
       fs.rmSync(testDir, { recursive: true, force: true });
     }
@@ -296,7 +308,8 @@ describe('EditTool', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('appears');
+      expect(result.error).toContain('matches');
+      expect(result.error).toContain('replace_all');
     });
   });
 

@@ -1,0 +1,17 @@
+{
+  "version": "1.0.0",
+  "inheritance": {
+    "inheritGlobal": true,
+    "inheritProject": true,
+    "overrideGlobal": true,
+    "mergeStrategy": "override"
+  },
+  "permissions": [
+    {
+      "tool": "Project",
+      "allowed": true,
+      "scope": "project",
+      "priority": 0
+    }
+  ]
+}

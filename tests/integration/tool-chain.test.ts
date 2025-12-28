@@ -16,13 +16,23 @@ import { GrepTool } from '../../src/tools/search.js';
 describe('Tool Chain Integration', () => {
   let env: TestEnvironment;
   let registry: ToolRegistry;
+  let originalEnv: string | undefined;
 
   beforeAll(async () => {
     env = await setupTestEnvironment();
+    // Disable file read requirement for tests
+    originalEnv = process.env.CLAUDE_EDIT_REQUIRE_READ;
+    process.env.CLAUDE_EDIT_REQUIRE_READ = 'false';
   });
 
   afterAll(async () => {
     await cleanupTestEnvironment(env);
+    // Restore original environment variable
+    if (originalEnv !== undefined) {
+      process.env.CLAUDE_EDIT_REQUIRE_READ = originalEnv;
+    } else {
+      delete process.env.CLAUDE_EDIT_REQUIRE_READ;
+    }
   });
 
   beforeEach(() => {
@@ -39,7 +49,8 @@ describe('Tool Chain Integration', () => {
       const readTool = new ReadTool();
       const readResult = await readTool.execute({ file_path: filePath });
 
-      expect(readResult).toContain('console.log("Hello")');
+      expect(readResult.success).toBe(true);
+      expect(readResult.output).toContain('console.log("Hello")');
 
       // Step 2: Edit the file
       const editTool = new EditTool();
@@ -49,7 +60,7 @@ describe('Tool Chain Integration', () => {
         new_string: 'console.log("Hello, World!")',
       });
 
-      expect(editResult).toContain('successfully');
+      expect(editResult.success).toBe(true);
 
       // Step 3: Verify the edit
       const finalContent = readTestFile(env, 'src/hello.ts');
@@ -117,17 +128,17 @@ describe('Tool Chain Integration', () => {
         path: env.projectDir,
       });
 
-      expect(globResult).toContain('file1.ts');
-      expect(globResult).toContain('file2.ts');
-      expect(globResult).toContain('file3.ts');
-      expect(globResult).not.toContain('readme.md');
+      expect(globResult.output).toContain('file1.ts');
+      expect(globResult.output).toContain('file2.ts');
+      expect(globResult.output).toContain('file3.ts');
+      expect(globResult.output).not.toContain('readme.md');
 
       // Step 2: Read one of the found files
       const readTool = new ReadTool();
       const file1Path = `${env.projectDir}/src/file1.ts`;
       const readResult = await readTool.execute({ file_path: file1Path });
 
-      expect(readResult).toContain('value1 = 1');
+      expect(readResult.output).toContain('value1 = 1');
     });
   });
 
@@ -153,8 +164,8 @@ describe('Tool Chain Integration', () => {
         output_mode: 'files_with_matches',
       });
 
-      expect(grepResult).toContain('app.ts');
-      expect(grepResult).toContain('utils.ts');
+      expect(grepResult.output).toContain('app.ts');
+      expect(grepResult.output).toContain('utils.ts');
 
       // Step 2: Edit one of the files to resolve TODO
       const editTool = new EditTool();
@@ -189,8 +200,8 @@ describe('Tool Chain Integration', () => {
         '-A': 1,
       });
 
-      expect(grepResult).toContain('FIXME');
-      expect(grepResult).toContain('return x / y');
+      expect(grepResult.output).toContain('FIXME');
+      expect(grepResult.output).toContain('return x / y');
 
       // Step 2: Fix the issue
       const editTool = new EditTool();
@@ -233,16 +244,16 @@ describe('Tool Chain Integration', () => {
         path: env.projectDir,
       });
 
-      expect(globResult).toContain('user.ts');
-      expect(globResult).toContain('post.ts');
+      expect(globResult.output).toContain('user.ts');
+      expect(globResult.output).toContain('post.ts');
 
       // Step 3: Read one of the created files
       const readTool = new ReadTool();
       const userPath = `${env.projectDir}/models/user.ts`;
       const readResult = await readTool.execute({ file_path: userPath });
 
-      expect(readResult).toContain('interface User');
-      expect(readResult).toContain('id: string');
+      expect(readResult.output).toContain('interface User');
+      expect(readResult.output).toContain('id: string');
     });
   });
 
@@ -265,14 +276,14 @@ describe('Tool Chain Integration', () => {
         output_mode: 'content',
       });
 
-      expect(searchResult).toContain('data: any');
+      expect(searchResult.output).toContain('data: any');
 
       // 2. Read the file to understand context
       const readTool = new ReadTool();
       const filePath = `${env.projectDir}/src/processor.ts`;
       const readResult = await readTool.execute({ file_path: filePath });
 
-      expect(readResult).toContain('processUser');
+      expect(readResult.output).toContain('processUser');
 
       // 3. Edit to add proper types
       const editTool = new EditTool();
@@ -316,17 +327,17 @@ describe('Tool Chain Integration', () => {
         path: env.projectDir,
       });
 
-      expect(allFiles).toContain('src/index.ts');
-      expect(allFiles).toContain('src/models/index.ts');
-      expect(allFiles).toContain('src/models/user.ts');
+      expect(allFiles.output).toContain('src/index.ts');
+      expect(allFiles.output).toContain('src/models/index.ts');
+      expect(allFiles.output).toContain('src/models/user.ts');
 
       // Step 3: Read and verify barrel exports
       const indexContent = await readTool.execute({
         file_path: `${env.projectDir}/src/index.ts`,
       });
 
-      expect(indexContent).toContain('export * from "./models"');
-      expect(indexContent).toContain('export * from "./services"');
+      expect(indexContent.output).toContain('export * from "./models"');
+      expect(indexContent.output).toContain('export * from "./services"');
     });
   });
 });

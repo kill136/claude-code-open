@@ -7,13 +7,22 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { setupTestEnvironment, cleanupTestEnvironment, createTestSession } from './setup.js';
 import type { TestEnvironment } from './setup.js';
 import { createTestSessionObject, createTestMessage } from './helpers.js';
-import { SessionManager } from '../../src/session/index.js';
+import {
+  createSession,
+  saveSession,
+  loadSession,
+  deleteSession,
+  listSessions,
+  getRecentSession,
+  addMessageToSession,
+  exportSessionToJSON,
+  importSessionFromJSON
+} from '../../src/session/index.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
 describe('Session Flow Integration', () => {
   let env: TestEnvironment;
-  let sessionManager: SessionManager;
 
   beforeAll(async () => {
     env = await setupTestEnvironment();
@@ -21,10 +30,6 @@ describe('Session Flow Integration', () => {
 
   afterAll(async () => {
     await cleanupTestEnvironment(env);
-  });
-
-  beforeEach(() => {
-    sessionManager = new SessionManager(env.sessionDir);
   });
 
   describe('Session Creation and Persistence', () => {
