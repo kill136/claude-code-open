@@ -954,7 +954,16 @@ export class McpTool extends BaseTool<McpInput, ToolResult> {
   private toolInputSchema: Record<string, unknown>;
 
   constructor(serverName: string, toolDef: McpToolDefinition) {
-    super();
+    // MCP 工具启用重试机制
+    super({
+      maxRetries: 3,
+      baseTimeout: 300000, // 5分钟超时
+      retryableErrors: [
+        4000, // NETWORK_CONNECTION_FAILED
+        4001, // NETWORK_TIMEOUT
+        4005, // NETWORK_RATE_LIMITED
+      ],
+    });
     this.serverName = serverName;
     this.toolName = toolDef.name;
     this.toolDescription = toolDef.description;
@@ -974,7 +983,10 @@ export class McpTool extends BaseTool<McpInput, ToolResult> {
   }
 
   async execute(input: McpInput): Promise<ToolResult> {
-    return callMcpTool(this.serverName, this.toolName, input);
+    // 使用重试和超时包装器
+    return this.executeWithRetryAndTimeout(async () => {
+      return callMcpTool(this.serverName, this.toolName, input);
+    });
   }
 }
 

@@ -4,6 +4,18 @@
  */
 
 import type { ToolDefinition, ToolResult } from '../types/index.js';
+import {
+  withRetry,
+  withTimeout,
+  type RetryOptions,
+  type TimeoutOptions,
+  DynamicTimeoutAdjuster,
+} from '../utils/retry.js';
+import {
+  ToolExecutionError,
+  ToolTimeoutError,
+  ErrorCode,
+} from '../types/errors.js';
 
 /**
  * 权限检查结果
@@ -17,13 +29,142 @@ export interface PermissionCheckResult<TInput = unknown> {
   updatedInput?: TInput;
 }
 
+/**
+ * 工具配置选项
+ */
+export interface ToolOptions {
+  /** 最大重试次数 */
+  maxRetries?: number;
+  /** 基础超时时间 (毫秒) */
+  baseTimeout?: number;
+  /** 启用动态超时调整 */
+  enableDynamicTimeout?: boolean;
+  /** 可重试的错误代码 */
+  retryableErrors?: ErrorCode[];
+}
+
 export abstract class BaseTool<TInput = unknown, TOutput extends ToolResult = ToolResult> {
   abstract name: string;
   abstract description: string;
 
+  /** 工具配置选项 */
+  protected options: ToolOptions;
+
+  /** 动态超时调整器 */
+  private timeoutAdjuster?: DynamicTimeoutAdjuster;
+
+  constructor(options: ToolOptions = {}) {
+    this.options = {
+      maxRetries: 0, // 默认不重试,子类可以覆盖
+      baseTimeout: 120000, // 2分钟默认超时
+      enableDynamicTimeout: false,
+      ...options,
+    };
+
+    if (this.options.enableDynamicTimeout && this.options.baseTimeout) {
+      this.timeoutAdjuster = new DynamicTimeoutAdjuster(this.options.baseTimeout);
+    }
+  }
+
   abstract getInputSchema(): ToolDefinition['inputSchema'];
 
+  /**
+   * 执行工具 (子类实现)
+   */
   abstract execute(input: TInput): Promise<TOutput>;
+
+  /**
+   * 带重试和超时的执行包装器
+   * 工具可以选择性地使用此方法包装其执行逻辑
+   */
+  protected async executeWithRetryAndTimeout(
+    executeFunc: () => Promise<TOutput>
+  ): Promise<TOutput> {
+    const startTime = Date.now();
+    const { maxRetries, baseTimeout, retryableErrors } = this.options;
+
+    try {
+      // 准备重试选项
+      const retryOptions: RetryOptions = {
+        maxRetries,
+        retryableErrors,
+        onRetry: (attempt, error) => {
+          // 可以在这里添加日志
+          console.warn(
+            `[${this.name}] Retry attempt ${attempt}/${maxRetries} after error:`,
+            error.message
+          );
+        },
+      };
+
+      // 准备超时选项
+      const timeout = this.timeoutAdjuster
+        ? this.timeoutAdjuster.getTimeout()
+        : baseTimeout;
+
+      const timeoutOptions: TimeoutOptions | undefined = timeout
+        ? {
+            timeout,
+            toolName: this.name,
+          }
+        : undefined;
+
+      // 执行带重试和超时的函数
+      let result: TOutput;
+      if (timeoutOptions) {
+        result = await withRetry(
+          () => withTimeout(executeFunc, timeoutOptions),
+          retryOptions
+        );
+      } else {
+        result = await withRetry(executeFunc, retryOptions);
+      }
+
+      // 记录执行时间用于动态超时调整
+      if (this.timeoutAdjuster) {
+        const executionTime = Date.now() - startTime;
+        this.timeoutAdjuster.recordExecutionTime(executionTime);
+      }
+
+      return result;
+    } catch (error) {
+      // 转换错误为 ToolExecutionError
+      if (error instanceof ToolTimeoutError) {
+        throw error;
+      }
+      if (error instanceof ToolExecutionError) {
+        throw error;
+      }
+      throw new ToolExecutionError(
+        error instanceof Error ? error.message : String(error),
+        this.name,
+        {
+          cause: error instanceof Error ? error : undefined,
+        }
+      );
+    }
+  }
+
+  /**
+   * 判断错误是否可重试
+   */
+  protected isRetryable(error: unknown): boolean {
+    if (error instanceof ToolTimeoutError) {
+      return true;
+    }
+    if (error instanceof ToolExecutionError) {
+      return error.retryable;
+    }
+    return false;
+  }
+
+  /**
+   * 获取重试延迟时间
+   */
+  protected getRetryDelay(attempt: number): number {
+    // 指数退避: 1s, 2s, 4s, 8s...
+    return Math.min(1000 * Math.pow(2, attempt - 1), 30000);
+  }
 
   /**
    * 权限检查方法（在工具执行前调用）
