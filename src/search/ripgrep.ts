@@ -6,7 +6,12 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { fileURLToPath } from 'url';
 import { execSync, spawn, SpawnOptions } from 'child_process';
+
+// ES module 兼容性：获取当前文件目录
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Ripgrep 版本
 const RG_VERSION = '14.1.0';
@@ -106,10 +111,33 @@ export function getSystemRgPath(): string | null {
 }
 
 /**
+ * 检查是否应该使用系统 ripgrep
+ * 当 USE_BUILTIN_RIPGREP 环境变量设置为真值时，使用系统 ripgrep
+ */
+function shouldUseSystemRipgrep(): boolean {
+  const env = process.env.USE_BUILTIN_RIPGREP;
+  if (!env) return false;
+
+  // 检查是否为真值（'1', 'true', 'yes' 等）
+  const truthyValues = ['1', 'true', 'yes', 'on'];
+  return truthyValues.includes(env.toLowerCase());
+}
+
+/**
  * 获取可用的 ripgrep 路径
+ * 根据 USE_BUILTIN_RIPGREP 环境变量决定使用系统还是内置版本
  */
 export function getRgPath(): string | null {
-  // 优先使用 vendored 版本
+  // 如果设置了 USE_BUILTIN_RIPGREP 环境变量，优先使用系统版本
+  if (shouldUseSystemRipgrep()) {
+    const system = getSystemRgPath();
+    if (system) return system;
+
+    // 如果系统版本不可用，回退到 vendored 版本
+    return getVendoredRgPath();
+  }
+
+  // 默认优先使用 vendored 版本
   const vendored = getVendoredRgPath();
   if (vendored) return vendored;
 

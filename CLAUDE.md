@@ -104,6 +104,14 @@ CLI Input → ConversationLoop → ClaudeClient (Anthropic API)
 - **Skills:** `~/.claude/skills/` and `./.claude/commands/`
 - **Plugins:** `~/.claude/plugins/` and `./.claude/plugins/`
 
+### Environment Variables
+
+- **`ANTHROPIC_API_KEY` / `CLAUDE_API_KEY`** - API key for Claude
+- **`USE_BUILTIN_RIPGREP`** - Control ripgrep selection behavior:
+  - When set to `1`, `true`, `yes`, or `on`: Use system ripgrep (from PATH)
+  - When unset or set to other values: Use vendored (built-in) ripgrep (default)
+  - Fallback: If preferred version is unavailable, automatically fall back to the alternative
+
 ### Windows-Specific Notes
 
 - Config path: `%USERPROFILE%\.claude\` instead of `~/.claude/`
