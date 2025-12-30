@@ -43,6 +43,23 @@ export class ThinkingManager {
   }
 
   /**
+   * 设置思考预算
+   */
+  setThinkingBudget(budget: number): void {
+    if (budget < 0) {
+      throw new Error('Thinking budget must be non-negative');
+    }
+    this.config.budgetTokens = budget;
+  }
+
+  /**
+   * 获取当前思考预算
+   */
+  getThinkingBudget(): number {
+    return this.config.budgetTokens || DEFAULT_THINKING_CONFIG.budgetTokens!;
+  }
+
+  /**
    * 检查模型是否支持 Extended Thinking
    */
   isSupported(modelId: string): boolean {

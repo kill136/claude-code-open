@@ -31,7 +31,7 @@ export class GlobTool extends BaseTool<GlobInput, ToolResult> {
         },
         path: {
           type: 'string',
-          description: 'The directory to search in. Defaults to current working directory.',
+          description: 'The directory to search in. If not specified, the current working directory will be used. IMPORTANT: Omit this field to use the default directory. DO NOT enter "undefined" or "null" - simply omit it for the default behavior. Must be a valid directory path if provided.',
         },
       },
       required: ['pattern'],
@@ -59,7 +59,7 @@ export class GlobTool extends BaseTool<GlobInput, ToolResult> {
         .map(item => item.file);
 
       if (sortedFiles.length === 0) {
-        return { success: true, output: 'No files found matching the pattern.' };
+        return { success: true, output: 'No files found' };
       }
 
       const output = sortedFiles.join('\n');
@@ -332,12 +332,53 @@ Usage:
       // 应用 offset 和 head_limit
       lines = this.applyOffsetAndLimit(lines, head_limit, offset);
 
-      const result = lines.join('\n');
-      if (!result) {
-        return { success: true, output: 'No matches found.' };
+      // 根据 output_mode 格式化输出
+      let finalOutput: string;
+
+      if (output_mode === 'content') {
+        // Content 模式：显示匹配行
+        const content = lines.join('\n') || 'No matches found';
+        const pagination = this.formatPagination(head_limit, offset);
+        finalOutput = pagination
+          ? `${content}\n\n[Showing results with pagination = ${pagination}]`
+          : content;
+      } else if (output_mode === 'count') {
+        // Count 模式：显示计数 + 统计信息
+        const content = lines.join('\n');
+
+        // 计算总匹配数和文件数
+        let totalMatches = 0;
+        let numFiles = 0;
+        for (const line of lines) {
+          const colonIndex = line.lastIndexOf(':');
+          if (colonIndex > 0) {
+            const countStr = line.substring(colonIndex + 1);
+            const count = parseInt(countStr, 10);
+            if (!isNaN(count)) {
+              totalMatches += count;
+              numFiles += 1;
+            }
+          }
+        }
+
+        const pagination = this.formatPagination(head_limit, offset);
+        const summary = `\n\nFound ${totalMatches} total ${totalMatches === 1 ? 'occurrence' : 'occurrences'} across ${numFiles} ${numFiles === 1 ? 'file' : 'files'}.${pagination ? ` with pagination = ${pagination}` : ''}`;
+        finalOutput = (content || 'No matches found') + summary;
+      } else {
+        // Files_with_matches 模式：显示文件列表 + 统计
+        if (lines.length === 0) {
+          return { success: true, output: 'No files found' };
+        }
+
+        const pagination = this.formatPagination(head_limit, offset);
+        const header = `Found ${lines.length} file${lines.length === 1 ? '' : 's'}${pagination ? ` ${pagination}` : ''}`;
+        finalOutput = `${header}\n${lines.join('\n')}`;
       }
 
-      return { success: true, output: result };
+      // 截断超长输出
+      finalOutput = this.truncateOutput(finalOutput);
+
+      return { success: true, output: finalOutput };
     } catch (err) {
       // 如果 rg 不可用，回退到 grep
       return this.fallbackGrep(input);
@@ -362,6 +403,26 @@ Usage:
       return lines.slice(offset);
     }
     return lines.slice(offset, offset + limit);
+  }
+
+  /**
+   * 格式化 pagination 信息
+   */
+  private formatPagination(limit?: number, offset?: number): string {
+    if (!limit && !offset) return '';
+    return `limit: ${limit}, offset: ${offset ?? 0}`;
+  }
+
+  /**
+   * 截断超长输出 (官方限制: 20000 字符)
+   */
+  private truncateOutput(text: string): string {
+    const MAX_LENGTH = 20000;
+    if (text.length <= MAX_LENGTH) return text;
+
+    const truncated = text.slice(0, MAX_LENGTH);
+    const remainingLines = text.slice(MAX_LENGTH).split('\n').length;
+    return `${truncated}\n\n... [${remainingLines} lines truncated] ...`;
   }
 
   private fallbackGrep(input: GrepInput): ToolResult {

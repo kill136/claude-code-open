@@ -11,6 +11,7 @@ import type { ToolResult, ToolDefinition } from '../types/index.js';
 
 interface SkillInput {
   skill: string;
+  args?: string;  // 可选参数，传递给技能
 }
 
 interface SlashCommandInput {
@@ -23,6 +24,13 @@ interface SkillDefinition {
   prompt: string;
   location: 'user' | 'project' | 'builtin';
   filePath?: string;
+  // 新增的frontmatter字段
+  allowedTools?: string[];           // 允许的工具列表
+  argumentHint?: string;              // 参数提示
+  whenToUse?: string;                 // 何时使用
+  version?: string;                   // 版本
+  model?: string;                     // 模型
+  disableModelInvocation?: boolean;   // 禁用模型调用
 }
 
 interface SlashCommandDefinition {
@@ -35,6 +43,12 @@ interface SlashCommandDefinition {
 interface SkillMetadata {
   name?: string;
   description?: string;
+  'allowed-tools'?: string;           // 允许的工具，逗号分隔
+  'argument-hint'?: string;           // 参数提示
+  'when-to-use'?: string;             // 何时使用
+  'version'?: string;                 // 版本
+  'model'?: string;                   // 模型
+  'disable-model-invocation'?: string | boolean;  // 禁用模型调用
   [key: string]: any;
 }
 
@@ -179,12 +193,34 @@ function loadSkillsFromPath(dirPath: string, location: 'user' | 'project' | 'bui
         const description = metadata.description || '';
         const prompt = body;
 
+        // 解析allowed-tools字段
+        let allowedTools: string[] | undefined;
+        if (metadata['allowed-tools']) {
+          allowedTools = metadata['allowed-tools']
+            .split(',')
+            .map((tool: string) => tool.trim())
+            .filter((tool: string) => tool.length > 0);
+        }
+
+        // 解析disable-model-invocation字段
+        let disableModelInvocation: boolean | undefined;
+        if (metadata['disable-model-invocation'] !== undefined) {
+          const val = metadata['disable-model-invocation'];
+          disableModelInvocation = typeof val === 'boolean' ? val : val === 'true';
+        }
+
         registerSkill({
           name,
           description,
           prompt,
           location,
           filePath: fullPath,
+          allowedTools,
+          argumentHint: metadata['argument-hint'],
+          whenToUse: metadata['when-to-use'],
+          version: metadata['version'],
+          model: metadata['model'],
+          disableModelInvocation,
         });
       } catch (error) {
         console.warn(`Failed to load skill from ${fullPath}:`, error);
@@ -312,7 +348,7 @@ function ensureCommandsLoaded(): void {
   }
 }
 
-export class SkillTool extends BaseTool<SkillInput, ToolResult> {
+export class SkillTool extends BaseTool<SkillInput, any> {
   name = 'Skill';
   description = `Execute a skill within the main conversation.
 
@@ -320,18 +356,20 @@ export class SkillTool extends BaseTool<SkillInput, ToolResult> {
 When users ask you to perform tasks, check if any of the available skills below can help complete the task more effectively. Skills provide specialized capabilities and domain knowledge.
 
 How to use skills:
-- Invoke skills using this tool with the skill name only (no arguments)
+- Invoke skills using this tool with the skill name
+- Optionally pass arguments using the args parameter
 - When you invoke a skill, you will see <command-message>The "{name}" skill is loading</command-message>
 - The skill's prompt will expand and provide detailed instructions on how to complete the task
 - Examples:
-  - skill: "pdf" - invoke the pdf skill
-  - skill: "xlsx" - invoke the xlsx skill
-  - skill: "my-package:analyzer" - invoke using fully qualified name
+  - skill: "pdf" - invoke the pdf skill without arguments
+  - skill: "xlsx", args: "sheet1" - invoke the xlsx skill with arguments
+  - skill: "my-package:analyzer" - invoke using fully qualified name with namespace
 
 Important:
 - Only use skills listed in <available_skills> below
 - Do not invoke a skill that is already running
 - Do not use this tool for built-in CLI commands (like /help, /clear, etc.)
+- Skills may define allowed-tools restrictions and other metadata
 </skills_instructions>
 
 Available skills are loaded from (in priority order):
@@ -345,21 +383,102 @@ Available skills are loaded from (in priority order):
       properties: {
         skill: {
           type: 'string',
-          description: 'The skill name (no arguments). E.g., "pdf" or "xlsx"',
+          description: 'The skill name. E.g., "pdf" or "xlsx" or "my-package:analyzer"',
+        },
+        args: {
+          type: 'string',
+          description: 'Optional arguments to pass to the skill',
         },
       },
       required: ['skill'],
     };
   }
 
-  async execute(input: SkillInput): Promise<ToolResult> {
-    const { skill } = input;
+  /**
+   * 验证输入
+   */
+  validateInput(input: SkillInput): { valid: boolean; error?: string } {
+    if (!input.skill || typeof input.skill !== 'string') {
+      return { valid: false, error: 'Skill name is required and must be a string' };
+    }
+
+    if (input.args && typeof input.args !== 'string') {
+      return { valid: false, error: 'Args must be a string' };
+    }
+
+    return { valid: true };
+  }
+
+  /**
+   * 检查权限
+   * 官方格式的权限检查系统
+   */
+  async checkPermissions(input: SkillInput): Promise<{
+    behavior: 'allow' | 'deny' | 'ask';
+    message?: string;
+    suggestions?: string[];
+  }> {
+    // 确保 skills 已加载
+    ensureSkillsLoaded();
+
+    // 解析技能名称（支持命名空间格式如 "namespace:skillName"）
+    const skillName = this.parseSkillName(input.skill);
+
+    // 查找技能
+    const skillDef = skillRegistry.get(skillName);
+    if (!skillDef) {
+      const available = Array.from(skillRegistry.keys()).sort();
+      return {
+        behavior: 'deny',
+        message: `Skill "${input.skill}" not found`,
+        suggestions: available.slice(0, 5), // 返回前5个可用技能作为建议
+      };
+    }
+
+    // 检查是否禁用模型调用
+    if (skillDef.disableModelInvocation) {
+      return {
+        behavior: 'deny',
+        message: `Skill "${skillDef.name}" has model invocation disabled`,
+      };
+    }
+
+    // 默认允许执行技能
+    return {
+      behavior: 'allow',
+    };
+  }
+
+  /**
+   * 解析技能名称，支持命名空间格式
+   * 例如: "namespace:skillName" -> "skillName"
+   */
+  private parseSkillName(skillInput: string): string {
+    // 如果包含冒号，提取最后一部分作为技能名称
+    const parts = skillInput.split(':');
+    return parts[parts.length - 1];
+  }
+
+  async execute(input: SkillInput): Promise<any> {
+    const { skill, args } = input;
+
+    // 验证输入
+    const validation = this.validateInput(input);
+    if (!validation.valid) {
+      return {
+        success: false,
+        error: validation.error,
+      };
+    }
 
     // 确保 skills 已加载
     ensureSkillsLoaded();
 
+    // 解析技能名称（支持命名空间格式）
+    const skillName = this.parseSkillName(skill);
+
     // 查找技能
-    const skillDef = skillRegistry.get(skill);
+    const skillDef = skillRegistry.get(skillName);
     if (!skillDef) {
       const available = Array.from(skillRegistry.keys()).sort().join(', ');
       return {
@@ -368,9 +487,37 @@ Available skills are loaded from (in priority order):
       };
     }
 
+    // 构建技能prompt，如果有args则附加
+    let skillPrompt = skillDef.prompt;
+    if (args) {
+      skillPrompt = `${skillPrompt}\n\n**Arguments:**\n${args}`;
+    }
+
+    // 构建输出信息（包含技能元数据）
+    let outputMessage = `<command-message>The "${skillDef.name}" skill is loading</command-message>\n\n`;
+    outputMessage += `<skill name="${skillDef.name}" location="${skillDef.location}"`;
+
+    // 添加可选的元数据属性
+    if (skillDef.version) {
+      outputMessage += ` version="${skillDef.version}"`;
+    }
+    if (skillDef.model) {
+      outputMessage += ` model="${skillDef.model}"`;
+    }
+    if (skillDef.allowedTools && skillDef.allowedTools.length > 0) {
+      outputMessage += ` allowed-tools="${skillDef.allowedTools.join(',')}"`;
+    }
+
+    outputMessage += `>\n${skillPrompt}\n</skill>`;
+
+    // 返回官方格式的结果
     return {
       success: true,
-      output: `<command-message>The "${skillDef.name}" skill is loading</command-message>\n\n<skill name="${skillDef.name}" location="${skillDef.location}">\n${skillDef.prompt}\n</skill>`,
+      output: outputMessage,
+      // 官方格式的额外字段
+      commandName: skillDef.name,
+      allowedTools: skillDef.allowedTools,
+      model: skillDef.model,
     };
   }
 }

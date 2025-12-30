@@ -3,32 +3,79 @@
  * EnterPlanMode 和 ExitPlanMode
  */
 
-import { BaseTool } from './base.js';
+import { BaseTool, type PermissionCheckResult } from './base.js';
 import type { ToolResult, ToolDefinition, ExitPlanModeInput } from '../types/index.js';
 import { PlanPersistenceManager } from '../plan/persistence.js';
 import type { SavedPlan } from '../plan/types.js';
 
-// 计划模式状态管理
-let planModeActive = false;
-let currentPlanFile: string | null = null;
-let currentPlanId: string | null = null;
+/**
+ * AppState 接口（简化版本，用于权限管理）
+ */
+export interface AppState {
+  toolPermissionContext: ToolPermissionContext;
+  planMode?: {
+    active: boolean;
+    planFile: string;
+    planId: string;
+  };
+}
+
+/**
+ * 工具权限上下文
+ */
+export interface ToolPermissionContext {
+  mode: 'normal' | 'plan' | 'delegate';
+}
+
+// ============ 全局状态管理（临时解决方案） ============
+// 注意：这是一个简化的实现，真实的官方实现使用更复杂的状态管理系统
+
+let globalAppState: AppState = {
+  toolPermissionContext: {
+    mode: 'normal',
+  },
+};
+
+export function getGlobalAppState(): AppState {
+  return globalAppState;
+}
+
+export function setGlobalAppState(updater: (state: AppState) => AppState): void {
+  globalAppState = updater(globalAppState);
+}
+
+// ============ 兼容性函数（保留旧的 API） ============
 
 export function isPlanModeActive(): boolean {
-  return planModeActive;
+  return globalAppState.toolPermissionContext.mode === 'plan';
 }
 
 export function getPlanFile(): string | null {
-  return currentPlanFile;
+  return globalAppState.planMode?.planFile || null;
 }
 
 export function getCurrentPlanId(): string | null {
-  return currentPlanId;
+  return globalAppState.planMode?.planId || null;
 }
 
 export function setPlanMode(active: boolean, planFile?: string, planId?: string): void {
-  planModeActive = active;
-  currentPlanFile = planFile || null;
-  currentPlanId = planId || null;
+  if (active) {
+    setGlobalAppState((state) => ({
+      ...state,
+      toolPermissionContext: { mode: 'plan' },
+      planMode: {
+        active: true,
+        planFile: planFile || process.cwd() + '/PLAN.md',
+        planId: planId || PlanPersistenceManager.generatePlanId(),
+      },
+    }));
+  } else {
+    setGlobalAppState((state) => ({
+      ...state,
+      toolPermissionContext: { mode: 'normal' },
+      planMode: undefined,
+    }));
+  }
 }
 
 export class EnterPlanModeTool extends BaseTool<Record<string, unknown>, ToolResult> {
@@ -115,21 +162,47 @@ User: "What files handle routing?"
     };
   }
 
+  /**
+   * 权限检查方法（官方实现）
+   * 此方法在工具执行前被调用，用于请求用户批准进入计划模式
+   */
+  async checkPermissions(input: Record<string, unknown>): Promise<PermissionCheckResult<Record<string, unknown>>> {
+    return {
+      behavior: 'ask',
+      message: 'Enter plan mode?',
+      updatedInput: input,
+    };
+  }
+
+  /**
+   * 执行工具（使用 AppState 系统）
+   */
   async execute(_input: Record<string, unknown>): Promise<ToolResult> {
-    if (planModeActive) {
+    // 获取当前状态
+    const appState = getGlobalAppState();
+
+    // 检查是否已经在计划模式中
+    if (appState.toolPermissionContext.mode === 'plan') {
       return {
         success: false,
         error: 'Already in plan mode. Use ExitPlanMode to exit first.',
       };
     }
 
-    planModeActive = true;
-
     // Generate plan ID and file path
     const planId = PlanPersistenceManager.generatePlanId();
     const planPath = process.cwd() + '/PLAN.md';
-    currentPlanFile = planPath;
-    currentPlanId = planId;
+
+    // 更新 AppState：设置计划模式
+    setGlobalAppState((state) => ({
+      ...state,
+      toolPermissionContext: { mode: 'plan' },
+      planMode: {
+        active: true,
+        planFile: planPath,
+        planId,
+      },
+    }));
 
     return {
       success: true,
@@ -203,19 +276,42 @@ Before using this tool, ensure your plan is clear and unambiguous. If there are 
     };
   }
 
+  /**
+   * 权限检查方法（官方实现）
+   * ExitPlanMode 通常不需要特殊权限，直接允许
+   */
+  async checkPermissions(input: ExitPlanModeInput): Promise<PermissionCheckResult<ExitPlanModeInput>> {
+    return {
+      behavior: 'allow',
+      updatedInput: input,
+    };
+  }
+
+  /**
+   * 执行工具（使用 AppState 系统）
+   */
   async execute(_input: ExitPlanModeInput): Promise<ToolResult> {
-    if (!planModeActive) {
+    // 获取当前状态
+    const appState = getGlobalAppState();
+
+    // 检查是否在计划模式中
+    if (appState.toolPermissionContext.mode !== 'plan') {
       return {
         success: false,
         error: 'Not in plan mode. Use EnterPlanMode first.',
       };
     }
 
-    planModeActive = false;
-    const planFile = currentPlanFile;
-    const planId = currentPlanId;
-    currentPlanFile = null;
-    currentPlanId = null;
+    // 获取计划文件信息
+    const planFile = appState.planMode?.planFile || null;
+    const planId = appState.planMode?.planId || null;
+
+    // 更新 AppState：退出计划模式
+    setGlobalAppState((state) => ({
+      ...state,
+      toolPermissionContext: { mode: 'normal' },
+      planMode: undefined,
+    }));
 
     let planContent = '';
     if (planFile) {

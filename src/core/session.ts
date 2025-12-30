@@ -38,6 +38,8 @@ export class Session {
       totalAPIDuration: 0,
       totalAPIDurationWithoutRetries: 0, // T143: 区分重试前后的时间
       totalToolDuration: 0, // T143: 工具执行时间统计
+      totalLinesAdded: 0, // 代码修改统计：添加的行数
+      totalLinesRemoved: 0, // 代码修改统计：删除的行数
       modelUsage: {},
       todos: [],
     };
@@ -128,6 +130,7 @@ export class Session {
       outputTokens: number;
       cacheReadInputTokens?: number;
       cacheCreationInputTokens?: number;
+      thinkingTokens?: number;
       webSearchRequests?: number;
     },
     cost: number,
@@ -141,7 +144,9 @@ export class Session {
         outputTokens: 0,
         cacheReadInputTokens: 0,
         cacheCreationInputTokens: 0,
+        thinkingTokens: 0,
         webSearchRequests: 0,
+        requests: 0,
         costUSD: 0,
         contextWindow: this.getContextWindow(model),
       };
@@ -153,7 +158,9 @@ export class Session {
     stats.outputTokens += usage.outputTokens;
     stats.cacheReadInputTokens = (stats.cacheReadInputTokens || 0) + (usage.cacheReadInputTokens || 0);
     stats.cacheCreationInputTokens = (stats.cacheCreationInputTokens || 0) + (usage.cacheCreationInputTokens || 0);
+    stats.thinkingTokens = (stats.thinkingTokens || 0) + (usage.thinkingTokens || 0);
     stats.webSearchRequests = (stats.webSearchRequests || 0) + (usage.webSearchRequests || 0);
+    stats.requests = (stats.requests || 0) + 1; // 增加请求计数
     stats.costUSD += cost;
 
     // 更新总计
@@ -170,6 +177,84 @@ export class Session {
    */
   updateToolDuration(duration: number): void {
     this.state.totalToolDuration = (this.state.totalToolDuration || 0) + duration;
+  }
+
+  /**
+   * 更新成本（对应官方的 MT0 函数）
+   */
+  updateCost(
+    costUSD: number,
+    modelUsage: {
+      inputTokens: number;
+      outputTokens: number;
+      cacheReadTokens?: number;
+      cacheWriteTokens?: number;
+      thinkingTokens?: number;
+    },
+    model: string
+  ): void {
+    // 初始化模型使用统计
+    if (!this.state.modelUsage[model]) {
+      this.state.modelUsage[model] = {
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheReadInputTokens: 0,
+        cacheCreationInputTokens: 0,
+        thinkingTokens: 0,
+        webSearchRequests: 0,
+        requests: 0,
+        costUSD: 0,
+        contextWindow: this.getContextWindow(model),
+      };
+    }
+
+    // 更新统计
+    const stats = this.state.modelUsage[model];
+    stats.inputTokens += modelUsage.inputTokens;
+    stats.outputTokens += modelUsage.outputTokens;
+    stats.cacheReadInputTokens = (stats.cacheReadInputTokens || 0) + (modelUsage.cacheReadTokens || 0);
+    stats.cacheCreationInputTokens = (stats.cacheCreationInputTokens || 0) + (modelUsage.cacheWriteTokens || 0);
+    stats.thinkingTokens = (stats.thinkingTokens || 0) + (modelUsage.thinkingTokens || 0);
+    stats.requests = (stats.requests || 0) + 1;
+    stats.costUSD += costUSD;
+
+    // 更新总成本
+    this.state.totalCostUSD += costUSD;
+  }
+
+  /**
+   * 更新 API 时长（对应官方的 OT0 函数）
+   */
+  updateAPIDuration(duration: number, durationWithoutRetries?: number): void {
+    this.state.totalAPIDuration += duration;
+    if (durationWithoutRetries !== undefined) {
+      this.state.totalAPIDurationWithoutRetries =
+        (this.state.totalAPIDurationWithoutRetries || 0) + durationWithoutRetries;
+    }
+  }
+
+  /**
+   * 更新代码修改统计（对应官方的 mF1 函数）
+   */
+  updateCodeChanges(linesAdded: number, linesRemoved: number): void {
+    this.state.totalLinesAdded = (this.state.totalLinesAdded || 0) + linesAdded;
+    this.state.totalLinesRemoved = (this.state.totalLinesRemoved || 0) + linesRemoved;
+  }
+
+  /**
+   * 追踪工具执行时长
+   */
+  async trackToolExecution<T>(
+    toolName: string,
+    execute: () => Promise<T>
+  ): Promise<T> {
+    const start = Date.now();
+    try {
+      return await execute();
+    } finally {
+      const duration = Date.now() - start;
+      this.updateToolDuration(duration);
+    }
   }
 
   /**
@@ -211,6 +296,54 @@ export class Session {
       totalTokens,
       totalToolDuration: this.state.totalToolDuration || 0,
     };
+  }
+
+  /**
+   * 获取会话摘要
+   */
+  getSessionSummary(): string {
+    const duration = Date.now() - this.state.startTime;
+    const durationSeconds = Math.floor(duration / 1000);
+    const minutes = Math.floor(durationSeconds / 60);
+    const seconds = durationSeconds % 60;
+
+    const linesAdded = this.state.totalLinesAdded || 0;
+    const linesRemoved = this.state.totalLinesRemoved || 0;
+
+    // 格式化模型使用统计
+    let modelUsageStr = '';
+    for (const [model, stats] of Object.entries(this.state.modelUsage)) {
+      const totalTokens = stats.inputTokens + stats.outputTokens;
+      modelUsageStr += `\n  ${model}:`;
+      modelUsageStr += `\n    - Requests: ${stats.requests || 0}`;
+      modelUsageStr += `\n    - Total Tokens: ${totalTokens.toLocaleString()}`;
+      modelUsageStr += `\n    - Input: ${stats.inputTokens.toLocaleString()}`;
+      modelUsageStr += `\n    - Output: ${stats.outputTokens.toLocaleString()}`;
+      if (stats.thinkingTokens) {
+        modelUsageStr += `\n    - Thinking: ${stats.thinkingTokens.toLocaleString()}`;
+      }
+      if (stats.cacheReadInputTokens) {
+        modelUsageStr += `\n    - Cache Read: ${stats.cacheReadInputTokens.toLocaleString()}`;
+      }
+      if (stats.cacheCreationInputTokens) {
+        modelUsageStr += `\n    - Cache Write: ${stats.cacheCreationInputTokens.toLocaleString()}`;
+      }
+      modelUsageStr += `\n    - Cost: $${stats.costUSD.toFixed(4)}`;
+    }
+
+    return `
+会话摘要:
+────────────────────────────────────────
+总成本:            $${this.state.totalCostUSD.toFixed(4)}
+API 总时长:        ${this.state.totalAPIDuration}ms
+API 时长(无重试):  ${this.state.totalAPIDurationWithoutRetries || 0}ms
+工具执行时长:      ${this.state.totalToolDuration || 0}ms
+会话总时长:        ${minutes}m ${seconds}s
+代码修改:          +${linesAdded} -${linesRemoved} (${linesAdded + linesRemoved} 行总变化)
+消息数量:          ${this.messages.length}
+${modelUsageStr ? '\n模型使用统计:' + modelUsageStr : ''}
+────────────────────────────────────────
+`;
   }
 
   // 设置自定义标题

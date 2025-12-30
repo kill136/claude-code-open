@@ -21,6 +21,10 @@ export interface ToolResult {
   output?: string;
   /** Error message if the tool execution failed */
   error?: string;
+  /** Error code for tool failures (tool-specific error codes) */
+  errorCode?: number;
+  /** Additional structured data from the tool */
+  data?: any;
   /**
    * Optional additional messages to send to the model
    * Used for sending media content (images, PDFs, etc.) that should be visible to Claude
@@ -81,10 +85,12 @@ export interface BashToolResult extends ToolResult {
   stdout?: string;
   /** Standard error output from the command */
   stderr?: string;
-  /** ID of the background shell (if run_in_background is true) - legacy field */
-  bash_id?: string;
-  /** ID of the background shell (if run_in_background is true) - official field name */
+  /** Task ID (official field name, UUID format) */
+  task_id?: string;
+  /** ID of the background shell (official field name, alias for task_id) */
   shell_id?: string;
+  /** ID of the background shell (legacy field, backward compatibility) */
+  bash_id?: string;
   /** Command execution duration in milliseconds */
   duration?: number;
   /** Whether the command was sandboxed */
@@ -490,6 +496,19 @@ export interface McpToolResult extends ToolResult {
   }>;
 }
 
+/**
+ * MCP Search result
+ * Returned by MCPSearch tool when searching for MCP tools
+ */
+export interface MCPSearchToolResult extends ToolResult {
+  /** Matched tool names */
+  matches?: string[];
+  /** Original search query */
+  query?: string;
+  /** Total number of MCP tools available */
+  total_mcp_tools?: number;
+}
+
 // ============================================================================
 // User Interaction Results
 // ============================================================================
@@ -638,6 +657,7 @@ export type AnyToolResult =
   | ListMcpResourcesToolResult
   | ReadMcpResourceToolResult
   | McpToolResult
+  | MCPSearchToolResult
   | AskUserQuestionToolResult
   | SkillToolResult
   | SlashCommandToolResult

@@ -156,6 +156,7 @@ export type {
   McpInput as McpToolInput,
   ListMcpResourcesInput as ListMcpResourcesToolInput,
   ReadMcpResourceInput as ReadMcpResourceToolInput,
+  MCPSearchInput as MCPSearchToolInput,
 } from './tools.js';
 
 // --- 交互工具 ---

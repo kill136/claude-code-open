@@ -29,7 +29,7 @@ import { TodoWriteTool } from './todo.js';
 import { TaskTool, TaskOutputTool, ListAgentsTool } from './agent.js';
 import { NotebookEditTool } from './notebook.js';
 import { EnterPlanModeTool, ExitPlanModeTool } from './planmode.js';
-import { ListMcpResourcesTool, ReadMcpResourceTool } from './mcp.js';
+import { ListMcpResourcesTool, ReadMcpResourceTool, MCPSearchTool } from './mcp.js';
 import { AskUserQuestionTool } from './ask.js';
 import { MultiEditTool } from './multiedit.js';
 import { TmuxTool } from './tmux.js';
@@ -40,7 +40,7 @@ import { LSPTool } from './lsp.js';
 export function registerAllTools(): void {
   // Bash 工具
   toolRegistry.register(new BashTool());
-  toolRegistry.register(new BashOutputTool());
+  toolRegistry.register(new BashOutputTool()); // 向后兼容
   toolRegistry.register(new KillShellTool());
 
   // 文件工具
@@ -61,7 +61,7 @@ export function registerAllTools(): void {
 
   // 代理工具
   toolRegistry.register(new TaskTool());
-  toolRegistry.register(new TaskOutputTool());
+  toolRegistry.register(new TaskOutputTool()); // 统一的 TaskOutput 工具（支持 Bash 和 Agent）
   toolRegistry.register(new ListAgentsTool());
 
   // Notebook 编辑
@@ -72,6 +72,7 @@ export function registerAllTools(): void {
   toolRegistry.register(new ExitPlanModeTool());
 
   // MCP 工具
+  toolRegistry.register(new MCPSearchTool());
   toolRegistry.register(new ListMcpResourcesTool());
   toolRegistry.register(new ReadMcpResourceTool());
 

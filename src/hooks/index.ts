@@ -158,13 +158,44 @@ export interface LegacyHookConfig {
   blocking?: boolean;
 }
 
+/**
+ * Hook 输入数据（完整接口，符合官方 CLI v2.0.76）
+ */
 export interface HookInput {
   event: HookEvent;
+  // 通用字段
   toolName?: string;
   toolInput?: unknown;
   toolOutput?: string;
   message?: string;
   sessionId?: string;
+
+  // PostToolUseFailure 专用字段
+  tool_use_id?: string;
+  error?: string;
+  error_type?: 'permission_denied' | 'execution_failed' | 'timeout' | 'invalid_input';
+  is_interrupt?: boolean;
+  is_timeout?: boolean;
+
+  // SubagentStart/SubagentStop 专用字段
+  agent_id?: string;
+  agent_type?: string;
+  result?: unknown;
+
+  // PermissionRequest 专用字段（tool_use_id已包含）
+
+  // Notification 专用字段
+  notification_type?: 'permission_prompt' | 'idle_prompt' | 'auth_success' | 'elicitation_dialog';
+
+  // SessionStart 专用字段
+  source?: 'startup' | 'resume' | 'clear' | 'compact';
+
+  // SessionEnd 专用字段
+  reason?: 'clear' | 'logout' | 'prompt_input_exit' | 'other';
+
+  // PreCompact 专用字段
+  trigger?: 'manual' | 'auto';
+  currentTokens?: number;
 }
 
 export interface HookResult {
@@ -393,7 +424,7 @@ async function executeCommandHook(
       CLAUDE_HOOK_SESSION_ID: input.sessionId || '',
     };
 
-    // 通过 stdin 传递输入
+    // 通过 stdin 传递输入（包含所有官方字段）
     const inputJson = JSON.stringify({
       event: input.event,
       toolName: input.toolName,
@@ -401,6 +432,25 @@ async function executeCommandHook(
       toolOutput: input.toolOutput,
       message: input.message,
       sessionId: input.sessionId,
+      // PostToolUseFailure 专用字段
+      tool_use_id: input.tool_use_id,
+      error: input.error,
+      error_type: input.error_type,
+      is_interrupt: input.is_interrupt,
+      is_timeout: input.is_timeout,
+      // SubagentStart/SubagentStop 专用字段
+      agent_id: input.agent_id,
+      agent_type: input.agent_type,
+      result: input.result,
+      // Notification 专用字段
+      notification_type: input.notification_type,
+      // SessionStart 专用字段
+      source: input.source,
+      // SessionEnd 专用字段
+      reason: input.reason,
+      // PreCompact 专用字段
+      trigger: input.trigger,
+      currentTokens: input.currentTokens,
     });
 
     const proc = spawn(command, hook.args || [], {
@@ -481,14 +531,23 @@ async function executePromptHook(
   const timeout = hook.timeout || 30000;
 
   try {
-    // 构建提示词，替换变量
+    // 构建提示词，替换变量（包含所有官方字段）
     let prompt = hook.prompt
       .replace(/\{EVENT\}/g, input.event)
       .replace(/\{TOOL_NAME\}/g, input.toolName || '')
       .replace(/\{TOOL_INPUT\}/g, JSON.stringify(input.toolInput || {}))
       .replace(/\{TOOL_OUTPUT\}/g, input.toolOutput || '')
       .replace(/\{MESSAGE\}/g, input.message || '')
-      .replace(/\{SESSION_ID\}/g, input.sessionId || '');
+      .replace(/\{SESSION_ID\}/g, input.sessionId || '')
+      .replace(/\{TOOL_USE_ID\}/g, input.tool_use_id || '')
+      .replace(/\{ERROR\}/g, input.error || '')
+      .replace(/\{ERROR_TYPE\}/g, input.error_type || '')
+      .replace(/\{AGENT_ID\}/g, input.agent_id || '')
+      .replace(/\{AGENT_TYPE\}/g, input.agent_type || '')
+      .replace(/\{NOTIFICATION_TYPE\}/g, input.notification_type || '')
+      .replace(/\{SOURCE\}/g, input.source || '')
+      .replace(/\{REASON\}/g, input.reason || '')
+      .replace(/\{TRIGGER\}/g, input.trigger || '');
 
     // 动态导入 ClaudeClient 以避免循环依赖
     const { ClaudeClient } = await import('../core/client.js');
@@ -601,7 +660,7 @@ async function executeAgentHook(
       };
     }
 
-    // 构建代理提示词
+    // 构建代理提示词（包含所有官方字段）
     const agentPrompt = `You are a validator agent of type "${hook.agentType}" in Claude Code.
 
 Your task is to evaluate the following operation and decide whether it should be allowed.
@@ -611,6 +670,17 @@ ${input.toolName ? `Tool Name: ${input.toolName}` : ''}
 ${input.toolInput ? `Tool Input: ${JSON.stringify(input.toolInput, null, 2)}` : ''}
 ${input.toolOutput ? `Tool Output: ${input.toolOutput}` : ''}
 ${input.message ? `Message: ${input.message}` : ''}
+${input.tool_use_id ? `Tool Use ID: ${input.tool_use_id}` : ''}
+${input.error ? `Error: ${input.error}` : ''}
+${input.error_type ? `Error Type: ${input.error_type}` : ''}
+${input.is_interrupt ? `Interrupted: ${input.is_interrupt}` : ''}
+${input.is_timeout ? `Timeout: ${input.is_timeout}` : ''}
+${input.agent_id ? `Agent ID: ${input.agent_id}` : ''}
+${input.agent_type ? `Agent Type: ${input.agent_type}` : ''}
+${input.notification_type ? `Notification Type: ${input.notification_type}` : ''}
+${input.source ? `Source: ${input.source}` : ''}
+${input.reason ? `Reason: ${input.reason}` : ''}
+${input.trigger ? `Trigger: ${input.trigger}` : ''}
 
 ${hook.agentConfig ? `Agent Configuration: ${JSON.stringify(hook.agentConfig, null, 2)}` : ''}
 
@@ -737,7 +807,7 @@ async function executeMcpHook(
       };
     }
 
-    // 合并工具参数（hook配置 + hook输入）
+    // 合并工具参数（hook配置 + hook输入）- 包含所有官方字段
     const toolArgs = {
       ...hook.toolArgs,
       event: input.event,
@@ -746,6 +816,25 @@ async function executeMcpHook(
       toolOutput: input.toolOutput,
       message: input.message,
       sessionId: input.sessionId,
+      // PostToolUseFailure 专用字段
+      tool_use_id: input.tool_use_id,
+      error: input.error,
+      error_type: input.error_type,
+      is_interrupt: input.is_interrupt,
+      is_timeout: input.is_timeout,
+      // SubagentStart/SubagentStop 专用字段
+      agent_id: input.agent_id,
+      agent_type: input.agent_type,
+      result: input.result,
+      // Notification 专用字段
+      notification_type: input.notification_type,
+      // SessionStart 专用字段
+      source: input.source,
+      // SessionEnd 专用字段
+      reason: input.reason,
+      // PreCompact 专用字段
+      trigger: input.trigger,
+      currentTokens: input.currentTokens,
     };
 
     // 调用 MCP 工具
@@ -837,6 +926,7 @@ async function executeUrlHook(
   const timeout = hook.timeout || 10000;
   const method = hook.method || 'POST';
 
+  // URL Hook payload - 包含所有官方字段
   const payload = {
     event: input.event,
     toolName: input.toolName,
@@ -845,6 +935,25 @@ async function executeUrlHook(
     message: input.message,
     sessionId: input.sessionId,
     timestamp: new Date().toISOString(),
+    // PostToolUseFailure 专用字段
+    tool_use_id: input.tool_use_id,
+    error: input.error,
+    error_type: input.error_type,
+    is_interrupt: input.is_interrupt,
+    is_timeout: input.is_timeout,
+    // SubagentStart/SubagentStop 专用字段
+    agent_id: input.agent_id,
+    agent_type: input.agent_type,
+    result: input.result,
+    // Notification 专用字段
+    notification_type: input.notification_type,
+    // SessionStart 专用字段
+    source: input.source,
+    // SessionEnd 专用字段
+    reason: input.reason,
+    // PreCompact 专用字段
+    trigger: input.trigger,
+    currentTokens: input.currentTokens,
   };
 
   try {
@@ -1041,14 +1150,21 @@ export async function runStopHooks(
 
 /**
  * PreCompact hook - 压缩前触发
+ *
+ * @param sessionId 会话ID
+ * @param currentTokens 当前token数
+ * @param trigger 触发方式（manual或auto）
+ * @returns 是否允许压缩
  */
 export async function runPreCompactHooks(
   sessionId?: string,
-  currentTokens?: number
+  currentTokens?: number,
+  trigger?: 'manual' | 'auto'
 ): Promise<{ allowed: boolean; message?: string }> {
   const results = await runHooks({
     event: 'PreCompact',
-    message: currentTokens ? `Current tokens: ${currentTokens}` : undefined,
+    currentTokens,
+    trigger,
     sessionId,
   });
 
@@ -1061,18 +1177,35 @@ export async function runPreCompactHooks(
 
 /**
  * PostToolUseFailure hook - 工具执行失败后触发
+ *
+ * @param toolName 工具名称
+ * @param toolInput 工具输入
+ * @param toolUseId 工具使用ID
+ * @param error 错误信息
+ * @param errorType 错误类型
+ * @param isInterrupt 是否被中断
+ * @param isTimeout 是否超时
+ * @param sessionId 会话ID
  */
 export async function runPostToolUseFailureHooks(
   toolName: string,
   toolInput: unknown,
+  toolUseId: string,
   error: string,
+  errorType: 'permission_denied' | 'execution_failed' | 'timeout' | 'invalid_input' = 'execution_failed',
+  isInterrupt: boolean = false,
+  isTimeout: boolean = false,
   sessionId?: string
 ): Promise<void> {
   await runHooks({
     event: 'PostToolUseFailure',
     toolName,
     toolInput,
-    message: error,
+    tool_use_id: toolUseId,
+    error,
+    error_type: errorType,
+    is_interrupt: isInterrupt,
+    is_timeout: isTimeout,
     sessionId,
   });
 }
@@ -1106,64 +1239,101 @@ export function getEventHookCount(event: HookEvent): number {
 
 /**
  * SessionStart hook - 会话开始时触发
+ *
+ * @param sessionId 会话ID
+ * @param source 会话启动来源
  */
-export async function runSessionStartHooks(sessionId: string): Promise<void> {
+export async function runSessionStartHooks(
+  sessionId: string,
+  source?: 'startup' | 'resume' | 'clear' | 'compact'
+): Promise<void> {
   await runHooks({
     event: 'SessionStart',
+    source,
     sessionId,
   });
 }
 
 /**
  * SessionEnd hook - 会话结束时触发
+ *
+ * @param sessionId 会话ID
+ * @param reason 会话结束原因
  */
-export async function runSessionEndHooks(sessionId: string): Promise<void> {
+export async function runSessionEndHooks(
+  sessionId: string,
+  reason?: 'clear' | 'logout' | 'prompt_input_exit' | 'other'
+): Promise<void> {
   await runHooks({
     event: 'SessionEnd',
+    reason,
     sessionId,
   });
 }
 
 /**
  * SubagentStart hook - 子代理启动时触发
+ *
+ * @param agentId 代理ID
+ * @param agentType 代理类型
+ * @param sessionId 会话ID
  */
 export async function runSubagentStartHooks(
+  agentId: string,
   agentType: string,
   sessionId?: string
 ): Promise<void> {
   await runHooks({
     event: 'SubagentStart',
-    toolName: agentType,
+    agent_id: agentId,
+    agent_type: agentType,
     sessionId,
   });
 }
 
 /**
  * SubagentStop hook - 子代理停止时触发
+ *
+ * @param agentId 代理ID
+ * @param agentType 代理类型
+ * @param result 代理执行结果
+ * @param sessionId 会话ID
  */
 export async function runSubagentStopHooks(
+  agentId: string,
   agentType: string,
+  result?: unknown,
   sessionId?: string
 ): Promise<void> {
   await runHooks({
     event: 'SubagentStop',
-    toolName: agentType,
+    agent_id: agentId,
+    agent_type: agentType,
+    result,
     sessionId,
   });
 }
 
 /**
  * PermissionRequest hook - 权限请求时触发
+ *
+ * @param toolName 工具名称
+ * @param toolInput 工具输入
+ * @param toolUseId 工具使用ID
+ * @param sessionId 会话ID
+ * @returns Hook决策结果
  */
 export async function runPermissionRequestHooks(
   toolName: string,
   toolInput: unknown,
+  toolUseId?: string,
   sessionId?: string
 ): Promise<{ decision?: 'allow' | 'deny'; message?: string }> {
   const results = await runHooks({
     event: 'PermissionRequest',
     toolName,
     toolInput,
+    tool_use_id: toolUseId,
     sessionId,
   });
 
@@ -1189,14 +1359,20 @@ export async function runPermissionRequestHooks(
 
 /**
  * Notification hook - 发送通知时触发
+ *
+ * @param message 通知消息
+ * @param notificationType 通知类型
+ * @param sessionId 会话ID
  */
 export async function runNotificationHooks(
   message: string,
+  notificationType?: 'permission_prompt' | 'idle_prompt' | 'auth_success' | 'elicitation_dialog',
   sessionId?: string
 ): Promise<void> {
   await runHooks({
     event: 'Notification',
     message,
+    notification_type: notificationType,
     sessionId,
   });
 }

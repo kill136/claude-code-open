@@ -140,33 +140,40 @@ Features:
       }
 
       // 找到目标单元格索引
-      let cellIndex = -1;
-      if (cell_id !== undefined) {
+      // 官方行为：未指定 cell_id 时，cellIndex 默认为 0
+      let cellIndex: number;
+      if (!cell_id) {
+        cellIndex = 0;
+      } else {
         cellIndex = this.findCellIndex(notebook.cells, cell_id);
 
-        // 如果按 ID 找不到，检查是否所有操作都需要有效的 cell_id
-        if (cellIndex === -1 && edit_mode !== 'insert') {
+        // 如果按 ID 找不到，对于非 insert 模式报错
+        if (cellIndex === -1) {
+          if (edit_mode !== 'insert') {
+            return {
+              success: false,
+              error: `Cell not found with ID: ${cell_id}. Available cells: ${notebook.cells.length}`,
+            };
+          }
+          // insert 模式下找不到 cell_id，也应该报错（与官方行为一致）
           return {
             success: false,
-            error: `Cell not found with ID: ${cell_id}. Available cells: ${notebook.cells.length}`,
+            error: `Cell with ID "${cell_id}" not found in notebook.`,
           };
         }
 
-        // insert 模式：插入到找到的单元格之后（如果找到了）
-        if (edit_mode === 'insert' && cellIndex >= 0) {
+        // insert 模式：在找到的单元格之后插入
+        if (edit_mode === 'insert') {
           cellIndex = cellIndex + 1;
         }
-      } else {
-        // 没有 cell_id 的情况
-        if (edit_mode === 'replace') {
-          cellIndex = 0; // replace 默认第一个单元格
-        } else if (edit_mode === 'delete') {
-          return {
-            success: false,
-            error: 'cell_id is required for delete mode',
-          };
-        }
-        // insert 模式不需要 cell_id，会插入到末尾
+      }
+
+      // delete 模式必须指定 cell_id
+      if (edit_mode === 'delete' && !cell_id) {
+        return {
+          success: false,
+          error: 'cell_id is required for delete mode',
+        };
       }
 
       // 执行编辑操作
@@ -238,10 +245,10 @@ Features:
           }
 
           // 确定插入位置
-          const insertIndex = cellIndex >= 0 ? cellIndex : notebook.cells.length;
-          notebook.cells.splice(insertIndex, 0, newCell);
+          // cellIndex 现在总是有效值（>= 0），因为在前面已经验证过了
+          notebook.cells.splice(cellIndex, 0, newCell);
 
-          resultMessage = `Inserted new ${finalCellType} cell at position ${insertIndex}`;
+          resultMessage = `Inserted new ${finalCellType} cell at position ${cellIndex}`;
           break;
         }
 

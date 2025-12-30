@@ -11,6 +11,20 @@ import { BaseTool } from './base.js';
 import type { WebFetchInput, WebSearchInput, ToolResult, ToolDefinition } from '../types/index.js';
 
 /**
+ * 响应体大小限制 (10MB)
+ */
+const MAX_RESPONSE_SIZE = 10 * 1024 * 1024;
+
+/**
+ * 搜索进度更新接口
+ */
+interface SearchProgressUpdate {
+  type: 'query_update' | 'search_results_received';
+  query?: string;
+  resultCount?: number;
+}
+
+/**
  * 缓存接口
  */
 interface CachedContent {
@@ -204,6 +218,8 @@ Usage notes:
   - When a URL redirects to a different host, the tool will inform you and provide the redirect URL in a special format. You should then make a new WebFetch request with the redirect URL to fetch the content.
 `;
 
+  private skipWebFetchPreflight = false;
+
   getInputSchema(): ToolDefinition['inputSchema'] {
     return {
       type: 'object',
@@ -220,6 +236,72 @@ Usage notes:
       },
       required: ['url', 'prompt'],
     };
+  }
+
+  /**
+   * 检查域名安全性（预检查）
+   * @param domain 要检查的域名
+   * @returns 是否安全
+   */
+  private async checkDomainSafety(domain: string): Promise<boolean> {
+    // 如果跳过预检查，直接返回true
+    if (this.skipWebFetchPreflight) {
+      return true;
+    }
+
+    // 常见的不安全域名黑名单
+    const unsafeDomains = [
+      'localhost',
+      '127.0.0.1',
+      '0.0.0.0',
+      '::1',
+      '169.254.169.254', // AWS 元数据服务
+      'metadata.google.internal', // GCP 元数据服务
+    ];
+
+    const normalizedDomain = domain.toLowerCase();
+
+    // 检查黑名单
+    for (const unsafeDomain of unsafeDomains) {
+      if (normalizedDomain === unsafeDomain || normalizedDomain.endsWith(`.${unsafeDomain}`)) {
+        return false;
+      }
+    }
+
+    // 检查私有IP范围
+    if (this.isPrivateIP(normalizedDomain)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * 检查是否为私有IP地址
+   */
+  private isPrivateIP(host: string): boolean {
+    const ipv4Regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+    const match = host.match(ipv4Regex);
+
+    if (!match) {
+      return false;
+    }
+
+    const [, a, b, c, d] = match.map(Number);
+
+    // 检查私有IP范围
+    // 10.0.0.0/8
+    if (a === 10) return true;
+    // 172.16.0.0/12
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    // 192.168.0.0/16
+    if (a === 192 && b === 168) return true;
+    // 127.0.0.0/8 (loopback)
+    if (a === 127) return true;
+    // 169.254.0.0/16 (link-local)
+    if (a === 169 && b === 254) return true;
+
+    return false;
   }
 
   /**
@@ -341,9 +423,20 @@ Usage notes:
         maxRedirects: 0, // 手动处理重定向
         validateStatus: (status) => status < 400 || (status >= 300 && status < 400),
         proxy: proxy ? proxy : false,
+        maxContentLength: MAX_RESPONSE_SIZE,
+        maxBodyLength: MAX_RESPONSE_SIZE,
       });
 
       const contentType = response.headers['content-type'] || '';
+      const contentLength = response.headers['content-length'];
+
+      // 检查响应体大小
+      if (contentLength && parseInt(contentLength, 10) > MAX_RESPONSE_SIZE) {
+        throw new Error(
+          `Response size (${contentLength} bytes) exceeds maximum allowed size (${MAX_RESPONSE_SIZE} bytes)`
+        );
+      }
+
       let content = '';
 
       if (contentType.includes('text/html')) {
@@ -352,6 +445,14 @@ Usage notes:
         content = JSON.stringify(response.data, null, 2);
       } else {
         content = String(response.data);
+      }
+
+      // 再次检查处理后内容的大小
+      const contentSize = Buffer.byteLength(content, 'utf8');
+      if (contentSize > MAX_RESPONSE_SIZE) {
+        throw new Error(
+          `Processed content size (${contentSize} bytes) exceeds maximum allowed size (${MAX_RESPONSE_SIZE} bytes)`
+        );
       }
 
       return {
@@ -400,8 +501,9 @@ Usage notes:
     let { url, prompt } = input;
 
     // URL 验证和规范化
+    let parsedUrl: URL;
     try {
-      const parsedUrl = new URL(url);
+      parsedUrl = new URL(url);
 
       // HTTP 到 HTTPS 自动升级
       if (parsedUrl.protocol === 'http:') {
@@ -412,6 +514,16 @@ Usage notes:
       return {
         success: false,
         error: `Invalid URL: ${url}`,
+      };
+    }
+
+    // 域名安全检查
+    const isSafe = await this.checkDomainSafety(parsedUrl.hostname);
+    if (!isSafe) {
+      return {
+        success: false,
+        error: `Domain safety check failed: ${parsedUrl.hostname} is not allowed for security reasons (localhost, private IP, or metadata service)`,
+        errorCode: 3,
       };
     }
 
@@ -514,6 +626,8 @@ IMPORTANT - Use the correct year in search queries:
   - Example: If today is 2025-07-15 and the user asks for "latest React docs", search for "React documentation 2025", NOT "React documentation 2024"
 `;
 
+  private searchProgress?: (update: SearchProgressUpdate) => void;
+
   getInputSchema(): ToolDefinition['inputSchema'] {
     return {
       type: 'object',
@@ -536,6 +650,13 @@ IMPORTANT - Use the correct year in search queries:
       },
       required: ['query'],
     };
+  }
+
+  /**
+   * 设置进度回调函数
+   */
+  setProgressCallback(callback: (update: SearchProgressUpdate) => void) {
+    this.searchProgress = callback;
   }
 
   /**
@@ -770,6 +891,26 @@ IMPORTANT - Use the correct year in search queries:
   async execute(input: WebSearchInput): Promise<ToolResult> {
     const { query, allowed_domains, blocked_domains } = input;
 
+    // 参数冲突验证
+    if (allowed_domains && blocked_domains) {
+      return {
+        success: false,
+        error: 'Cannot specify both allowed_domains and blocked_domains',
+        errorCode: 2,
+      };
+    }
+
+    // 记录开始时间
+    const startTime = performance.now();
+
+    // 发送进度更新：查询开始
+    if (this.searchProgress) {
+      this.searchProgress({
+        type: 'query_update',
+        query,
+      });
+    }
+
     // 生成缓存键
     // T-012: 使用缓存优化搜索性能
     const cacheKey = generateSearchCacheKey(query, allowed_domains, blocked_domains);
@@ -778,11 +919,27 @@ IMPORTANT - Use the correct year in search queries:
     const cached = webSearchCache.get(cacheKey);
     if (cached) {
       const cacheAge = Math.floor((Date.now() - cached.fetchedAt) / 1000 / 60); // 分钟
+      const durationSeconds = (performance.now() - startTime) / 1000;
+
+      // 发送进度更新：搜索结果接收（从缓存）
+      if (this.searchProgress) {
+        this.searchProgress({
+          type: 'search_results_received',
+          query,
+          resultCount: cached.results.length,
+        });
+      }
+
       return {
         success: true,
         output:
           this.formatSearchResults(cached.results, query) +
           `\n\n_[Cached results from ${cacheAge} minute(s) ago]_`,
+        data: {
+          query,
+          results: cached.results,
+          durationSeconds,
+        },
       };
     }
 
@@ -796,6 +953,18 @@ IMPORTANT - Use the correct year in search queries:
         allowed_domains,
         blocked_domains
       );
+
+      // 计算持续时间
+      const durationSeconds = (performance.now() - startTime) / 1000;
+
+      // 发送进度更新：搜索结果接收
+      if (this.searchProgress) {
+        this.searchProgress({
+          type: 'search_results_received',
+          query,
+          resultCount: filteredResults.length,
+        });
+      }
 
       // 缓存结果（即使为空也缓存，避免重复请求）
       webSearchCache.set(cacheKey, {
@@ -813,6 +982,11 @@ IMPORTANT - Use the correct year in search queries:
         return {
           success: true,
           output: this.formatSearchResults(filteredResults, query),
+          data: {
+            query,
+            results: filteredResults,
+            durationSeconds,
+          },
         };
       }
 
@@ -829,6 +1003,11 @@ Filters applied:
 - Blocked domains: ${blocked_domains?.join(', ') || 'none'}
 
 Try adjusting your domain filters or search query.`,
+          data: {
+            query,
+            results: [],
+            durationSeconds,
+          },
         };
       }
 
@@ -849,11 +1028,22 @@ Suggestions:
   * Google: Set GOOGLE_SEARCH_API_KEY and GOOGLE_SEARCH_ENGINE_ID
 
 Current search provider: DuckDuckGo Instant Answer API (free)`,
+        data: {
+          query,
+          results: [],
+          durationSeconds,
+        },
       };
     } catch (err: any) {
+      const durationSeconds = (performance.now() - startTime) / 1000;
       return {
         success: false,
         error: `Search error: ${err.message || String(err)}`,
+        data: {
+          query,
+          results: [],
+          durationSeconds,
+        },
       };
     }
   }

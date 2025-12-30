@@ -1,6 +1,6 @@
 /**
  * Agent 工具 (Task)
- * 子代理管理
+ * 子代理管理 - 参照官方 Claude Code CLI v2.0.76 实现
  */
 
 import { BaseTool } from './base.js';
@@ -10,26 +10,53 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { getBackgroundShell, isShellId } from './bash.js';
+import { ConversationLoop, type LoopOptions } from '../core/loop.js';
+import {
+  runSubagentStartHooks,
+  runSubagentStopHooks,
+  type HookInput
+} from '../hooks/index.js';
+import type { Message } from '../types/index.js';
 
-// 代理类型定义
-export const AGENT_TYPES = {
-  'general-purpose': {
-    description: 'General-purpose agent for researching complex questions',
-    tools: ['*'],
+// 代理类型定义（参照官方）
+export interface AgentTypeDefinition {
+  agentType: string;
+  whenToUse: string;
+  tools?: string[];
+  forkContext?: boolean;  // 是否访问父对话上下文
+  permissionMode?: 'default' | 'plan' | 'acceptEdits' | 'bypassPermissions';
+  model?: string;
+  description?: string;
+}
+
+// 内置代理类型
+export const BUILT_IN_AGENT_TYPES: AgentTypeDefinition[] = [
+  {
+    agentType: 'general-purpose',
+    whenToUse: 'Use this for researching complex questions that require exploring multiple files',
+    tools: ['*'],  // 所有工具
+    forkContext: false,
   },
-  'Explore': {
-    description: 'Fast agent for exploring codebases',
+  {
+    agentType: 'Explore',
+    whenToUse: 'Fast agent for exploring codebases and finding specific code patterns',
     tools: ['Glob', 'Grep', 'Read'],
+    forkContext: false,
   },
-  'Plan': {
-    description: 'Software architect agent for designing implementation plans',
+  {
+    agentType: 'Plan',
+    whenToUse: 'Software architect agent for designing implementation plans',
     tools: ['*'],
+    forkContext: false,
+    permissionMode: 'plan',
   },
-  'claude-code-guide': {
-    description: 'Agent for Claude Code documentation',
+  {
+    agentType: 'claude-code-guide',
+    whenToUse: 'Agent for Claude Code documentation and API questions',
     tools: ['Glob', 'Grep', 'Read', 'WebFetch', 'WebSearch'],
+    forkContext: false,
   },
-};
+];
 
 // 代理执行历史条目
 export interface AgentHistoryEntry {
@@ -58,6 +85,8 @@ export interface BackgroundAgent {
   totalSteps?: number;
   workingDirectory?: string;
   metadata?: Record<string, any>;
+  // 新增：对话历史
+  messages?: Message[];
 }
 
 const backgroundAgents: Map<string, BackgroundAgent> = new Map();
@@ -223,6 +252,11 @@ export function pauseBackgroundAgent(id: string): boolean {
   return false;
 }
 
+// 获取代理类型定义
+export function getAgentTypeDefinition(agentType: string): AgentTypeDefinition | null {
+  return BUILT_IN_AGENT_TYPES.find(def => def.agentType === agentType) || null;
+}
+
 // 初始化时加载所有代理
 loadAllAgents();
 
@@ -231,17 +265,25 @@ export class TaskTool extends BaseTool<AgentInput, ToolResult> {
   description = `Launch a new agent to handle complex, multi-step tasks autonomously.
 
 Available agent types:
-- general-purpose: General-purpose agent for researching complex questions
-- Explore: Fast agent for exploring codebases (quick/medium/very thorough)
-- Plan: Software architect agent for designing implementation plans
-- claude-code-guide: Agent for Claude Code documentation questions
+${BUILT_IN_AGENT_TYPES.map(def => `- ${def.agentType}: ${def.whenToUse}${def.forkContext ? ' (has access to current context)' : ''}`).join('\n')}
 
 Usage notes:
 - Launch multiple agents concurrently for maximum performance
 - Use resume parameter to continue a paused or failed agent
 - Agent state is persisted to ~/.claude/agents/
 - The agent's outputs should be trusted
-- Use model parameter to specify haiku/sonnet/opus`;
+- Use model parameter to specify haiku/sonnet/opus
+- Agents with "access to current context" can see the full conversation history`;
+
+  // 父对话上下文（用于 forkContext）
+  private parentMessages: Message[] = [];
+
+  /**
+   * 设置父对话上下文（在 Loop 中调用）
+   */
+  setParentContext(messages: Message[]): void {
+    this.parentMessages = messages;
+  }
 
   getInputSchema(): ToolDefinition['inputSchema'] {
     return {
@@ -280,80 +322,21 @@ Usage notes:
   async execute(input: AgentInput): Promise<ToolResult> {
     const { description, prompt, subagent_type, model, resume, run_in_background } = input;
 
-    // Resume 模式
-    if (resume) {
-      const existingAgent = getBackgroundAgent(resume);
-
-      if (!existingAgent) {
-        return {
-          success: false,
-          error: `Agent ${resume} not found. Unable to resume.`,
-        };
-      }
-
-      // 检查代理状态是否可以恢复
-      if (existingAgent.status === 'completed') {
-        return {
-          success: false,
-          error: `Agent ${resume} has already completed. Cannot resume.`,
-          output: `Agent result:\n${JSON.stringify(existingAgent.result, null, 2)}`,
-        };
-      }
-
-      if (existingAgent.status === 'running') {
-        return {
-          success: false,
-          error: `Agent ${resume} is still running. Cannot resume.`,
-        };
-      }
-
-      // 恢复代理执行
-      existingAgent.status = 'running';
-      addAgentHistory(existingAgent, 'resumed', `Agent resumed from step ${existingAgent.currentStep || 0}`);
-
-      const resumeInfo = [
-        `Resuming agent ${resume}`,
-        `Type: ${existingAgent.agentType}`,
-        `Description: ${existingAgent.description}`,
-        `Original prompt: ${existingAgent.prompt}`,
-        `Current step: ${existingAgent.currentStep || 0}/${existingAgent.totalSteps || 'unknown'}`,
-        `\nExecution history:`,
-        ...existingAgent.history.map(h =>
-          `  [${h.timestamp.toISOString()}] ${h.type}: ${h.message}`
-        ),
-      ];
-
-      if (existingAgent.intermediateResults.length > 0) {
-        resumeInfo.push('\nIntermediate results:');
-        existingAgent.intermediateResults.forEach((result, idx) => {
-          resumeInfo.push(`  Step ${idx + 1}: ${JSON.stringify(result).substring(0, 100)}...`);
-        });
-      }
-
-      if (run_in_background) {
-        // 后台恢复执行
-        this.executeAgentInBackground(existingAgent);
-
-        return {
-          success: true,
-          output: resumeInfo.join('\n') + '\n\nAgent resumed in background.',
-        };
-      }
-
-      // 同步恢复执行
-      const result = await this.executeAgentSync(existingAgent);
-      return result;
-    }
-
-    // 新建代理模式
     // 验证代理类型
-    if (!AGENT_TYPES[subagent_type as keyof typeof AGENT_TYPES]) {
+    const agentDef = getAgentTypeDefinition(subagent_type);
+    if (!agentDef) {
       return {
         success: false,
-        error: `Unknown agent type: ${subagent_type}. Available types: ${Object.keys(AGENT_TYPES).join(', ')}`,
+        error: `Unknown agent type: ${subagent_type}. Available types: ${BUILT_IN_AGENT_TYPES.map(d => d.agentType).join(', ')}`,
       };
     }
 
+    // Resume 模式
+    if (resume) {
+      return this.resumeAgent(resume, run_in_background);
+    }
+
+    // 新建代理模式
     const agentId = uuidv4();
     const agent: BackgroundAgent = {
       id: agentId,
@@ -368,6 +351,7 @@ Usage notes:
       currentStep: 0,
       workingDirectory: process.cwd(),
       metadata: {},
+      messages: [],
     };
 
     // 添加启动历史
@@ -378,7 +362,8 @@ Usage notes:
     saveAgentState(agent);
 
     if (run_in_background) {
-      this.executeAgentInBackground(agent);
+      // 后台执行 - 不阻塞，立即返回
+      this.executeAgentInBackground(agent, agentDef);
 
       return {
         success: true,
@@ -386,71 +371,126 @@ Usage notes:
       };
     }
 
-    // 同步执行
-    const result = await this.executeAgentSync(agent);
+    // 同步执行 - 阻塞直到完成
+    const result = await this.executeAgentSync(agent, agentDef);
     return result;
   }
 
-  private executeAgentInBackground(agent: BackgroundAgent): void {
-    // 模拟后台执行
-    // 在实际实现中，这里会启动真实的子代理进程
-    setTimeout(() => {
-      const steps = agent.totalSteps || 5;
-      let currentStep = agent.currentStep || 0;
+  /**
+   * 恢复已有代理
+   */
+  private async resumeAgent(agentId: string, runInBackground?: boolean): Promise<ToolResult> {
+    const existingAgent = getBackgroundAgent(agentId);
 
-      const executeStep = () => {
-        if (currentStep >= steps) {
-          agent.status = 'completed';
-          agent.endTime = new Date();
-          agent.currentStep = steps;
-          agent.result = {
-            success: true,
-            output: `Agent ${agent.agentType} completed task: ${agent.description}\n\nExecuted ${steps} steps successfully.`,
-          };
-          addAgentHistory(agent, 'completed', `Agent completed all ${steps} steps`);
-          return;
-        }
-
-        currentStep++;
-        agent.currentStep = currentStep;
-        agent.intermediateResults.push({
-          step: currentStep,
-          timestamp: new Date(),
-          result: `Step ${currentStep} result`,
-        });
-
-        addAgentHistory(
-          agent,
-          'progress',
-          `Completed step ${currentStep}/${steps}`,
-          { step: currentStep }
-        );
-
-        // 继续下一步
-        setTimeout(executeStep, 1000);
+    if (!existingAgent) {
+      return {
+        success: false,
+        error: `Agent ${agentId} not found. Unable to resume.`,
       };
+    }
 
-      if (!agent.totalSteps) {
-        agent.totalSteps = steps;
-      }
+    // 检查代理状态是否可以恢复
+    if (existingAgent.status === 'completed') {
+      return {
+        success: false,
+        error: `Agent ${agentId} has already completed. Cannot resume.`,
+        output: `Agent result:\n${JSON.stringify(existingAgent.result, null, 2)}`,
+      };
+    }
 
-      executeStep();
-    }, 100);
+    if (existingAgent.status === 'running') {
+      return {
+        success: false,
+        error: `Agent ${agentId} is still running. Cannot resume.`,
+      };
+    }
+
+    // 恢复代理执行
+    existingAgent.status = 'running';
+    addAgentHistory(existingAgent, 'resumed', `Agent resumed from step ${existingAgent.currentStep || 0}`);
+
+    const agentDef = getAgentTypeDefinition(existingAgent.agentType);
+    if (!agentDef) {
+      return {
+        success: false,
+        error: `Agent type ${existingAgent.agentType} not found`,
+      };
+    }
+
+    const resumeInfo = [
+      `Resuming agent ${agentId}`,
+      `Type: ${existingAgent.agentType}`,
+      `Description: ${existingAgent.description}`,
+      `Original prompt: ${existingAgent.prompt}`,
+      `Current step: ${existingAgent.currentStep || 0}/${existingAgent.totalSteps || 'unknown'}`,
+      `\nExecution history:`,
+      ...existingAgent.history.map(h =>
+        `  [${h.timestamp.toISOString()}] ${h.type}: ${h.message}`
+      ),
+    ];
+
+    if (existingAgent.intermediateResults.length > 0) {
+      resumeInfo.push('\nIntermediate results:');
+      existingAgent.intermediateResults.forEach((result, idx) => {
+        resumeInfo.push(`  Step ${idx + 1}: ${JSON.stringify(result).substring(0, 100)}...`);
+      });
+    }
+
+    if (runInBackground) {
+      // 后台恢复执行
+      this.executeAgentInBackground(existingAgent, agentDef);
+
+      return {
+        success: true,
+        output: resumeInfo.join('\n') + '\n\nAgent resumed in background.',
+      };
+    }
+
+    // 同步恢复执行
+    const result = await this.executeAgentSync(existingAgent, agentDef);
+    return result;
   }
 
-  private async executeAgentSync(agent: BackgroundAgent): Promise<ToolResult> {
-    // 同步执行 - 在实际实现中，这里会启动子代理
-    try {
-      agent.currentStep = (agent.currentStep || 0) + 1;
-      agent.totalSteps = agent.totalSteps || 1;
+  /**
+   * 后台执行代理（异步，不阻塞）
+   */
+  private executeAgentInBackground(agent: BackgroundAgent, agentDef: AgentTypeDefinition): void {
+    // 使用 Promise 在后台执行，捕获错误
+    this.executeAgentLoop(agent, agentDef)
+      .then(() => {
+        // 执行完成
+        agent.status = 'completed';
+        agent.endTime = new Date();
+        addAgentHistory(agent, 'completed', 'Agent completed successfully');
+        saveAgentState(agent);
+      })
+      .catch((error) => {
+        // 执行失败
+        agent.status = 'failed';
+        agent.error = error instanceof Error ? error.message : String(error);
+        agent.endTime = new Date();
+        addAgentHistory(agent, 'failed', `Agent failed: ${agent.error}`);
+        saveAgentState(agent);
+      });
+  }
 
-      addAgentHistory(agent, 'progress', `Executing step ${agent.currentStep}`);
+  /**
+   * 同步执行代理（阻塞直到完成）
+   */
+  private async executeAgentSync(agent: BackgroundAgent, agentDef: AgentTypeDefinition): Promise<ToolResult> {
+    try {
+      await this.executeAgentLoop(agent, agentDef);
 
       agent.status = 'completed';
       agent.endTime = new Date();
+
+      // 构建结果输出
+      const duration = (agent.endTime.getTime() - agent.startTime.getTime()) / 1000;
+      const output = agent.result?.output || `Agent ${agent.agentType} completed: ${agent.description}`;
+
       agent.result = {
         success: true,
-        output: `Agent ${agent.agentType} (${agent.model || 'default'}) executed: ${agent.description}\n\nPrompt: ${agent.prompt}\n\nNote: Full agent execution requires API integration.\n\nAgent ID: ${agent.id} (can be resumed if needed)`,
+        output: `${output}\n\n[Agent completed in ${duration.toFixed(1)}s]`,
       };
 
       addAgentHistory(agent, 'completed', 'Agent execution completed');
@@ -463,11 +503,84 @@ Usage notes:
       agent.endTime = new Date();
 
       addAgentHistory(agent, 'failed', `Agent failed: ${agent.error}`);
+      saveAgentState(agent);
 
       return {
         success: false,
         error: `Agent execution failed: ${agent.error}`,
       };
+    }
+  }
+
+  /**
+   * 真实的代理执行循环（核心逻辑）
+   * 参照官方 B4A 函数实现
+   */
+  private async executeAgentLoop(agent: BackgroundAgent, agentDef: AgentTypeDefinition): Promise<void> {
+    // 调用 SubagentStart Hook
+    await runSubagentStartHooks(agent.agentType, agent.id);
+
+    try {
+      // 构建代理的初始消息
+      let initialMessages: Message[] = [];
+
+      // 如果代理支持 forkContext，添加父对话历史
+      if (agentDef.forkContext && this.parentMessages.length > 0) {
+        // 只包含用户和助手的消息，过滤掉工具调用相关内容
+        initialMessages = this.parentMessages
+          .filter(msg => msg.role === 'user' || msg.role === 'assistant')
+          .map(msg => ({
+            role: msg.role,
+            content: typeof msg.content === 'string' ? msg.content :
+                     Array.isArray(msg.content) ? msg.content.filter(block => block.type === 'text') : [],
+          }));
+      }
+
+      // 如果是恢复模式，使用已有的消息历史
+      if (agent.messages && agent.messages.length > 0) {
+        initialMessages = agent.messages;
+      }
+
+      // 添加当前任务提示
+      initialMessages.push({
+        role: 'user',
+        content: agent.prompt,
+      });
+
+      // 构建 LoopOptions
+      const loopOptions: LoopOptions = {
+        model: agent.model,
+        maxTurns: 30,  // 限制最大轮次以避免无限循环
+        verbose: process.env.CLAUDE_VERBOSE === 'true',
+        permissionMode: agentDef.permissionMode || 'default',
+        // 根据代理定义限制工具访问
+        allowedTools: agentDef.tools,
+        workingDir: agent.workingDirectory,
+      };
+
+      // 创建子对话循环
+      const loop = new ConversationLoop(loopOptions);
+
+      // 执行代理任务
+      const response = await loop.processMessage(agent.prompt);
+
+      // 保存结果
+      agent.result = {
+        success: true,
+        output: response,
+      };
+
+      // 保存对话历史以支持恢复
+      agent.messages = initialMessages;
+
+      // 调用 SubagentStop Hook
+      await runSubagentStopHooks(agent.agentType, agent.id);
+
+    } catch (error) {
+      // 即使失败也要调用 SubagentStop Hook
+      await runSubagentStopHooks(agent.agentType, agent.id);
+
+      throw error;
     }
   }
 }

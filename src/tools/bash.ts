@@ -9,6 +9,7 @@ import { promisify } from 'util';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { v4 as uuidv4 } from 'uuid';
 import { BaseTool } from './base.js';
 import { executeInSandbox, isBubblewrapAvailable } from './sandbox.js';
 import { runPreToolUseHooks, runPostToolUseHooks } from '../hooks/index.js';
@@ -143,8 +144,9 @@ function getPlatformSpawnOptions(cwd: string): {
   return options;
 }
 
-// 后台 shell 管理
-interface ShellState {
+// 后台任务管理（统一使用 task_id）
+interface TaskState {
+  taskId: string; // 使用 UUID 格式的 task_id
   process: ReturnType<typeof spawn>;
   output: string[];
   outputFile: string;
@@ -162,33 +164,57 @@ interface ShellState {
   lastReadPosition: number;
 }
 
-const backgroundShells: Map<string, ShellState> = new Map();
+// 使用 task_id 作为键，兼容官方格式
+const backgroundTasks: Map<string, TaskState> = new Map();
+
+// 向后兼容：保留旧的变量名作为别名
+const backgroundShells = backgroundTasks;
 
 /**
- * 获取后台 shell 信息（供 TaskOutput 工具使用）
+ * 获取后台任务信息（供 TaskOutput 工具使用）
  */
-export function getBackgroundShell(shellId: string): ShellState | undefined {
-  return backgroundShells.get(shellId);
+export function getBackgroundTask(taskId: string): TaskState | undefined {
+  return backgroundTasks.get(taskId);
 }
 
 /**
- * 检查 ID 是否是 shell ID
+ * 向后兼容：获取后台 shell 信息
+ */
+export function getBackgroundShell(taskId: string): TaskState | undefined {
+  return getBackgroundTask(taskId);
+}
+
+/**
+ * 检查 ID 是否是任务 ID（支持 UUID 和旧格式）
+ */
+export function isTaskId(id: string): boolean {
+  // 支持 UUID 格式和旧的 bash_ 格式
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) || id.startsWith('bash_');
+}
+
+/**
+ * 向后兼容：检查 ID 是否是 shell ID
  */
 export function isShellId(id: string): boolean {
-  return id.startsWith('bash_');
+  return isTaskId(id);
 }
 
-// 获取后台输出文件路径
-function getBackgroundOutputPath(shellId: string): string {
+// 获取任务输出文件路径（使用官方的 tasks 目录）
+function getTaskOutputPath(taskId: string): string {
   const homeDir = process.env.HOME || process.env.USERPROFILE || '/tmp';
-  const claudeDir = path.join(homeDir, '.claude', 'background');
+  const tasksDir = path.join(homeDir, '.claude', 'tasks');
 
   // 确保目录存在
-  if (!fs.existsSync(claudeDir)) {
-    fs.mkdirSync(claudeDir, { recursive: true });
+  if (!fs.existsSync(tasksDir)) {
+    fs.mkdirSync(tasksDir, { recursive: true });
   }
 
-  return path.join(claudeDir, `${shellId}.log`);
+  return path.join(tasksDir, `${taskId}.log`);
+}
+
+// 向后兼容：保留旧的函数名
+function getBackgroundOutputPath(taskId: string): string {
+  return getTaskOutputPath(taskId);
 }
 
 // 配置
@@ -286,33 +312,36 @@ function recordAudit(log: AuditLog): void {
 }
 
 /**
- * 清理超时的后台 shell
+ * 清理超时的后台任务
  */
-function cleanupTimedOutShells(): number {
+function cleanupTimedOutTasks(): number {
   let cleaned = 0;
   const now = Date.now();
 
-  Array.from(backgroundShells.entries()).forEach(([id, shell]) => {
-    if (shell.maxRuntime && now - shell.startTime > shell.maxRuntime) {
+  Array.from(backgroundTasks.entries()).forEach(([id, task]) => {
+    if (task.maxRuntime && now - task.startTime > task.maxRuntime) {
       try {
-        shell.process.kill('SIGTERM');
+        task.process.kill('SIGTERM');
         // 关闭输出流
-        shell.outputStream?.end();
+        task.outputStream?.end();
         setTimeout(() => {
-          if (shell.status === 'running') {
-            shell.process.kill('SIGKILL');
+          if (task.status === 'running') {
+            task.process.kill('SIGKILL');
           }
         }, 1000);
-        backgroundShells.delete(id);
+        backgroundTasks.delete(id);
         cleaned++;
       } catch (err) {
-        console.error(`Failed to cleanup shell ${id}:`, err);
+        console.error(`Failed to cleanup task ${id}:`, err);
       }
     }
   });
 
   return cleaned;
 }
+
+// 向后兼容
+const cleanupTimedOutShells = cleanupTimedOutTasks;
 
 export class BashTool extends BaseTool<BashInput, BashResult> {
   name = 'Bash';
@@ -527,23 +556,24 @@ Sandbox: ${isBubblewrapAvailable() ? 'Available (bubblewrap)' : 'Not available'}
   }
 
   private executeBackground(command: string, maxRuntime: number): BashResult {
-    // 检查后台 shell 数量限制
-    if (backgroundShells.size >= MAX_BACKGROUND_SHELLS) {
-      // 尝试清理已完成的 shell
-      const cleaned = cleanupCompletedShells();
-      if (cleaned === 0 && backgroundShells.size >= MAX_BACKGROUND_SHELLS) {
+    // 检查后台任务数量限制
+    if (backgroundTasks.size >= MAX_BACKGROUND_SHELLS) {
+      // 尝试清理已完成的任务
+      const cleaned = cleanupCompletedTasks();
+      if (cleaned === 0 && backgroundTasks.size >= MAX_BACKGROUND_SHELLS) {
         return {
           success: false,
-          error: `Maximum number of background shells (${MAX_BACKGROUND_SHELLS}) reached. Clean up completed shells first.`,
+          error: `Maximum number of background tasks (${MAX_BACKGROUND_SHELLS}) reached. Clean up completed tasks first.`,
         };
       }
     }
 
-    // 定期清理超时的 shell
-    cleanupTimedOutShells();
+    // 定期清理超时的任务
+    cleanupTimedOutTasks();
 
-    const id = `bash_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const outputFile = getBackgroundOutputPath(id);
+    // 使用 UUID 作为 task_id，与官方一致
+    const taskId = uuidv4();
+    const outputFile = getTaskOutputPath(taskId);
 
     const proc = spawn('bash', ['-c', command], {
       cwd: process.cwd(),
@@ -554,7 +584,8 @@ Sandbox: ${isBubblewrapAvailable() ? 'Available (bubblewrap)' : 'Not available'}
     // 创建输出文件流
     const outputStream = fs.createWriteStream(outputFile, { flags: 'w' });
 
-    const shellState: ShellState = {
+    const taskState: TaskState = {
+      taskId,
       process: proc,
       output: [],
       outputFile,
@@ -569,65 +600,65 @@ Sandbox: ${isBubblewrapAvailable() ? 'Available (bubblewrap)' : 'Not available'}
 
     // 设置超时清理
     const timeout = setTimeout(() => {
-      if (shellState.status === 'running') {
-        console.warn(`[Bash] Background shell ${id} exceeded max runtime, terminating...`);
+      if (taskState.status === 'running') {
+        console.warn(`[Bash] Background task ${taskId} exceeded max runtime, terminating...`);
         try {
           proc.kill('SIGTERM');
           setTimeout(() => {
-            if (shellState.status === 'running') {
+            if (taskState.status === 'running') {
               proc.kill('SIGKILL');
             }
           }, 1000);
         } catch (err) {
-          console.error(`Failed to kill shell ${id}:`, err);
+          console.error(`Failed to kill task ${taskId}:`, err);
         }
       }
-    }, shellState.maxRuntime);
+    }, taskState.maxRuntime);
 
-    shellState.timeout = timeout;
+    taskState.timeout = timeout;
 
     proc.stdout?.on('data', (data) => {
       const dataStr = data.toString();
-      shellState.outputSize += dataStr.length;
+      taskState.outputSize += dataStr.length;
 
       // 写入文件
-      shellState.outputStream?.write(dataStr);
+      taskState.outputStream?.write(dataStr);
 
-      // 同时保存在内存中（用于 BashOutput 工具）
-      if (shellState.outputSize < MAX_BACKGROUND_OUTPUT) {
-        shellState.output.push(dataStr);
-      } else if (shellState.output[shellState.output.length - 1] !== '[Output limit reached]') {
-        shellState.output.push('[Output limit reached - further output discarded]');
+      // 同时保存在内存中（用于 TaskOutput 工具）
+      if (taskState.outputSize < MAX_BACKGROUND_OUTPUT) {
+        taskState.output.push(dataStr);
+      } else if (taskState.output[taskState.output.length - 1] !== '[Output limit reached]') {
+        taskState.output.push('[Output limit reached - further output discarded]');
       }
     });
 
     proc.stderr?.on('data', (data) => {
       const dataStr = data.toString();
       const stderrStr = `STDERR: ${dataStr}`;
-      shellState.outputSize += dataStr.length;
+      taskState.outputSize += dataStr.length;
 
       // 写入文件
-      shellState.outputStream?.write(stderrStr);
+      taskState.outputStream?.write(stderrStr);
 
       // 同时保存在内存中
-      if (shellState.outputSize < MAX_BACKGROUND_OUTPUT) {
-        shellState.output.push(stderrStr);
-      } else if (shellState.output[shellState.output.length - 1] !== '[Output limit reached]') {
-        shellState.output.push('[Output limit reached - further output discarded]');
+      if (taskState.outputSize < MAX_BACKGROUND_OUTPUT) {
+        taskState.output.push(stderrStr);
+      } else if (taskState.output[taskState.output.length - 1] !== '[Output limit reached]') {
+        taskState.output.push('[Output limit reached - further output discarded]');
       }
     });
 
     proc.on('close', (code) => {
-      shellState.status = code === 0 ? 'completed' : 'failed';
-      shellState.exitCode = code ?? undefined;
-      shellState.endTime = Date.now();
+      taskState.status = code === 0 ? 'completed' : 'failed';
+      taskState.exitCode = code ?? undefined;
+      taskState.endTime = Date.now();
 
-      if (shellState.timeout) {
-        clearTimeout(shellState.timeout);
+      if (taskState.timeout) {
+        clearTimeout(taskState.timeout);
       }
 
       // 关闭输出文件流
-      shellState.outputStream?.end();
+      taskState.outputStream?.end();
 
       // 记录审计日志
       const auditLog: AuditLog = {
@@ -637,42 +668,48 @@ Sandbox: ${isBubblewrapAvailable() ? 'Available (bubblewrap)' : 'Not available'}
         sandboxed: false,
         success: code === 0,
         exitCode: code ?? undefined,
-        duration: Date.now() - shellState.startTime,
-        outputSize: shellState.outputSize,
+        duration: Date.now() - taskState.startTime,
+        outputSize: taskState.outputSize,
         background: true,
       };
       recordAudit(auditLog);
     });
 
     proc.on('error', (err) => {
-      shellState.status = 'failed';
+      taskState.status = 'failed';
       const errorMsg = `ERROR: ${err.message}`;
-      shellState.output.push(errorMsg);
-      shellState.outputStream?.write(errorMsg + '\n');
-      shellState.outputStream?.end();
-      if (shellState.timeout) {
-        clearTimeout(shellState.timeout);
+      taskState.output.push(errorMsg);
+      taskState.outputStream?.write(errorMsg + '\n');
+      taskState.outputStream?.end();
+      if (taskState.timeout) {
+        clearTimeout(taskState.timeout);
       }
     });
 
-    backgroundShells.set(id, shellState);
+    backgroundTasks.set(taskId, taskState);
 
-    // 返回与官方一致的格式
-    const statusMsg = `<shell-id>${id}</shell-id>
+    // 返回与官方一致的格式（使用 task_id）
+    const statusMsg = `<task-id>${taskId}</task-id>
+<task-type>bash</task-type>
 <output-file>${outputFile}</output-file>
 <status>running</status>
 <summary>Background command "${command.substring(0, 50)}${command.length > 50 ? '...' : ''}" started.</summary>
-Read the output file to retrieve the output. You can also use BashOutput tool with bash_id="${id}" for real-time incremental updates.`;
+Use TaskOutput tool with task_id="${taskId}" to retrieve the output.`;
 
     return {
       success: true,
       output: statusMsg,
-      bash_id: id, // 保持向后兼容
-      shell_id: id, // 官方字段名
+      task_id: taskId, // 官方字段名
+      shell_id: taskId, // 向后兼容
+      bash_id: taskId, // 向后兼容
     };
   }
 }
 
+/**
+ * BashOutput 工具（向后兼容）
+ * 直接实现，不依赖 TaskOutput 以避免循环依赖
+ */
 export class BashOutputTool extends BaseTool<
   { bash_id: string; filter?: string; block?: boolean; timeout?: number },
   BashResult
@@ -680,14 +717,15 @@ export class BashOutputTool extends BaseTool<
   name = 'BashOutput';
   description = `Retrieves output from a running or completed background bash shell.
 
+DEPRECATED: This tool is deprecated. Use TaskOutput instead.
+
 Usage:
-  - Takes a bash_id (or shell_id) parameter identifying the shell
+  - Takes a bash_id (or task_id) parameter identifying the task
   - Returns new output since the last check (incremental updates)
-  - Use block=true (default: false) to wait for task completion
+  - Use block=true to wait for task completion
   - Use block=false for non-blocking check of current status
   - timeout specifies max wait time in ms when blocking
-  - Supports optional regex filtering to show only lines matching a pattern
-  - Shell IDs can be found using the /tasks command`;
+  - Supports optional regex filtering to show only lines matching a pattern`;
 
   getInputSchema(): ToolDefinition['inputSchema'] {
     return {
@@ -695,7 +733,7 @@ Usage:
       properties: {
         bash_id: {
           type: 'string',
-          description: 'The ID of the background shell (also accepts shell_id)',
+          description: 'The ID of the background task (bash_id or task_id)',
         },
         filter: {
           type: 'string',
@@ -720,35 +758,34 @@ Usage:
     block?: boolean;
     timeout?: number;
   }): Promise<BashResult> {
-    const shell = backgroundShells.get(input.bash_id);
-    if (!shell) {
-      return { success: false, error: `Shell ${input.bash_id} not found` };
+    const task = backgroundTasks.get(input.bash_id);
+    if (!task) {
+      return { success: false, error: `Task ${input.bash_id} not found` };
     }
 
     // 如果需要阻塞等待完成
-    if (input.block && shell.status === 'running') {
+    const shouldBlock = input.block === true;
+    if (shouldBlock && task.status === 'running') {
       const maxTimeout = input.timeout || 30000;
       const startTime = Date.now();
 
-      while (shell.status === 'running' && Date.now() - startTime < maxTimeout) {
+      while (task.status === 'running' && Date.now() - startTime < maxTimeout) {
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
 
-      if (shell.status === 'running') {
-        // 超时但仍在运行
+      if (task.status === 'running') {
         return {
           success: true,
-          output: `Shell ${input.bash_id} is still running after ${maxTimeout}ms timeout.\nUse block=false to check current output without waiting.`,
-          stdout: `Status: ${shell.status}`,
-          shell_id: input.bash_id,
+          output: `Task ${input.bash_id} is still running after ${maxTimeout}ms timeout.\nUse block=false to check current output without waiting.`,
+          stdout: `Status: ${task.status}`,
+          task_id: input.bash_id,
         };
       }
     }
 
     // 读取新输出（增量）
-    let output = shell.output.join('');
-    // 清空已读取的输出
-    shell.output.length = 0;
+    let output = task.output.join('');
+    task.output.length = 0;
 
     if (input.filter) {
       try {
@@ -762,17 +799,18 @@ Usage:
       }
     }
 
-    const duration = Date.now() - shell.startTime;
+    const duration = Date.now() - task.startTime;
 
     // 构建状态信息
     const statusInfo = [];
-    statusInfo.push(`<shell-id>${input.bash_id}</shell-id>`);
-    statusInfo.push(`<status>${shell.status}</status>`);
+    statusInfo.push(`<task-id>${input.bash_id}</task-id>`);
+    statusInfo.push(`<task-type>bash</task-type>`);
+    statusInfo.push(`<status>${task.status}</status>`);
     statusInfo.push(`<duration>${duration}ms</duration>`);
-    statusInfo.push(`<output-file>${shell.outputFile}</output-file>`);
+    statusInfo.push(`<output-file>${task.outputFile}</output-file>`);
 
-    if (shell.exitCode !== undefined) {
-      statusInfo.push(`<exit-code>${shell.exitCode}</exit-code>`);
+    if (task.exitCode !== undefined) {
+      statusInfo.push(`<exit-code>${task.exitCode}</exit-code>`);
     }
 
     if (output.trim()) {
@@ -781,32 +819,32 @@ Usage:
       statusInfo.push(`<output>(no new output)</output>`);
     }
 
-    if (shell.status === 'completed') {
-      statusInfo.push(`<summary>Command completed successfully.</summary>`);
-    } else if (shell.status === 'failed') {
-      statusInfo.push(`<summary>Command failed with exit code ${shell.exitCode}.</summary>`);
+    if (task.status === 'completed') {
+      statusInfo.push(`<summary>Task completed successfully.</summary>`);
+    } else if (task.status === 'failed') {
+      statusInfo.push(`<summary>Task failed with exit code ${task.exitCode}.</summary>`);
     } else {
-      statusInfo.push(`<summary>Command is still running. Use block=true to wait for completion.</summary>`);
+      statusInfo.push(`<summary>Task is still running.</summary>`);
     }
 
     return {
       success: true,
       output: statusInfo.join('\n'),
-      exitCode: shell.exitCode,
+      exitCode: task.exitCode,
       stdout: output,
-      shell_id: input.bash_id,
+      task_id: input.bash_id,
     };
   }
 }
 
 export class KillShellTool extends BaseTool<{ shell_id: string }, BashResult> {
   name = 'KillShell';
-  description = `Kills a running background bash shell by its ID.
+  description = `Kills a running background task by its ID.
 
 Usage:
-  - Takes a shell_id parameter identifying the shell to kill
+  - Takes a shell_id (or task_id) parameter identifying the task to kill
   - Returns a success or failure status
-  - Use this tool when you need to terminate a long-running shell`;
+  - Use this tool when you need to terminate a long-running task`;
 
   getInputSchema(): ToolDefinition['inputSchema'] {
     return {
@@ -814,7 +852,7 @@ Usage:
       properties: {
         shell_id: {
           type: 'string',
-          description: 'The ID of the background shell to kill',
+          description: 'The ID of the background task to kill (shell_id or task_id)',
         },
       },
       required: ['shell_id'],
@@ -822,49 +860,49 @@ Usage:
   }
 
   async execute(input: { shell_id: string }): Promise<BashResult> {
-    const shell = backgroundShells.get(input.shell_id);
-    if (!shell) {
-      return { success: false, error: `Shell ${input.shell_id} not found` };
+    const task = backgroundTasks.get(input.shell_id);
+    if (!task) {
+      return { success: false, error: `Task ${input.shell_id} not found` };
     }
 
     try {
-      shell.process.kill('SIGTERM');
+      task.process.kill('SIGTERM');
       // 关闭输出流
-      shell.outputStream?.end();
+      task.outputStream?.end();
 
       // 等待一秒，如果还在运行则强制杀死
       await new Promise((resolve) => setTimeout(resolve, 1000));
-      if (shell.status === 'running') {
-        shell.process.kill('SIGKILL');
+      if (task.status === 'running') {
+        task.process.kill('SIGKILL');
       }
 
-      backgroundShells.delete(input.shell_id);
+      backgroundTasks.delete(input.shell_id);
 
       return {
         success: true,
-        output: `Shell ${input.shell_id} killed`,
+        output: `Task ${input.shell_id} killed`,
       };
     } catch (err) {
-      return { success: false, error: `Failed to kill shell: ${err}` };
+      return { success: false, error: `Failed to kill task: ${err}` };
     }
   }
 }
 
 /**
- * 获取所有后台 shell 的状态
+ * 获取所有后台任务的状态
  */
-export function getBackgroundShells(): Array<{
+export function getBackgroundTasks(): Array<{
   id: string;
   status: string;
   duration: number;
 }> {
   const result: Array<{ id: string; status: string; duration: number }> = [];
 
-  Array.from(backgroundShells.entries()).forEach(([id, shell]) => {
+  Array.from(backgroundTasks.entries()).forEach(([id, task]) => {
     result.push({
       id,
-      status: shell.status,
-      duration: Date.now() - shell.startTime,
+      status: task.status,
+      duration: Date.now() - task.startTime,
     });
   });
 
@@ -872,25 +910,43 @@ export function getBackgroundShells(): Array<{
 }
 
 /**
- * 清理已完成的后台 shell
+ * 向后兼容：获取所有后台 shell 的状态
  */
-export function cleanupCompletedShells(): number {
+export function getBackgroundShells(): Array<{
+  id: string;
+  status: string;
+  duration: number;
+}> {
+  return getBackgroundTasks();
+}
+
+/**
+ * 清理已完成的后台任务
+ */
+export function cleanupCompletedTasks(): number {
   let cleaned = 0;
 
-  Array.from(backgroundShells.entries()).forEach(([id, shell]) => {
-    if (shell.status !== 'running') {
+  Array.from(backgroundTasks.entries()).forEach(([id, task]) => {
+    if (task.status !== 'running') {
       // 清理超时定时器
-      if (shell.timeout) {
-        clearTimeout(shell.timeout);
+      if (task.timeout) {
+        clearTimeout(task.timeout);
       }
       // 关闭输出流
-      shell.outputStream?.end();
-      backgroundShells.delete(id);
+      task.outputStream?.end();
+      backgroundTasks.delete(id);
       cleaned++;
     }
   });
 
   return cleaned;
+}
+
+/**
+ * 向后兼容：清理已完成的后台 shell
+ */
+export function cleanupCompletedShells(): number {
+  return cleanupCompletedTasks();
 }
 
 /**
@@ -965,9 +1021,9 @@ export function clearAuditLogs(): number {
 }
 
 /**
- * 列出所有后台 shell 详细信息
+ * 列出所有后台任务详细信息
  */
-export function listBackgroundShells(): Array<{
+export function listBackgroundTasks(): Array<{
   id: string;
   command: string;
   status: string;
@@ -984,14 +1040,14 @@ export function listBackgroundShells(): Array<{
     maxRuntime?: number;
   }> = [];
 
-  Array.from(backgroundShells.entries()).forEach(([id, shell]) => {
+  Array.from(backgroundTasks.entries()).forEach(([id, task]) => {
     result.push({
       id,
-      command: shell.command.substring(0, 100) + (shell.command.length > 100 ? '...' : ''),
-      status: shell.status,
-      duration: Date.now() - shell.startTime,
-      outputSize: shell.outputSize,
-      maxRuntime: shell.maxRuntime,
+      command: task.command.substring(0, 100) + (task.command.length > 100 ? '...' : ''),
+      status: task.status,
+      duration: Date.now() - task.startTime,
+      outputSize: task.outputSize,
+      maxRuntime: task.maxRuntime,
     });
   });
 
@@ -999,30 +1055,51 @@ export function listBackgroundShells(): Array<{
 }
 
 /**
- * 强制终止所有后台 shell
+ * 向后兼容：列出所有后台 shell 详细信息
  */
-export function killAllBackgroundShells(): number {
+export function listBackgroundShells(): Array<{
+  id: string;
+  command: string;
+  status: string;
+  duration: number;
+  outputSize: number;
+  maxRuntime?: number;
+}> {
+  return listBackgroundTasks();
+}
+
+/**
+ * 强制终止所有后台任务
+ */
+export function killAllBackgroundTasks(): number {
   let killed = 0;
 
-  Array.from(backgroundShells.entries()).forEach(([id, shell]) => {
+  Array.from(backgroundTasks.entries()).forEach(([id, task]) => {
     try {
-      shell.process.kill('SIGTERM');
-      if (shell.timeout) {
-        clearTimeout(shell.timeout);
+      task.process.kill('SIGTERM');
+      if (task.timeout) {
+        clearTimeout(task.timeout);
       }
       // 关闭输出流
-      shell.outputStream?.end();
+      task.outputStream?.end();
       setTimeout(() => {
-        if (shell.status === 'running') {
-          shell.process.kill('SIGKILL');
+        if (task.status === 'running') {
+          task.process.kill('SIGKILL');
         }
       }, 1000);
       killed++;
     } catch (err) {
-      console.error(`Failed to kill shell ${id}:`, err);
+      console.error(`Failed to kill task ${id}:`, err);
     }
   });
 
-  backgroundShells.clear();
+  backgroundTasks.clear();
   return killed;
+}
+
+/**
+ * 向后兼容：强制终止所有后台 shell
+ */
+export function killAllBackgroundShells(): number {
+  return killAllBackgroundTasks();
 }

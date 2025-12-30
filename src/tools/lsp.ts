@@ -53,6 +53,23 @@ type LSPInputType = z.infer<typeof LSPInput>;
 type LSPOutputType = z.infer<typeof LSPOutput> & import('../types/index.js').ToolResult;
 
 /**
+ * 规范化的位置对象
+ */
+interface NormalizedLocation {
+  uri: string;
+  range: {
+    start: {
+      line: number;
+      character: number;
+    };
+    end?: {
+      line: number;
+      character: number;
+    };
+  };
+}
+
+/**
  * LSP 工具
  */
 export class LSPTool extends BaseTool<LSPInputType, LSPOutputType> {
@@ -244,7 +261,10 @@ Note: LSP servers must be configured for the file type. If no server is availabl
   private formatLocationResult(result: any, workingDir: string) {
     const locations = Array.isArray(result) ? result : result ? [result] : [];
 
-    if (locations.length === 0) {
+    // 过滤并验证位置
+    const validLocations = locations.filter((loc) => this.isValidLocation(loc));
+
+    if (validLocations.length === 0) {
       return {
         formatted: 'No definition found. This may occur if the symbol is not defined in the workspace, or if the LSP server has not fully indexed the file.',
         resultCount: 0,
@@ -252,32 +272,33 @@ Note: LSP servers must be configured for the file type. If no server is availabl
       };
     }
 
-    if (locations.length === 1) {
-      const loc = locations[0];
-      const filePath = this.uriToPath(loc.uri || loc.targetUri, workingDir);
-      const line = (loc.range || loc.targetRange).start.line + 1;
+    if (validLocations.length === 1) {
+      const normalized = this.normalizeLocation(validLocations[0]);
+      const locationStr = this.formatLocationString(normalized, workingDir);
       return {
-        formatted: `Definition found at ${filePath}:${line}`,
+        formatted: `Definition found at ${locationStr}`,
         resultCount: 1,
         fileCount: 1,
       };
     }
 
-    const grouped = this.groupByFile(locations, workingDir);
-    const lines = [`Found ${locations.length} definitions across ${grouped.size} files:`];
+    // 规范化所有位置
+    const normalizedLocations = validLocations.map((loc) => this.normalizeLocation(loc));
+    const grouped = this.groupNormalizedByFile(normalizedLocations, workingDir);
+    const lines = [`Found ${normalizedLocations.length} definitions across ${grouped.size} files:`];
 
     for (const [file, locs] of grouped) {
       lines.push(`\n${file}:`);
       for (const loc of locs) {
-        const line = (loc.range || loc.targetRange).start.line + 1;
-        const char = (loc.range || loc.targetRange).start.character + 1;
+        const line = loc.range.start.line + 1;
+        const char = loc.range.start.character + 1;
         lines.push(`  Line ${line}:${char}`);
       }
     }
 
     return {
       formatted: lines.join('\n'),
-      resultCount: locations.length,
+      resultCount: normalizedLocations.length,
       fileCount: grouped.size,
     };
   }
@@ -288,7 +309,10 @@ Note: LSP servers must be configured for the file type. If no server is availabl
   private formatReferencesResult(result: any, workingDir: string) {
     const references = result || [];
 
-    if (references.length === 0) {
+    // 过滤并验证位置
+    const validReferences = references.filter((loc: unknown) => this.isValidLocation(loc));
+
+    if (validReferences.length === 0) {
       return {
         formatted: 'No references found. This may occur if the symbol is not used elsewhere, or if the LSP server has not fully indexed the project.',
         resultCount: 0,
@@ -296,8 +320,10 @@ Note: LSP servers must be configured for the file type. If no server is availabl
       };
     }
 
-    const grouped = this.groupByFile(references, workingDir);
-    const lines = [`Found ${references.length} references across ${grouped.size} files:`];
+    // 规范化所有引用
+    const normalizedReferences = validReferences.map((ref: any) => this.normalizeLocation(ref));
+    const grouped = this.groupNormalizedByFile(normalizedReferences, workingDir);
+    const lines = [`Found ${normalizedReferences.length} references across ${grouped.size} files:`];
 
     for (const [file, refs] of grouped) {
       lines.push(`\n${file}:`);
@@ -310,7 +336,7 @@ Note: LSP servers must be configured for the file type. If no server is availabl
 
     return {
       formatted: lines.join('\n'),
-      resultCount: references.length,
+      resultCount: normalizedReferences.length,
       fileCount: grouped.size,
     };
   }
@@ -392,7 +418,10 @@ Note: LSP servers must be configured for the file type. If no server is availabl
    * 格式化工作区符号结果
    */
   private formatWorkspaceSymbolResult(result: any, workingDir: string) {
-    const symbols = (result || []).filter((s: any) => s && s.location && s.location.uri);
+    // 验证并过滤符号
+    const symbols = (result || []).filter(
+      (s: any) => s && s.location && s.location.uri && this.isValidLocation(s.location)
+    );
 
     if (symbols.length === 0) {
       return {
@@ -475,7 +504,14 @@ Note: LSP servers must be configured for the file type. If no server is availabl
   private formatCallsResult(operation: string, result: any, workingDir: string) {
     const calls = result || [];
 
-    if (calls.length === 0) {
+    // 验证调用数据
+    const validCalls = calls.filter((call: any) => {
+      const isIncoming = operation === 'incomingCalls';
+      const item = call[isIncoming ? 'from' : 'to'];
+      return item && item.uri && item.range;
+    });
+
+    if (validCalls.length === 0) {
       const type = operation === 'incomingCalls' ? 'incoming' : 'outgoing';
       return {
         formatted: `No ${type} calls found (${operation === 'incomingCalls' ? 'nothing calls this function' : 'this function calls nothing'})`,
@@ -487,11 +523,11 @@ Note: LSP servers must be configured for the file type. If no server is availabl
     const isIncoming = operation === 'incomingCalls';
     const callItem = isIncoming ? 'from' : 'to';
     const label = isIncoming ? 'caller' : 'callee';
-    const lines = [`Found ${calls.length} ${label}${calls.length === 1 ? '' : 's'}:`];
+    const lines = [`Found ${validCalls.length} ${label}${validCalls.length === 1 ? '' : 's'}:`];
 
     const grouped = new Map<string, any[]>();
 
-    for (const call of calls) {
+    for (const call of validCalls) {
       const item = call[callItem];
       if (!item) continue;
 
@@ -525,18 +561,73 @@ Note: LSP servers must be configured for the file type. If no server is availabl
 
     return {
       formatted: lines.join('\n'),
-      resultCount: calls.length,
+      resultCount: validCalls.length,
       fileCount: grouped.size,
     };
   }
 
   /**
-   * 辅助方法：URI 转路径
+   * 辅助方法：URI 转路径（增强版）
    */
-  private uriToPath(uri: string, workingDir: string): string {
-    const filePath = uri.replace(/^file:\/\//, '');
-    const relativePath = path.relative(workingDir, filePath);
-    return relativePath.startsWith('..') ? filePath : relativePath;
+  private uriToPath(uri: string, workingDir?: string): string {
+    let decoded = uri.replace(/^file:\/\//, '');
+    try {
+      decoded = decodeURIComponent(decoded);
+    } catch (e) {
+      // 使用未解码的路径
+      console.warn('Failed to decode URI:', uri);
+    }
+
+    // 如果提供了工作目录，尝试返回相对路径
+    if (workingDir) {
+      const relativePath = path.relative(workingDir, decoded);
+      return relativePath.startsWith('..') ? decoded : relativePath;
+    }
+
+    return decoded;
+  }
+
+  /**
+   * 辅助方法：验证位置数据
+   */
+  private isValidLocation(loc: unknown): boolean {
+    if (!loc || typeof loc !== 'object') return false;
+    if (!('uri' in loc) && !('targetUri' in loc) && !('location' in loc)) {
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * 辅助方法：规范化位置对象
+   */
+  private normalizeLocation(loc: any): NormalizedLocation {
+    if ('targetUri' in loc) {
+      return {
+        uri: loc.targetUri,
+        range: loc.targetSelectionRange || loc.targetRange,
+      };
+    }
+    if ('location' in loc) {
+      return {
+        uri: loc.location.uri,
+        range: loc.location.range,
+      };
+    }
+    return {
+      uri: loc.uri,
+      range: loc.range,
+    };
+  }
+
+  /**
+   * 辅助方法：格式化位置信息（官方格式: "路径:行:列"）
+   */
+  private formatLocationString(loc: NormalizedLocation, workingDir: string): string {
+    const filePath = this.uriToPath(loc.uri, workingDir);
+    const line = loc.range.start.line + 1;
+    const char = loc.range.start.character + 1;
+    return `${filePath}:${line}:${char}`;
   }
 
   /**
@@ -550,6 +641,28 @@ Note: LSP servers must be configured for the file type. If no server is availabl
       if (!uri) continue;
 
       const filePath = this.uriToPath(uri, workingDir);
+
+      if (!grouped.has(filePath)) {
+        grouped.set(filePath, []);
+      }
+
+      grouped.get(filePath)!.push(loc);
+    }
+
+    return grouped;
+  }
+
+  /**
+   * 辅助方法：按文件分组（规范化位置）
+   */
+  private groupNormalizedByFile(
+    locations: NormalizedLocation[],
+    workingDir: string
+  ): Map<string, NormalizedLocation[]> {
+    const grouped = new Map<string, NormalizedLocation[]>();
+
+    for (const loc of locations) {
+      const filePath = this.uriToPath(loc.uri, workingDir);
 
       if (!grouped.has(filePath)) {
         grouped.set(filePath, []);

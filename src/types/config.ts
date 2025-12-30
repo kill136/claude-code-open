@@ -1190,6 +1190,8 @@ export interface SessionState {
   totalAPIDuration: number;
   totalAPIDurationWithoutRetries?: number; // T143: 不含重试的 API 时间
   totalToolDuration?: number; // T143: 工具执行总时间
+  totalLinesAdded?: number; // 代码修改统计：添加的行数
+  totalLinesRemoved?: number; // 代码修改统计：删除的行数
   modelUsage: Record<string, ModelUsageStats>; // T151: 扩展为详细统计
   todos: Array<{
     content: string;
@@ -1206,7 +1208,9 @@ export interface ModelUsageStats {
   outputTokens: number;
   cacheReadInputTokens?: number;
   cacheCreationInputTokens?: number;
+  thinkingTokens?: number; // 思考 token 数（Extended Thinking）
   webSearchRequests?: number;
+  requests?: number; // API 请求次数
   costUSD: number;
   contextWindow: number;
 }

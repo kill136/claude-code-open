@@ -7,6 +7,8 @@ import { spawn, spawnSync } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
+import { getGlobalAppState } from './planmode.js';
+import type { ToolPermissionContext } from './planmode.js';
 
 // ============ 类型定义 ============
 
@@ -39,6 +41,10 @@ export interface SandboxOptions {
   maxMemory?: number;
   /** 最大 CPU 使用率 (0-100) */
   maxCpu?: number;
+  /** 工具权限上下文（用于权限模式判断） */
+  permissionContext?: ToolPermissionContext;
+  /** 命令（用于特殊处理，如 mcp-cli） */
+  command?: string;
 }
 
 export interface SandboxResult {
@@ -707,7 +713,41 @@ async function executeDirectly(
 // ============ 主执行函数 ============
 
 /**
- * 使用沙箱执行命令 - 自动选择最佳沙箱
+ * 根据权限模式判断是否应该使用沙箱
+ */
+function shouldUseSandbox(
+  command: string,
+  options: SandboxOptions,
+  permissionContext?: ToolPermissionContext
+): boolean {
+  // 如果明确禁用沙箱
+  if (options.disableSandbox) {
+    return false;
+  }
+
+  // MCP 工具的特殊处理：mcp-cli 命令必须禁用沙箱
+  if (command.includes('mcp-cli')) {
+    return false;
+  }
+
+  // 如果没有权限上下文，使用全局状态
+  const context = permissionContext || getGlobalAppState()?.toolPermissionContext;
+
+  // 在某些权限模式下禁用沙箱
+  // 注意：官方实现中，只有在某些特定模式下才会绕过沙箱
+  // 这里我们简化实现，保持沙箱默认开启
+
+  // 如果沙箱全局禁用
+  if (!sandboxConfig.enabled) {
+    return false;
+  }
+
+  // 检查沙箱是否可用
+  return isSandboxAvailable();
+}
+
+/**
+ * 使用沙箱执行命令 - 自动选择最佳沙箱，支持自动重试
  */
 export async function executeInSandbox(
   command: string,
@@ -718,20 +758,26 @@ export async function executeInSandbox(
     env = {},
     timeout = 120000,
     disableSandbox = false,
+    permissionContext,
   } = options;
 
-  // 如果禁用沙箱或沙箱不可用，直接执行
-  if (disableSandbox || !sandboxConfig.enabled) {
+  // 判断是否使用沙箱
+  const useSandbox = shouldUseSandbox(command, options, permissionContext);
+
+  // 如果不使用沙箱，直接执行
+  if (!useSandbox) {
     return executeDirectly(command, { cwd, env, timeout });
   }
 
   const sandboxType = getSandboxType();
 
   try {
+    let result: SandboxResult;
+
     if (sandboxType === 'bubblewrap') {
-      return await executeWithBubblewrap(command, options);
+      result = await executeWithBubblewrap(command, options);
     } else if (sandboxType === 'seatbelt') {
-      return await executeWithSeatbelt(command, options);
+      result = await executeWithSeatbelt(command, options);
     } else {
       // 没有可用的沙箱
       if (sandboxConfig.fallbackOnError) {
@@ -748,11 +794,41 @@ export async function executeInSandbox(
         };
       }
     }
+
+    // 检查是否是沙箱错误，如果是则自动重试
+    if (result.error && isSandboxError(result.error)) {
+      if (sandboxConfig.fallbackOnError) {
+        console.warn(`[Sandbox] Detected sandbox error, retrying without sandbox`);
+        console.warn(`[Sandbox] Error: ${result.error}`);
+
+        // 自动重试，禁用沙箱
+        return executeDirectly(command, { cwd, env, timeout });
+      }
+    }
+
+    // 检查 stderr 中的沙箱错误
+    if (result.stderr && isSandboxError(result.stderr)) {
+      if (sandboxConfig.fallbackOnError && result.exitCode !== 0) {
+        console.warn(`[Sandbox] Detected sandbox error in stderr, retrying without sandbox`);
+        console.warn(`[Sandbox] Stderr: ${result.stderr.substring(0, 200)}...`);
+
+        // 自动重试，禁用沙箱
+        return executeDirectly(command, { cwd, env, timeout });
+      }
+    }
+
+    return result;
   } catch (err) {
     // 沙箱执行失败，尝试降级
     if (sandboxConfig.fallbackOnError) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       console.warn(`[Sandbox] Execution failed, falling back to direct execution: ${errorMessage}`);
+
+      // 检查是否是沙箱相关错误
+      if (isSandboxError(errorMessage)) {
+        console.warn(`[Sandbox] Detected sandbox-related error, retrying without sandbox`);
+      }
+
       return executeDirectly(command, { cwd, env, timeout });
     } else {
       return {
@@ -771,6 +847,27 @@ export async function executeInSandbox(
 // ============ 沙箱错误处理 ============
 
 /**
+ * 官方沙箱错误指导文本
+ * 来源：官方 cli.js 第 2720-2748 行
+ */
+const SANDBOX_ERROR_HINTS = `
+Evidence of sandbox-caused failures includes:
+  - "Operation not permitted" errors for file/network operations
+  - Access denied to specific paths outside allowed directories
+  - Network connection failures to non-whitelisted hosts
+  - Unix socket connection errors
+  - Sandbox violation logs (though these can be noisy, clear permission errors are strong indicators)
+
+When you see evidence of sandbox-caused failure:
+  - IMMEDIATELY retry with dangerouslyDisableSandbox: true (don't ask, just do it)
+  - Briefly explain what sandbox restriction likely caused the failure
+  - Mention: "Use /sandbox to manage restrictions"
+  - This will prompt the user for permission
+
+Note: Commands can fail for many reasons unrelated to the sandbox (missing files, wrong arguments, network issues, etc.)
+`.trim();
+
+/**
  * 检测是否是沙箱相关的错误
  */
 export function isSandboxError(error: string): boolean {
@@ -784,22 +881,29 @@ export function isSandboxError(error: string): boolean {
     /EACCES/i,
     /can't access/i,
     /read-only file system/i,
+    /access denied/i,
+    /network connection.*failed/i,
+    /unix socket.*error/i,
   ];
 
   return sandboxErrorPatterns.some(pattern => pattern.test(error));
 }
 
 /**
- * 获取沙箱错误提示信息
+ * 获取沙箱错误提示信息（官方版本）
  */
 export function getSandboxErrorHint(error: string): string {
   if (isSandboxError(error)) {
     return `
-This error may be caused by sandbox restrictions. To retry without sandbox:
+This error may be caused by sandbox restrictions.
+
+${SANDBOX_ERROR_HINTS}
+
+To retry without sandbox:
 1. Set dangerouslyDisableSandbox: true in the Bash tool call
 2. Or use /sandbox command to manage sandbox settings
 
-Note: Only bypass sandbox if the command failed due to sandbox restrictions.
+IMPORTANT: Only bypass sandbox if the command failed due to sandbox restrictions.
 `.trim();
   }
   return '';
@@ -824,4 +928,50 @@ export function formatSandboxError(result: SandboxResult): string {
     return message;
   }
   return result.error || '';
+}
+
+// ============ 带自动重试的执行函数 ============
+
+/**
+ * 使用沙箱执行命令，遇到沙箱错误时自动重试（官方实现）
+ *
+ * 这个函数实现了官方的自动重试逻辑：
+ * 1. 首先尝试在沙箱中执行
+ * 2. 如果检测到沙箱错误，自动禁用沙箱重试
+ * 3. MCP 工具（mcp-cli）会自动禁用沙箱
+ *
+ * @param command 要执行的命令
+ * @param options 沙箱选项
+ * @returns 执行结果
+ */
+export async function executeWithSandboxFallback(
+  command: string,
+  options: SandboxOptions = {}
+): Promise<SandboxResult> {
+  try {
+    // 第一次尝试：使用沙箱执行
+    const result = await executeInSandbox(command, {
+      ...options,
+      command, // 传递命令用于 MCP 检测
+    });
+
+    // executeInSandbox 已经包含了自动重试逻辑
+    return result;
+  } catch (error) {
+    // 如果是沙箱错误且允许降级，则禁用沙箱重试
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    if (isSandboxError(errorMessage) && sandboxConfig.fallbackOnError) {
+      console.warn(`[Sandbox] Error detected, retrying without sandbox: ${errorMessage}`);
+
+      return executeDirectly(command, {
+        cwd: options.cwd || process.cwd(),
+        env: options.env || {},
+        timeout: options.timeout || 120000,
+      });
+    }
+
+    // 其他错误，直接抛出
+    throw error;
+  }
 }

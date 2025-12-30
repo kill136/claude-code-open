@@ -16,6 +16,190 @@ import {
 } from '../prompt/index.js';
 import { modelConfig, type ThinkingConfig } from '../models/index.js';
 import { initAuth, getAuth, ensureOAuthApiKey } from '../auth/index.js';
+import { runPermissionRequestHooks } from '../hooks/index.js';
+import * as readline from 'readline';
+
+// ============================================================================
+// 持久化输出常量
+// ============================================================================
+
+/** 持久化输出起始标签 */
+const PERSISTED_OUTPUT_START = '<persisted-output>';
+
+/** 持久化输出结束标签 */
+const PERSISTED_OUTPUT_END = '</persisted-output>';
+
+/** 最大输出行数限制 */
+const MAX_OUTPUT_LINES = 2000;
+
+/** 输出阈值（字符数），超过此值使用持久化标签 */
+const OUTPUT_THRESHOLD = 50000;
+
+/** 预览大小（字节） */
+const PREVIEW_SIZE = 2000000; // 2MB
+
+// ============================================================================
+// 工具结果处理辅助函数
+// ============================================================================
+
+/**
+ * 截断输出到指定行数
+ * @param content 原始内容
+ * @returns 截断后的内容
+ */
+function truncateOutput(content: string): string {
+  const lines = content.split('\n');
+  if (lines.length > MAX_OUTPUT_LINES) {
+    const truncated = lines.slice(0, MAX_OUTPUT_LINES).join('\n');
+    const remaining = lines.length - MAX_OUTPUT_LINES;
+    return `${truncated}\n... (${remaining} more lines truncated)`;
+  }
+  return content;
+}
+
+/**
+ * 使用持久化标签包装大型输出
+ * @param content 输出内容
+ * @param toolName 工具名称
+ * @returns 包装后的内容
+ */
+function wrapPersistedOutput(content: string, toolName: string): string {
+  // 如果输出超过阈值，使用持久化标签包装
+  if (content.length > OUTPUT_THRESHOLD) {
+    return `${PERSISTED_OUTPUT_START}\n${content}\n${PERSISTED_OUTPUT_END}`;
+  }
+  return content;
+}
+
+/**
+ * 格式化工具结果
+ * @param toolName 工具名称
+ * @param result 工具执行结果
+ * @returns 格式化后的内容
+ */
+function formatToolResult(
+  toolName: string,
+  result: { success: boolean; output?: string; error?: string }
+): string {
+  let content: string;
+
+  if (!result.success) {
+    content = `Error: ${result.error}`;
+  } else {
+    content = result.output || '';
+  }
+
+  // 先截断到最大行数
+  content = truncateOutput(content);
+
+  // 对于特定工具，应用特殊处理
+  switch (toolName) {
+    case 'Read':
+      // 图片和二进制文件已经在工具内部处理
+      // 这里只处理文本输出
+      break;
+
+    case 'Bash':
+      // Bash 输出可能非常大，使用持久化
+      content = wrapPersistedOutput(content, toolName);
+      break;
+
+    case 'Grep':
+      // Grep 输出可能很长，使用持久化
+      content = wrapPersistedOutput(content, toolName);
+      break;
+
+    case 'Glob':
+      // 文件列表可能很长
+      content = wrapPersistedOutput(content, toolName);
+      break;
+
+    default:
+      // 对于其他工具，根据大小决定是否持久化
+      content = wrapPersistedOutput(content, toolName);
+      break;
+  }
+
+  return content;
+}
+
+/**
+ * 清理消息历史中的旧持久化输出
+ * 保留最近的 N 个持久化输出，清理更早的
+ * @param messages 消息列表
+ * @param keepRecent 保留最近的数量（默认 3）
+ * @returns 清理后的消息列表
+ */
+function cleanOldPersistedOutputs(messages: Message[], keepRecent: number = 3): Message[] {
+  const persistedOutputIndices: number[] = [];
+
+  // 找到所有包含持久化输出的消息索引
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
+    if (msg.role === 'user' && Array.isArray(msg.content)) {
+      for (const block of msg.content) {
+        if (
+          typeof block === 'object' &&
+          'type' in block &&
+          block.type === 'tool_result' &&
+          typeof block.content === 'string' &&
+          block.content.includes(PERSISTED_OUTPUT_START)
+        ) {
+          persistedOutputIndices.push(i);
+          break;
+        }
+      }
+    }
+  }
+
+  // 如果持久化输出数量超过限制，清理旧的
+  if (persistedOutputIndices.length > keepRecent) {
+    const indicesToClean = persistedOutputIndices.slice(0, -keepRecent);
+
+    return messages.map((msg, index) => {
+      if (!indicesToClean.includes(index)) {
+        return msg;
+      }
+
+      // 清理这条消息中的持久化标签
+      if (msg.role === 'user' && Array.isArray(msg.content)) {
+        return {
+          ...msg,
+          content: msg.content.map((block) => {
+            if (
+              typeof block === 'object' &&
+              'type' in block &&
+              block.type === 'tool_result' &&
+              typeof block.content === 'string'
+            ) {
+              // 移除持久化标签，只保留简要信息
+              let content = block.content;
+              if (content.includes(PERSISTED_OUTPUT_START)) {
+                const start = content.indexOf(PERSISTED_OUTPUT_START);
+                const end = content.indexOf(PERSISTED_OUTPUT_END);
+                if (start !== -1 && end !== -1) {
+                  const persistedContent = content.substring(
+                    start + PERSISTED_OUTPUT_START.length,
+                    end
+                  );
+                  const lines = persistedContent.trim().split('\n');
+                  const preview = lines.slice(0, 10).join('\n');
+                  content = `[Previous output truncated - ${lines.length} lines]\n${preview}\n...`;
+                }
+              }
+              return { ...block, content };
+            }
+            return block;
+          }),
+        };
+      }
+
+      return msg;
+    });
+  }
+
+  return messages;
+}
 
 export interface LoopOptions {
   model?: string;
@@ -47,6 +231,107 @@ export class ConversationLoop {
   private totalCostUSD: number = 0;
   private promptBuilder: SystemPromptBuilder;
   private promptContext: PromptContext;
+
+  /**
+   * 处理权限请求（询问用户是否允许工具执行）
+   * @param toolName 工具名称
+   * @param toolInput 工具输入
+   * @param message 权限请求消息
+   * @returns 是否批准执行
+   */
+  private async handlePermissionRequest(
+    toolName: string,
+    toolInput: unknown,
+    message?: string
+  ): Promise<boolean> {
+    // 1. 触发 PermissionRequest Hooks
+    const hookResult = await runPermissionRequestHooks(
+      toolName,
+      toolInput,
+      this.session.sessionId
+    );
+
+    // 如果 hook 返回了决策，使用 hook 的决策
+    if (hookResult.decision === 'allow') {
+      if (this.options.verbose) {
+        console.log(chalk.green(`[Permission] Allowed by hook: ${hookResult.message || 'No reason provided'}`));
+      }
+      return true;
+    } else if (hookResult.decision === 'deny') {
+      if (this.options.verbose) {
+        console.log(chalk.red(`[Permission] Denied by hook: ${hookResult.message || 'No reason provided'}`));
+      }
+      return false;
+    }
+
+    // 2. 检查权限模式
+    if (this.options.permissionMode === 'bypassPermissions' || this.options.dangerouslySkipPermissions) {
+      if (this.options.verbose) {
+        console.log(chalk.yellow('[Permission] Bypassed due to permission mode'));
+      }
+      return true;
+    }
+
+    if (this.options.permissionMode === 'dontAsk') {
+      // dontAsk 模式：自动拒绝需要询问的操作
+      if (this.options.verbose) {
+        console.log(chalk.red('[Permission] Auto-denied in dontAsk mode'));
+      }
+      return false;
+    }
+
+    // 3. 显示权限请求对话框
+    console.log(chalk.yellow('\n┌─────────────────────────────────────────┐'));
+    console.log(chalk.yellow('│          Permission Request             │'));
+    console.log(chalk.yellow('├─────────────────────────────────────────┤'));
+    console.log(chalk.yellow(`│ Tool: ${toolName.padEnd(33)}│`));
+    if (message) {
+      const displayMessage = message.length > 33 ? message.slice(0, 30) + '...' : message;
+      console.log(chalk.yellow(`│ Reason: ${displayMessage.padEnd(31)}│`));
+    }
+    if (toolInput && typeof toolInput === 'object') {
+      const inputStr = JSON.stringify(toolInput).slice(0, 30);
+      console.log(chalk.yellow(`│ Input: ${inputStr.padEnd(32)}│`));
+    }
+    console.log(chalk.yellow('└─────────────────────────────────────────┘'));
+    console.log('\nOptions:');
+    console.log('  [y] Yes, allow once');
+    console.log('  [n] No, deny');
+    console.log('  [a] Always allow for this session');
+
+    // 4. 等待用户输入
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+
+    return new Promise((resolve) => {
+      rl.question('\nYour choice [y/n/a]: ', (answer) => {
+        rl.close();
+
+        const choice = answer.trim().toLowerCase();
+
+        switch (choice) {
+          case 'y':
+            console.log(chalk.green('✓ Permission granted for this request'));
+            resolve(true);
+            break;
+
+          case 'a':
+            console.log(chalk.green('✓ Permission granted for all requests in this session'));
+            // TODO: 实现会话级权限记忆
+            resolve(true);
+            break;
+
+          case 'n':
+          default:
+            console.log(chalk.red('✗ Permission denied'));
+            resolve(false);
+            break;
+        }
+      });
+    });
+  }
 
   constructor(options: LoopOptions = {}) {
     // 解析模型别名
@@ -290,10 +575,14 @@ export class ConversationLoop {
     while (turns < maxTurns) {
       turns++;
 
+      // 在发送请求前清理旧的持久化输出
+      const messages = this.session.getMessages();
+      const cleanedMessages = cleanOldPersistedOutputs(messages, 3);
+
       let response;
       try {
         response = await this.client.createMessage(
-          this.session.getMessages(),
+          cleanedMessages,
           this.tools,
           systemPrompt,
           {
@@ -341,16 +630,27 @@ export class ConversationLoop {
             console.log(chalk.cyan(`\n[Tool: ${toolName}]`));
           }
 
-          const result = await toolRegistry.execute(toolName, toolInput);
+          // 执行工具（带权限检查和回调）
+          const result = await toolRegistry.execute(
+            toolName,
+            toolInput,
+            // 权限请求回调函数
+            async (name, input, message) => {
+              return await this.handlePermissionRequest(name, input, message);
+            }
+          );
 
           if (this.options.verbose) {
             console.log(chalk.gray(result.output || result.error || ''));
           }
 
+          // 使用格式化函数处理工具结果
+          const formattedContent = formatToolResult(toolName, result);
+
           toolResults.push({
             type: 'tool_result',
             tool_use_id: toolId,
-            content: result.success ? (result.output || '') : `Error: ${result.error}`,
+            content: formattedContent,
           });
         }
       }
@@ -465,13 +765,17 @@ Guidelines:
     while (turns < maxTurns) {
       turns++;
 
+      // 在发送请求前清理旧的持久化输出
+      const messages = this.session.getMessages();
+      const cleanedMessages = cleanOldPersistedOutputs(messages, 3);
+
       const assistantContent: ContentBlock[] = [];
       const toolCalls: Map<string, { name: string; input: string }> = new Map();
       let currentToolId = '';
 
       try {
         for await (const event of this.client.createMessageStream(
-          this.session.getMessages(),
+          cleanedMessages,
           this.tools,
           systemPrompt,
           {
@@ -517,7 +821,16 @@ Guidelines:
       for (const [id, tool] of toolCalls) {
         try {
           const input = JSON.parse(tool.input || '{}');
-          const result = await toolRegistry.execute(tool.name, input);
+
+          // 执行工具（带权限检查和回调）
+          const result = await toolRegistry.execute(
+            tool.name,
+            input,
+            // 权限请求回调函数
+            async (name, toolInput, message) => {
+              return await this.handlePermissionRequest(name, toolInput, message);
+            }
+          );
 
           yield {
             type: 'tool_end',
@@ -534,10 +847,13 @@ Guidelines:
             input,
           });
 
+          // 使用格式化函数处理工具结果
+          const formattedContent = formatToolResult(tool.name, result);
+
           toolResults.push({
             type: 'tool_result',
             tool_use_id: id,
-            content: result.success ? (result.output || '') : `Error: ${result.error}`,
+            content: formattedContent,
           });
         } catch (err) {
           yield {

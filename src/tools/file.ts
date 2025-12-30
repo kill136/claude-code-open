@@ -53,12 +53,22 @@ interface ExtendedFileEditInput extends FileEditInput {
 }
 
 /**
+ * 文件读取记录接口
+ */
+interface FileReadRecord {
+  path: string;
+  readTime: number;  // 读取时的时间戳
+  mtime: number;     // 读取时的文件修改时间（mtimeMs）
+}
+
+/**
  * 全局文件读取跟踪器
  * 用于验证在编辑文件之前是否已读取该文件
+ * 并跟踪文件的 mtime 以检测外部修改
  */
 class FileReadTracker {
   private static instance: FileReadTracker;
-  private readFiles: Set<string> = new Set();
+  private readFiles: Map<string, FileReadRecord> = new Map();
 
   static getInstance(): FileReadTracker {
     if (!FileReadTracker.instance) {
@@ -67,15 +77,25 @@ class FileReadTracker {
     return FileReadTracker.instance;
   }
 
-  markAsRead(filePath: string): void {
+  markAsRead(filePath: string, mtime: number): void {
     // 规范化路径
     const normalizedPath = path.resolve(filePath);
-    this.readFiles.add(normalizedPath);
+    const record: FileReadRecord = {
+      path: normalizedPath,
+      readTime: Date.now(),
+      mtime,
+    };
+    this.readFiles.set(normalizedPath, record);
   }
 
   hasBeenRead(filePath: string): boolean {
     const normalizedPath = path.resolve(filePath);
     return this.readFiles.has(normalizedPath);
+  }
+
+  getRecord(filePath: string): FileReadRecord | undefined {
+    const normalizedPath = path.resolve(filePath);
+    return this.readFiles.get(normalizedPath);
   }
 
   clear(): void {
@@ -344,8 +364,8 @@ Usage:
         return `${lineNum}\t${truncatedLine}`;
       }).join('\n');
 
-      // 标记文件已被读取（用于 Edit 工具验证）
-      fileReadTracker.markAsRead(file_path);
+      // 标记文件已被读取（用于 Edit 工具验证），记录 mtime
+      fileReadTracker.markAsRead(file_path, stat.mtimeMs);
 
       return {
         success: true,
@@ -747,10 +767,17 @@ class FileBackup {
  * 对应官方 cli.js 中的 errorCode
  */
 enum EditErrorCode {
-  STRING_NOT_FOUND = 8,
-  MULTIPLE_MATCHES = 9,
-  FILE_NOT_READ = 10,
-  INVALID_PATH = 11,
+  NO_CHANGE = 1,              // 文件内容无变化
+  PATH_DENIED = 2,            // 路径权限被拒绝
+  FILE_EXISTS = 3,            // 文件已存在（创建新文件时）
+  FILE_NOT_FOUND = 4,         // 文件不存在
+  IS_NOTEBOOK = 5,            // 是 Jupyter Notebook 文件
+  NOT_READ = 6,               // 文件未被读取
+  EXTERNALLY_MODIFIED = 7,    // 文件在读取后被外部修改
+  STRING_NOT_FOUND = 8,       // 字符串未找到
+  MULTIPLE_MATCHES = 9,       // 找到多个匹配
+  FILE_NOT_READ = 10,         // 文件未被读取（兼容旧代码）
+  INVALID_PATH = 11,          // 无效路径
 }
 
 export class EditTool extends BaseTool<ExtendedFileEditInput, EditToolResult> {
@@ -844,7 +871,7 @@ Usage:
         return {
           success: false,
           error: `You must read the file with the Read tool before editing it. File: ${file_path}`,
-          errorCode: EditErrorCode.FILE_NOT_READ,
+          errorCode: EditErrorCode.NOT_READ,
         };
       }
 
@@ -862,28 +889,38 @@ Usage:
         return { success: false, error: `Path is a directory: ${file_path}` };
       }
 
-      // 4. 读取原始内容
+      // 4. 检查文件是否在读取后被外部修改
+      const readRecord = fileReadTracker.getRecord(file_path);
+      if (readRecord && stat.mtimeMs > readRecord.mtime) {
+        return {
+          success: false,
+          error: 'File has been modified since it was read. Please read the file again to see the latest changes before editing.',
+          errorCode: EditErrorCode.EXTERNALLY_MODIFIED,
+        };
+      }
+
+      // 5. 读取原始内容
       const originalContent = fs.readFileSync(file_path, 'utf-8');
 
-      // 5. 特殊情况：old_string 为空表示写入/覆盖整个文件
+      // 6. 特殊情况：old_string 为空表示写入/覆盖整个文件
       if (old_string === '') {
         return this.writeEntireFile(file_path, new_string ?? '', originalContent, show_diff);
       }
 
-      // 6. 备份原始内容
+      // 7. 备份原始内容
       this.fileBackup.backup(file_path, originalContent);
 
-      // 7. 确定编辑操作列表
+      // 8. 确定编辑操作列表
       const edits: BatchEdit[] = batch_edits || [{ old_string: old_string!, new_string: new_string!, replace_all }];
 
-      // 8. 验证并执行所有编辑操作
+      // 9. 验证并执行所有编辑操作
       let currentContent = originalContent;
       const appliedEdits: string[] = [];
 
       for (let i = 0; i < edits.length; i++) {
         const edit = edits[i];
 
-        // 8.1 智能查找匹配字符串
+        // 9.1 智能查找匹配字符串
         const matchedString = smartFindString(currentContent, edit.old_string);
 
         if (!matchedString) {
@@ -895,10 +932,10 @@ Usage:
           };
         }
 
-        // 8.2 计算匹配次数
+        // 9.2 计算匹配次数
         const matchCount = currentContent.split(matchedString).length - 1;
 
-        // 8.3 如果不是 replace_all，检查唯一性
+        // 9.3 如果不是 replace_all，检查唯一性
         if (matchCount > 1 && !edit.replace_all) {
           return {
             success: false,
@@ -907,12 +944,12 @@ Usage:
           };
         }
 
-        // 8.4 检查 old_string 和 new_string 是否相同
+        // 9.4 检查 old_string 和 new_string 是否相同
         if (matchedString === edit.new_string) {
           continue; // 跳过无变化的编辑
         }
 
-        // 8.5 检查是否会与之前的 new_string 冲突
+        // 9.5 检查是否会与之前的 new_string 冲突
         for (const prevEdit of appliedEdits) {
           if (matchedString !== '' && prevEdit.includes(matchedString)) {
             return {
@@ -922,12 +959,12 @@ Usage:
           }
         }
 
-        // 8.6 应用编辑
+        // 9.6 应用编辑
         currentContent = replaceString(currentContent, matchedString, edit.new_string, edit.replace_all);
         appliedEdits.push(edit.new_string);
       }
 
-      // 9. 检查是否有实际变化
+      // 10. 检查是否有实际变化
       if (currentContent === originalContent) {
         return {
           success: false,
@@ -937,13 +974,13 @@ Usage:
 
       const modifiedContent = currentContent;
 
-      // 10. 生成差异预览
+      // 11. 生成差异预览
       let diffPreview: DiffPreview | null = null;
       if (show_diff) {
         diffPreview = generateUnifiedDiff(file_path, originalContent, modifiedContent);
       }
 
-      // 11. 检查是否需要确认
+      // 12. 检查是否需要确认
       if (require_confirmation) {
         return {
           success: false,
@@ -952,7 +989,7 @@ Usage:
         };
       }
 
-      // 12. 执行实际的文件写入
+      // 13. 执行实际的文件写入
       try {
         fs.writeFileSync(file_path, modifiedContent, 'utf-8');
 

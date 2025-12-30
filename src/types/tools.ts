@@ -520,6 +520,23 @@ export interface ReadMcpResourceInput {
   uri: string;
 }
 
+/**
+ * Input parameters for searching MCP tools
+ */
+export interface MCPSearchInput {
+  /**
+   * Search query for MCP tools
+   * - Keywords: "filesystem" or "list directory" - fuzzy search
+   * - Direct selection: "select:mcp__filesystem__list_directory" - load specific tool
+   */
+  query: string;
+
+  /**
+   * Maximum number of results to return (default: 5)
+   */
+  max_results?: number;
+}
+
 // ============================================================================
 // AskUserQuestion Tool
 // ============================================================================
@@ -813,6 +830,7 @@ export type ToolInputSchemas =
   | McpInput
   | ListMcpResourcesInput
   | ReadMcpResourceInput
+  | MCPSearchInput
   | AskUserQuestionInput
   | SkillInput
   | ExitPlanModeInput

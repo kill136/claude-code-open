@@ -9,10 +9,12 @@ import type {
   McpInput,
   ListMcpResourcesInput,
   ReadMcpResourceInput,
+  MCPSearchInput,
   McpServerConfig,
   ToolResult,
   ToolDefinition,
 } from '../types/index.js';
+import type { MCPSearchToolResult } from '../types/results.js';
 
 // MCP 服务器状态管理
 interface McpServerState {
@@ -742,6 +744,209 @@ Resources are data sources provided by MCP servers. Use ListMcpResources first t
   }
 }
 
+// ============ MCP Search 工具 ============
+
+/**
+ * MCP工具搜索工具 - 用于查找和加载MCP工具
+ * 这是官方强制要求的工具，必须在调用MCP工具前使用
+ */
+export class MCPSearchTool extends BaseTool<MCPSearchInput, MCPSearchToolResult> {
+  name = 'MCPSearch';
+
+  description = `Search and load MCP tools before calling them.
+
+**CRITICAL - READ THIS FIRST:**
+You MUST use this tool to load MCP tools BEFORE calling them directly.
+This is a BLOCKING REQUIREMENT - MCP tools listed below are NOT available
+until you load them using this tool.
+
+**How to use:**
+1. Search by keywords: query: "filesystem" or query: "list directory"
+2. Select specific tool: query: "select:mcp__filesystem__list_directory"
+
+**Query Syntax:**
+- Keywords: "list directory" - fuzzy search across tool names and descriptions
+- Direct selection: "select:<tool_name>" - load a specific tool immediately
+
+**Examples:**
+- "list directory" - find tools for listing directories
+- "read file" - find tools for reading files
+- "slack message" - find slack messaging tools
+- Returns up to 5 matching tools ranked by relevance
+
+**CORRECT Usage Patterns:**
+
+<example>
+User: List files in the src directory
+Assistant: I can see mcp__filesystem__list_directory in the available tools. Let me select it.
+[Calls MCPSearch with query: "select:mcp__filesystem__list_directory"]
+[Calls the MCP tool]
+</example>
+
+<example>
+User: I need to work with slack somehow
+Assistant: Let me search for slack tools.
+[Calls MCPSearch with query: "slack"]
+Assistant: Found several options including mcp__slack__read_channel.
+[Calls the MCP tool]
+</example>
+
+**INCORRECT Usage Pattern - NEVER DO THIS:**
+
+<bad-example>
+User: Read my slack messages
+Assistant: [Directly calls mcp__slack__read_channel without loading it first]
+WRONG - You must load the tool FIRST using this tool
+</bad-example>
+
+Available MCP tools (must be loaded before use):
+${this.getAvailableMcpTools()}`;
+
+  getInputSchema(): ToolDefinition['inputSchema'] {
+    return {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Query to find MCP tools. Use "select:<tool_name>" for direct selection, or keywords to search.',
+        },
+        max_results: {
+          type: 'number',
+          description: 'Maximum number of results to return (default: 5)',
+        },
+      },
+      required: ['query'],
+    };
+  }
+
+  /**
+   * 获取所有可用的MCP工具列表
+   */
+  private getAvailableMcpTools(): string {
+    const tools: string[] = [];
+    for (const [serverName, server] of mcpServers) {
+      for (const tool of server.tools) {
+        tools.push(`mcp__${serverName}__${tool.name}`);
+      }
+    }
+    return tools.join('\n');
+  }
+
+  /**
+   * 执行关键词搜索
+   */
+  private async keywordSearch(query: string, maxResults: number): Promise<string[]> {
+    const keywords = query.toLowerCase().split(/\s+/).filter((k) => k.length > 0);
+    const results: Array<{ name: string; score: number }> = [];
+
+    for (const [serverName, server] of mcpServers) {
+      for (const tool of server.tools) {
+        const fullName = `mcp__${serverName}__${tool.name}`;
+        const searchableName = fullName.toLowerCase().replace(/__/g, ' ');
+        const searchableDesc = tool.description.toLowerCase();
+
+        let score = 0;
+        for (const keyword of keywords) {
+          // 完全匹配工具名
+          if (searchableName === keyword) {
+            score += 10;
+          }
+          // 工具名包含关键词
+          else if (searchableName.includes(keyword)) {
+            score += 5;
+          }
+          // 描述包含关键词
+          if (searchableDesc.includes(keyword)) {
+            score += 2;
+          }
+        }
+
+        if (score > 0) {
+          results.push({ name: fullName, score });
+        }
+      }
+    }
+
+    // 按分数排序并返回前N个
+    return results
+      .sort((a, b) => b.score - a.score)
+      .slice(0, maxResults)
+      .map((r) => r.name);
+  }
+
+  async execute(input: MCPSearchInput): Promise<MCPSearchToolResult> {
+    const { query, max_results = 5 } = input;
+
+    // 获取所有MCP工具数量
+    let totalMcpTools = 0;
+    for (const server of mcpServers.values()) {
+      totalMcpTools += server.tools.length;
+    }
+
+    // 检查是否是 select: 语法
+    const selectMatch = query.match(/^select:(.+)$/i);
+    if (selectMatch) {
+      const toolName = selectMatch[1].trim();
+
+      // 验证工具是否存在
+      let found = false;
+      for (const [serverName, server] of mcpServers) {
+        for (const tool of server.tools) {
+          const fullName = `mcp__${serverName}__${tool.name}`;
+          if (fullName === toolName) {
+            found = true;
+            break;
+          }
+        }
+        if (found) break;
+      }
+
+      if (!found) {
+        return {
+          success: true,
+          output: `Tool not found: ${toolName}\n\nAvailable tools:\n${this.getAvailableMcpTools()}`,
+          matches: [],
+          query,
+          total_mcp_tools: totalMcpTools,
+        };
+      }
+
+      return {
+        success: true,
+        output: `Selected and loaded MCP tool: ${toolName}\n\nYou can now call this tool directly.`,
+        matches: [toolName],
+        query,
+        total_mcp_tools: totalMcpTools,
+      };
+    }
+
+    // 关键词搜索
+    const matches = await this.keywordSearch(query, max_results);
+
+    if (matches.length === 0) {
+      return {
+        success: true,
+        output: `No matching MCP tools found for query: "${query}"\n\nAvailable tools:\n${this.getAvailableMcpTools()}`,
+        matches: [],
+        query,
+        total_mcp_tools: totalMcpTools,
+      };
+    }
+
+    const output = `Found ${matches.length} MCP tool${matches.length === 1 ? '' : 's'} matching "${query}":\n\n${matches.map((m, i) => `${i + 1}. ${m}`).join('\n')}\n\nThese tools are now loaded and ready to use.`;
+
+    return {
+      success: true,
+      output,
+      matches,
+      query,
+      total_mcp_tools: totalMcpTools,
+    };
+  }
+}
+
+// ============ MCP 工具类 ============
+
 export class McpTool extends BaseTool<McpInput, ToolResult> {
   private serverName: string;
   private toolName: string;
@@ -749,7 +954,16 @@ export class McpTool extends BaseTool<McpInput, ToolResult> {
   private toolInputSchema: Record<string, unknown>;
 
   constructor(serverName: string, toolDef: McpToolDefinition) {
-    super();
+    // MCP 工具启用重试机制
+    super({
+      maxRetries: 3,
+      baseTimeout: 300000, // 5分钟超时
+      retryableErrors: [
+        4000, // NETWORK_CONNECTION_FAILED
+        4001, // NETWORK_TIMEOUT
+        4005, // NETWORK_RATE_LIMITED
+      ],
+    });
     this.serverName = serverName;
     this.toolName = toolDef.name;
     this.toolDescription = toolDef.description;
@@ -769,7 +983,10 @@ export class McpTool extends BaseTool<McpInput, ToolResult> {
   }
 
   async execute(input: McpInput): Promise<ToolResult> {
-    return callMcpTool(this.serverName, this.toolName, input);
+    // 使用重试和超时包装器
+    return this.executeWithRetryAndTimeout(async () => {
+      return callMcpTool(this.serverName, this.toolName, input);
+    });
   }
 }
 

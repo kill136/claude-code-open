@@ -147,6 +147,32 @@ export enum ErrorSeverity {
   CRITICAL = 'critical',
 }
 
+// ============ 工具错误类型 ============
+
+/**
+ * 工具错误类型枚举
+ */
+export enum ToolErrorType {
+  /** 权限被拒绝 */
+  PERMISSION_DENIED = 'permission_denied',
+  /** 执行失败 */
+  EXECUTION_FAILED = 'execution_failed',
+  /** 超时 */
+  TIMEOUT = 'timeout',
+  /** 无效输入 */
+  INVALID_INPUT = 'invalid_input',
+  /** 网络错误 */
+  NETWORK_ERROR = 'network_error',
+  /** 沙箱错误 */
+  SANDBOX_ERROR = 'sandbox_error',
+  /** 文件系统错误 */
+  FILE_SYSTEM_ERROR = 'file_system_error',
+  /** MCP错误 */
+  MCP_ERROR = 'mcp_error',
+  /** 未知错误 */
+  UNKNOWN = 'unknown',
+}
+
 // ============ 基础错误类型 ============
 
 /**
@@ -170,6 +196,8 @@ export interface ClaudeError extends Error {
   cause?: Error;
   /** 上下文信息 */
   context?: Record<string, unknown>;
+  /** 工具错误类型 (仅工具错误) */
+  toolErrorType?: ToolErrorType;
 }
 
 /**
@@ -188,6 +216,8 @@ export interface ErrorOptions {
   severity?: ErrorSeverity;
   /** 上下文信息 */
   context?: Record<string, unknown>;
+  /** 工具错误类型 */
+  toolErrorType?: ToolErrorType;
 }
 
 // ============ 基础错误类 ============
@@ -204,6 +234,7 @@ export class BaseClaudeError extends Error implements ClaudeError {
   timestamp: number;
   cause?: Error;
   context?: Record<string, unknown>;
+  toolErrorType?: ToolErrorType;
 
   constructor(
     code: ErrorCode,
@@ -220,6 +251,7 @@ export class BaseClaudeError extends Error implements ClaudeError {
     this.timestamp = Date.now();
     this.cause = options.cause;
     this.context = options.context;
+    this.toolErrorType = options.toolErrorType;
 
     // 保持错误堆栈
     if (options.cause && options.cause.stack) {
@@ -244,6 +276,7 @@ export class BaseClaudeError extends Error implements ClaudeError {
       timestamp: this.timestamp,
       details: this.details,
       context: this.context,
+      toolErrorType: this.toolErrorType,
     };
   }
 
@@ -318,11 +351,38 @@ export class ToolExecutionError extends BaseClaudeError {
   constructor(message: string, toolName?: string, options: ErrorOptions = {}) {
     super(ErrorCode.TOOL_EXECUTION_FAILED, message, {
       ...options,
+      toolErrorType: options.toolErrorType ?? ToolErrorType.EXECUTION_FAILED,
       context: { ...options.context, toolName },
     });
     this.name = 'ToolExecutionError';
     this.toolName = toolName;
     Object.setPrototypeOf(this, ToolExecutionError.prototype);
+  }
+}
+
+/**
+ * 工具超时错误
+ */
+export class ToolTimeoutError extends BaseClaudeError {
+  toolName?: string;
+  timeout?: number;
+
+  constructor(
+    message: string,
+    toolName?: string,
+    timeout?: number,
+    options: ErrorOptions = {}
+  ) {
+    super(ErrorCode.TOOL_TIMEOUT, message, {
+      ...options,
+      toolErrorType: ToolErrorType.TIMEOUT,
+      retryable: true,
+      context: { ...options.context, toolName, timeout },
+    });
+    this.name = 'ToolTimeoutError';
+    this.toolName = toolName;
+    this.timeout = timeout;
+    Object.setPrototypeOf(this, ToolTimeoutError.prototype);
   }
 }
 
