@@ -1,5 +1,5 @@
-# Claude Code (Restored)
-The world needs an open-source Claude Code.
+# The world needs an open-source Claude Code.
+
 A reverse-engineered restoration based on `@anthropic-ai/claude-code` v2.0.76.
 
 **For educational and research purposes only.**
@@ -75,12 +75,12 @@ $env:CLAUDE_API_KEY="your-api-key"
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `ANTHROPIC_API_KEY` | API Key | - |
-| `BASH_MAX_OUTPUT_LENGTH` | Max Bash output length | 30000 |
-| `CLAUDE_CODE_MAX_OUTPUT_TOKENS` | Max output tokens | 32000 |
-| `CLAUDE_TELEMETRY_ENABLED` | Enable telemetry | true |
+| Variable                        | Description            | Default |
+| ------------------------------- | ---------------------- | ------- |
+| `ANTHROPIC_API_KEY`             | API Key                | -       |
+| `BASH_MAX_OUTPUT_LENGTH`        | Max Bash output length | 30000   |
+| `CLAUDE_CODE_MAX_OUTPUT_TOKENS` | Max output tokens      | 32000   |
+| `CLAUDE_TELEMETRY_ENABLED`      | Enable telemetry       | true    |
 
 ## Project Structure
 
@@ -187,40 +187,40 @@ src/
 
 ## Implemented Tools (25+)
 
-| Tool | Status | Description |
-|------|--------|-------------|
-| **File Operations** | | |
-| Read | ✅ Complete | File reading with image/PDF/Notebook support + external modification detection |
-| Write | ✅ Complete | File writing with overwrite protection |
-| Edit | ✅ Complete | File editing (string replacement) |
-| MultiEdit | ✅ Complete | Batch file editing (atomic operations) |
-| **Search & Discovery** | | |
-| Glob | ✅ Complete | File pattern matching |
-| Grep | ✅ Complete | Content search (ripgrep-based) with official output format |
-| **Execution** | | |
-| Bash | ✅ Complete | Command execution with background & sandbox support |
-| TaskOutput | ✅ Complete | Get background command/agent output (unified UUID/task_id format) |
-| KillShell | ✅ Complete | Terminate background processes |
-| **Web Access** | | |
-| WebFetch | ✅ Complete | Web page fetching with caching |
-| WebSearch | ⚠️ Needs config | Web search (requires API configuration) |
-| **Task Management** | | |
-| TodoWrite | ✅ Complete | Task management with auto-reminder system |
-| Task | ✅ Complete | Sub-agents (explore, plan, guide, etc.) |
-| **Planning** | | |
-| EnterPlanMode | ✅ Complete | Enter plan mode with permission system |
-| ExitPlanMode | ✅ Complete | Exit plan mode |
-| **Interaction** | | |
-| AskUserQuestion | ✅ Complete | Ask user questions (multiSelect, options, validation) |
-| **Code Tools** | | |
-| NotebookEdit | ✅ Complete | Jupyter Notebook cell editing (replace/insert/delete) |
-| LSP* | ✅ Complete | Language Server Protocol integration (diagnostics, hover, references) |
-| **Integration** | | |
-| ListMcpResources | ✅ Complete | List MCP resources |
-| ReadMcpResource | ✅ Complete | Read MCP resource |
-| Skill | ✅ Complete | Skill system with args parameter and permission checks |
-| **Terminal** | | |
-| Tmux | ✅ Complete | Multi-terminal session management (Linux/macOS) |
+| Tool                   | Status         | Description                                                                    |
+| ---------------------- | -------------- | ------------------------------------------------------------------------------ |
+| **File Operations**    |                |                                                                                |
+| Read                   | ✅ Complete     | File reading with image/PDF/Notebook support + external modification detection |
+| Write                  | ✅ Complete     | File writing with overwrite protection                                         |
+| Edit                   | ✅ Complete     | File editing (string replacement)                                              |
+| MultiEdit              | ✅ Complete     | Batch file editing (atomic operations)                                         |
+| **Search & Discovery** |                |                                                                                |
+| Glob                   | ✅ Complete     | File pattern matching                                                          |
+| Grep                   | ✅ Complete     | Content search (ripgrep-based) with official output format                     |
+| **Execution**          |                |                                                                                |
+| Bash                   | ✅ Complete     | Command execution with background & sandbox support                            |
+| TaskOutput             | ✅ Complete     | Get background command/agent output (unified UUID/task_id format)              |
+| KillShell              | ✅ Complete     | Terminate background processes                                                 |
+| **Web Access**         |                |                                                                                |
+| WebFetch               | ✅ Complete     | Web page fetching with caching                                                 |
+| WebSearch              | ⚠️ Needs config | Web search (requires API configuration)                                        |
+| **Task Management**    |                |                                                                                |
+| TodoWrite              | ✅ Complete     | Task management with auto-reminder system                                      |
+| Task                   | ✅ Complete     | Sub-agents (explore, plan, guide, etc.)                                        |
+| **Planning**           |                |                                                                                |
+| EnterPlanMode          | ✅ Complete     | Enter plan mode with permission system                                         |
+| ExitPlanMode           | ✅ Complete     | Exit plan mode                                                                 |
+| **Interaction**        |                |                                                                                |
+| AskUserQuestion        | ✅ Complete     | Ask user questions (multiSelect, options, validation)                          |
+| **Code Tools**         |                |                                                                                |
+| NotebookEdit           | ✅ Complete     | Jupyter Notebook cell editing (replace/insert/delete)                          |
+| LSP*                   | ✅ Complete     | Language Server Protocol integration (diagnostics, hover, references)          |
+| **Integration**        |                |                                                                                |
+| ListMcpResources       | ✅ Complete     | List MCP resources                                                             |
+| ReadMcpResource        | ✅ Complete     | Read MCP resource                                                              |
+| Skill                  | ✅ Complete     | Skill system with args parameter and permission checks                         |
+| **Terminal**           |                |                                                                                |
+| Tmux                   | ✅ Complete     | Multi-terminal session management (Linux/macOS)                                |
 
 *LSP tools available when language servers are configured
 
@@ -522,27 +522,27 @@ npm run test:watch
 
 ## Comparison with Official Version
 
-| Component | Status | Notes |
-|-----------|--------|-------|
-| **Core Architecture** | ✅ 100% | Three-layer design (Entry → Engine → Tools) |
-| **CLI Interface** | ✅ 100% | All commands & flags implemented |
-| **Tool System** | ✅ 100% | 25+ tools with full feature parity |
-| **API Client** | ✅ 100% | Streaming, retry, cost calculation |
-| **Permission System** | ✅ 100% | Accept/bypass/plan modes |
-| **Error Handling** | ✅ 100% | Tool-level retry with exponential backoff |
-| **File Operations** | ✅ 100% | External modification detection |
-| **Background Tasks** | ✅ 100% | Unified UUID/task_id format |
-| **Output Formatting** | ✅ 100% | Grep, LSP, and all tools match official |
-| **Sandbox** | ✅ 100% | Bubblewrap isolation (Linux) |
-| **Hooks** | ✅ 100% | Complete event system |
-| **MCP** | ✅ 100% | Full protocol support |
-| **UI Components** | ✅ 100% | Ink/React framework with auto-scroll |
-| **Skills/Commands** | ✅ 100% | Args, permissions, discovery |
-| **Authentication** | ✅ 100% | API Key + OAuth |
-| **Session Management** | ✅ 100% | Persistence, recovery, export |
-| **Context Management** | ✅ 100% | Auto-summarization |
-| **Code Parser** | ✅ 100% | Tree-sitter WASM |
-| **Telemetry** | ✅ 100% | Local analytics |
+| Component              | Status | Notes                                       |
+| ---------------------- | ------ | ------------------------------------------- |
+| **Core Architecture**  | ✅ 100% | Three-layer design (Entry → Engine → Tools) |
+| **CLI Interface**      | ✅ 100% | All commands & flags implemented            |
+| **Tool System**        | ✅ 100% | 25+ tools with full feature parity          |
+| **API Client**         | ✅ 100% | Streaming, retry, cost calculation          |
+| **Permission System**  | ✅ 100% | Accept/bypass/plan modes                    |
+| **Error Handling**     | ✅ 100% | Tool-level retry with exponential backoff   |
+| **File Operations**    | ✅ 100% | External modification detection             |
+| **Background Tasks**   | ✅ 100% | Unified UUID/task_id format                 |
+| **Output Formatting**  | ✅ 100% | Grep, LSP, and all tools match official     |
+| **Sandbox**            | ✅ 100% | Bubblewrap isolation (Linux)                |
+| **Hooks**              | ✅ 100% | Complete event system                       |
+| **MCP**                | ✅ 100% | Full protocol support                       |
+| **UI Components**      | ✅ 100% | Ink/React framework with auto-scroll        |
+| **Skills/Commands**    | ✅ 100% | Args, permissions, discovery                |
+| **Authentication**     | ✅ 100% | API Key + OAuth                             |
+| **Session Management** | ✅ 100% | Persistence, recovery, export               |
+| **Context Management** | ✅ 100% | Auto-summarization                          |
+| **Code Parser**        | ✅ 100% | Tree-sitter WASM                            |
+| **Telemetry**          | ✅ 100% | Local analytics                             |
 
 **Overall Accuracy: ~100%** (based on public API and behavioral analysis)
 
