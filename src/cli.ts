@@ -89,7 +89,7 @@ program
   .option('--agent <agent>', 'Agent for the current session')
   .option('--betas <betas...>', 'Beta headers for API requests')
   .option('--fallback-model <model>', 'Fallback model when default is overloaded')
-  .option('--max-tokens <tokens>', 'Maximum tokens for response', '8192')
+  .option('--max-tokens <tokens>', 'Maximum tokens for response', '32000')
   // 其他选项
   .option('--settings <file-or-json>', 'Path to settings JSON file or JSON string')
   .option('--add-dir <directories...>', 'Additional directories to allow tool access')

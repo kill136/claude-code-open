@@ -350,32 +350,68 @@ function ensureCommandsLoaded(): void {
 
 export class SkillTool extends BaseTool<SkillInput, any> {
   name = 'Skill';
-  description = `Execute a skill within the main conversation.
+
+  /**
+   * 动态生成 description，包含实际可用的技能列表
+   */
+  get description(): string {
+    // 确保技能已加载
+    ensureSkillsLoaded();
+
+    // 格式化技能列表
+    const availableSkills = this.formatAvailableSkills();
+
+    return `Execute a skill within the main conversation
 
 <skills_instructions>
 When users ask you to perform tasks, check if any of the available skills below can help complete the task more effectively. Skills provide specialized capabilities and domain knowledge.
 
-How to use skills:
-- Invoke skills using this tool with the skill name
-- Optionally pass arguments using the args parameter
-- When you invoke a skill, you will see <command-message>The "{name}" skill is loading</command-message>
-- The skill's prompt will expand and provide detailed instructions on how to complete the task
+When users ask you to run a "slash command" or reference "/<something>" (e.g., "/commit", "/review-pr"), they are referring to a skill. Use this tool to invoke the corresponding skill.
+
+<example>
+User: "run /commit"
+Assistant: [Calls Skill tool with skill: "commit"]
+</example>
+
+How to invoke:
+- Use this tool with the skill name and optional arguments
 - Examples:
-  - skill: "pdf" - invoke the pdf skill without arguments
-  - skill: "xlsx", args: "sheet1" - invoke the xlsx skill with arguments
-  - skill: "my-package:analyzer" - invoke using fully qualified name with namespace
+  - \`skill: "pdf"\` - invoke the pdf skill
+  - \`skill: "commit", args: "-m 'Fix bug'"\` - invoke with arguments
+  - \`skill: "review-pr", args: "123"\` - invoke with arguments
+  - \`skill: "ms-office-suite:pdf"\` - invoke using fully qualified name
 
 Important:
+- When a skill is relevant, you must invoke this tool IMMEDIATELY as your first action
+- NEVER just announce or mention a skill in your text response without actually calling this tool
+- This is a BLOCKING REQUIREMENT: invoke the relevant Skill tool BEFORE generating any other response about the task
 - Only use skills listed in <available_skills> below
 - Do not invoke a skill that is already running
 - Do not use this tool for built-in CLI commands (like /help, /clear, etc.)
-- Skills may define allowed-tools restrictions and other metadata
 </skills_instructions>
 
-Available skills are loaded from (in priority order):
-1. .claude/skills/*.md (project skills - highest priority)
-2. ~/.claude/skills/*.md (user skills)
-3. Built-in skills (lowest priority)`;
+<available_skills>
+${availableSkills}
+</available_skills>
+`;
+  }
+
+  /**
+   * 格式化可用技能列表为官方格式
+   */
+  private formatAvailableSkills(): string {
+    const skills = Array.from(skillRegistry.values())
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    if (skills.length === 0) {
+      return '';
+    }
+
+    return skills.map(skill => {
+      let skillXml = `<skill>\n<name>\n${skill.name}\n</name>\n<description>\n${skill.description}\n</description>\n<location>\n${skill.location}\n</location>\n</skill>`;
+      return skillXml;
+    }).join('\n');
+  }
 
   getInputSchema(): ToolDefinition['inputSchema'] {
     return {

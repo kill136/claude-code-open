@@ -77,10 +77,10 @@ const CONFIG_ITEMS: ConfigItem[] = [
   },
   {
     key: 'maxTokens',
-    defaultValue: 8192,
+    defaultValue: 32000,
     description: 'Maximum output tokens per request',
     type: 'number',
-    example: '4096, 8192, 16384'
+    example: '4096, 8192, 16384, 32000'
   },
   {
     key: 'autoCompact',
@@ -156,7 +156,7 @@ export const configCommand: SlashCommand = {
 │    model             ${(config.model || 'sonnet').toString().padEnd(28)} │
 │    theme             ${(config.theme || 'dark').toString().padEnd(28)} │
 │    verbose           ${(config.verbose ?? false).toString().padEnd(28)} │
-│    maxTokens         ${(config.maxTokens || 8192).toString().padEnd(28)} │
+│    maxTokens         ${(config.maxTokens || 32000).toString().padEnd(28)} │
 │    autoCompact       ${(config.autoCompact ?? true).toString().padEnd(28)} │
 │    defaultPermission ${(config.defaultPermissionMode || 'default').toString().padEnd(28)} │
 │    outputStyle       ${(config.outputStyle || 'default').toString().padEnd(28)} │

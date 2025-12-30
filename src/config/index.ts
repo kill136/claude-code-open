@@ -41,7 +41,7 @@ const UserConfigSchema = z.object({
   // API 配置
   apiKey: z.string().optional(),
   model: z.enum(['claude-opus-4-5-20251101', 'claude-sonnet-4-5-20250929', 'claude-haiku-4-5-20251001', 'opus', 'sonnet', 'haiku']).default('sonnet'),
-  maxTokens: z.number().int().positive().max(200000).default(8192),
+  maxTokens: z.number().int().positive().max(200000).default(32000),
   temperature: z.number().min(0).max(1).default(1),
 
   // 后端选择（新增 apiProvider 枚举，保留向后兼容）
@@ -188,7 +188,7 @@ export type UserConfig = z.infer<typeof UserConfigSchema>;
 const DEFAULT_CONFIG: Partial<UserConfig> = {
   version: '2.0.76',
   model: 'sonnet',
-  maxTokens: 8192,
+  maxTokens: 32000,
   temperature: 1,
   theme: 'auto',
   verbose: false,

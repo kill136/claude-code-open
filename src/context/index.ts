@@ -17,7 +17,7 @@ import type { Message, ContentBlock, AnyContentBlock } from '../types/index.js';
 // Token 估算常量
 const CHARS_PER_TOKEN = 3.5; // 更精确的估算（英文约4，中文约2）
 const MAX_CONTEXT_TOKENS = 180000; // Claude 3.5 的上下文窗口
-const RESERVE_TOKENS = 8192; // 保留给输出
+const RESERVE_TOKENS = 32000; // 保留给输出
 
 // 压缩配置常量
 const CODE_BLOCK_MAX_LINES = 50; // 代码块最大保留行数

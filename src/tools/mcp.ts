@@ -539,9 +539,23 @@ export function getServerStatus(name: string): {
 
 export class ListMcpResourcesTool extends BaseTool<ListMcpResourcesInput, ToolResult> {
   name = 'ListMcpResources';
-  description = `List available resources from MCP servers.
+  description = `Lists available resources from configured MCP servers.
+Each resource object includes a 'server' field indicating which server it's from.
 
-Resources are data sources that MCP servers can provide, such as files, database records, or API responses.`;
+Usage examples:
+- List all resources from all servers: \`listMcpResources\`
+- List resources from a specific server: \`listMcpResources({ server: "myserver" })\``;
+
+  getPrompt?(): string {
+    return `List available resources from configured MCP servers.
+Each returned resource will include all standard MCP resource fields plus a 'server' field
+indicating which server the resource belongs to.
+
+Parameters:
+- server (optional): The name of a specific MCP server to get resources from. If not provided,
+  resources from all servers will be returned.
+- refresh (optional): Force refresh resource list from server, bypassing cache.`;
+  }
 
   getInputSchema(): ToolDefinition['inputSchema'] {
     return {
@@ -635,9 +649,20 @@ Resources are data sources that MCP servers can provide, such as files, database
 
 export class ReadMcpResourceTool extends BaseTool<ReadMcpResourceInput, ToolResult> {
   name = 'ReadMcpResource';
-  description = `Read a resource from an MCP server.
+  description = `Reads a specific resource from an MCP server.
+- server: The name of the MCP server to read from
+- uri: The URI of the resource to read
 
-Resources are data sources provided by MCP servers. Use ListMcpResources first to see available resources.`;
+Usage examples:
+- Read a resource from a server: \`readMcpResource({ server: "myserver", uri: "my-resource-uri" })\``;
+
+  getPrompt?(): string {
+    return `Reads a specific resource from an MCP server, identified by server name and resource URI.
+
+Parameters:
+- server (required): The name of the MCP server from which to read the resource
+- uri (required): The URI of the resource to read`;
+  }
 
   getInputSchema(): ToolDefinition['inputSchema'] {
     return {
@@ -753,26 +778,30 @@ Resources are data sources provided by MCP servers. Use ListMcpResources first t
 export class MCPSearchTool extends BaseTool<MCPSearchInput, MCPSearchToolResult> {
   name = 'MCPSearch';
 
-  description = `Search and load MCP tools before calling them.
+  description = `Search for or select MCP tools to make them available for use.
 
-**CRITICAL - READ THIS FIRST:**
+**MANDATORY PREREQUISITE - THIS IS A HARD REQUIREMENT**
+
 You MUST use this tool to load MCP tools BEFORE calling them directly.
-This is a BLOCKING REQUIREMENT - MCP tools listed below are NOT available
-until you load them using this tool.
 
-**How to use:**
-1. Search by keywords: query: "filesystem" or query: "list directory"
-2. Select specific tool: query: "select:mcp__filesystem__list_directory"
+This is a BLOCKING REQUIREMENT - MCP tools listed below are NOT available until you load them using this tool.
 
-**Query Syntax:**
-- Keywords: "list directory" - fuzzy search across tool names and descriptions
-- Direct selection: "select:<tool_name>" - load a specific tool immediately
+**Why this is non-negotiable:**
+- MCP tools are deferred and not loaded until discovered via this tool
+- Calling an MCP tool without first loading it will fail
 
-**Examples:**
-- "list directory" - find tools for listing directories
-- "read file" - find tools for reading files
-- "slack message" - find slack messaging tools
-- Returns up to 5 matching tools ranked by relevance
+**Query modes:**
+
+1. **Direct selection** - Use \`select:<tool_name>\` when you know exactly which tool you need:
+   - "select:mcp__slack__read_channel"
+   - "select:mcp__filesystem__list_directory"
+   - Returns just that tool if it exists
+
+2. **Keyword search** - Use keywords when you're unsure which tool to use:
+   - "list directory" - find tools for listing directories
+   - "read file" - find tools for reading files
+   - "slack message" - find slack messaging tools
+   - Returns up to 5 matching tools ranked by relevance
 
 **CORRECT Usage Patterns:**
 
@@ -797,10 +826,7 @@ Assistant: Found several options including mcp__slack__read_channel.
 User: Read my slack messages
 Assistant: [Directly calls mcp__slack__read_channel without loading it first]
 WRONG - You must load the tool FIRST using this tool
-</bad-example>
-
-Available MCP tools (must be loaded before use):
-${this.getAvailableMcpTools()}`;
+</bad-example>`;
 
   getInputSchema(): ToolDefinition['inputSchema'] {
     return {

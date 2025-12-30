@@ -1378,7 +1378,7 @@ export interface ConfigMigration {
 export const DEFAULT_CONFIG: Partial<ClaudeConfig> = {
   version: '2.0.76',
   model: 'sonnet',
-  maxTokens: 8192,
+  maxTokens: 32000,
   temperature: 1,
   maxRetries: 3,
   requestTimeout: 300000,

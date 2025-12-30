@@ -330,9 +330,9 @@ export class ClaudeClient {
 
     // 根据模型能力设置 maxTokens
     const capabilities = modelConfig.getCapabilities(this.model);
-    this.maxTokens = config.maxTokens || Math.min(8192, capabilities.maxOutputTokens);
+    this.maxTokens = config.maxTokens || Math.min(32000, capabilities.maxOutputTokens);
 
-    this.maxRetries = config.maxRetries ?? 4;
+    this.maxRetries = config.maxRetries ?? 2;
     this.retryDelay = config.retryDelay ?? 1000;
 
     // 配置回退模型

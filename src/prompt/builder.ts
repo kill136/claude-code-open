@@ -133,27 +133,27 @@ export class SystemPromptBuilder {
     // 4. 任务管理
     parts.push(TASK_MANAGEMENT);
 
-    // 5. 代码编写指南
+    // 6. 代码编写指南
     parts.push(CODING_GUIDELINES);
 
-    // 6. 工具使用指南
+    // 7. 工具使用指南
     if (opts.includeToolGuidelines) {
       parts.push(TOOL_GUIDELINES);
     }
 
-    // 7. Git 操作指南
+    // 8. Git 操作指南
     parts.push(GIT_GUIDELINES);
 
-    // 8. 子代理系统
+    // 9. 子代理系统
     parts.push(SUBAGENT_SYSTEM);
 
-    // 9. 权限模式
+    // 10. 权限模式
     if (opts.includePermissionMode && context.permissionMode) {
       const modeDescription = PERMISSION_MODES[context.permissionMode] || PERMISSION_MODES.default;
       parts.push(modeDescription);
     }
 
-    // 10. 环境信息
+    // 11. 环境信息
     parts.push(
       getEnvironmentInfo({
         workingDir: context.workingDir,
@@ -164,7 +164,7 @@ export class SystemPromptBuilder {
       })
     );
 
-    // 11. 附件内容
+    // 12. 附件内容
     for (const attachment of attachments) {
       if (attachment.content) {
         parts.push(attachment.content);
@@ -223,8 +223,8 @@ export class SystemPromptBuilder {
     maxTokens: number
   ): string {
     // 优先保留核心部分
-    const coreParts = parts.slice(0, 6); // 身份、帮助、风格、任务、代码、工具
-    const remainingParts = parts.slice(6);
+    const coreParts = parts.slice(0, 7); // 身份、帮助、风格、代码引用、任务、代码、工具
+    const remainingParts = parts.slice(7);
 
     // 计算核心部分的 tokens
     let content = coreParts.join('\n\n');
