@@ -22,6 +22,8 @@ import open from 'open';
 
 // 导入 MFA 模块
 import * as MFA from './mfa.js';
+// 导入 Keychain 模块
+import * as Keychain from './keychain.js';
 
 // ============ 类型定义 ============
 
@@ -316,6 +318,22 @@ export function initAuth(): AuthConfig | null {
     }
   }
 
+  // 3.5. 检查 macOS Keychain（如果可用）
+  if (Keychain.isKeychainAvailable()) {
+    const keychainApiKey = Keychain.loadFromKeychain();
+    if (keychainApiKey) {
+      console.log('[Auth] Using API Key from macOS Keychain');
+      currentAuth = {
+        type: 'api_key',
+        accountType: 'api',
+        apiKey: keychainApiKey,
+        mfaRequired: false,
+        mfaVerified: true,
+      };
+      return currentAuth;
+    }
+  }
+
   // 注意：我们不再使用官方 Claude Code 的 OAuth token
   // 因为 Anthropic 服务器会验证请求来源，只允许官方客户端使用
 
@@ -493,7 +511,7 @@ export async function ensureOAuthApiKey(): Promise<string | null> {
 /**
  * 设置 API Key
  */
-export function setApiKey(apiKey: string, persist = false): void {
+export function setApiKey(apiKey: string, persist = false, useKeychain = true): void {
   currentAuth = {
     type: 'api_key',
     accountType: 'api',
@@ -501,6 +519,18 @@ export function setApiKey(apiKey: string, persist = false): void {
   };
 
   if (persist) {
+    // 如果在 macOS 上且 useKeychain 为 true，优先使用 Keychain
+    if (useKeychain && Keychain.isKeychainAvailable()) {
+      const saved = Keychain.saveToKeychain(apiKey);
+      if (saved) {
+        console.log('[Auth] API Key saved to macOS Keychain');
+        return;
+      } else {
+        console.warn('[Auth] Failed to save to Keychain, falling back to file storage');
+      }
+    }
+
+    // 否则保存到文件
     if (!fs.existsSync(AUTH_DIR)) {
       fs.mkdirSync(AUTH_DIR, { recursive: true });
     }
@@ -1473,3 +1503,17 @@ export async function waitForEnterKey(message: string = 'Press Enter to continue
     });
   });
 }
+
+// ============ Keychain 集成 ============
+
+// 重新导出 Keychain 相关函数
+export {
+  isMacOS,
+  isKeychainAvailable,
+  saveToKeychain,
+  loadFromKeychain,
+  deleteFromKeychain,
+  hasKeychainApiKey,
+  migrateToKeychain,
+  getKeychainStatus,
+} from './keychain.js';
