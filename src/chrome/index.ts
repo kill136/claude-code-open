@@ -4,6 +4,11 @@
  */
 
 import * as http from 'http';
+import * as https from 'https';
+import * as childProcess from 'child_process';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 import WebSocket from 'ws';
 import { EventEmitter } from 'events';
 
@@ -44,6 +49,23 @@ export interface CDPResponse {
 export interface CDPEvent {
   method: string;
   params: Record<string, unknown>;
+}
+
+// Chrome 启动选项
+export interface ChromeLaunchOptions {
+  headless?: boolean;
+  userDataDir?: string;
+  port?: number;
+  args?: string[];
+  executablePath?: string;
+}
+
+// 控制台消息
+export interface ConsoleMessage {
+  type: 'log' | 'info' | 'warn' | 'error' | 'debug';
+  args: unknown[];
+  text: string;
+  timestamp: number;
 }
 
 // Chrome DevTools Protocol 客户端
@@ -183,6 +205,61 @@ export class CDPClient extends EventEmitter {
   async setUserAgent(userAgent: string): Promise<void> {
     await this.send('Network.setUserAgentOverride', { userAgent });
   }
+
+  // 启用页面事件监听
+  async enablePageEvents(): Promise<void> {
+    await this.send('Page.enable');
+  }
+
+  // 启用 DOM 事件监听
+  async enableDOMEvents(): Promise<void> {
+    await this.send('DOM.enable');
+  }
+
+  // 启用控制台日志监听
+  async enableConsole(): Promise<void> {
+    await this.send('Runtime.enable');
+    await this.send('Log.enable');
+  }
+
+  // 启用网络事件监听
+  async enableNetwork(): Promise<void> {
+    await this.send('Network.enable');
+  }
+
+  // 等待页面加载完成
+  async waitForPageLoad(timeout: number = 30000): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.removeListener('Page.loadEventFired', onLoad);
+        reject(new Error('Page load timeout'));
+      }, timeout);
+
+      const onLoad = () => {
+        clearTimeout(timer);
+        resolve();
+      };
+
+      this.once('Page.loadEventFired', onLoad);
+    });
+  }
+
+  // 获取控制台消息
+  getConsoleMessages(): ConsoleMessage[] {
+    const messages: ConsoleMessage[] = [];
+
+    this.on('Runtime.consoleAPICalled', (params: unknown) => {
+      const p = params as { type: string; args: unknown[]; timestamp: number };
+      messages.push({
+        type: p.type as ConsoleMessage['type'],
+        args: p.args,
+        text: JSON.stringify(p.args),
+        timestamp: p.timestamp,
+      });
+    });
+
+    return messages;
+  }
 }
 
 // Chrome 浏览器管理器
@@ -311,9 +388,58 @@ export class ChromeManager extends EventEmitter {
 // Chrome 工具集成
 export class ChromeTools {
   private manager: ChromeManager;
+  private launcher: ChromeLauncher | null = null;
+  private consoleLogs: ConsoleMessage[] = [];
 
   constructor(config?: ChromeConfig) {
     this.manager = new ChromeManager(config);
+  }
+
+  // 启动 Chrome
+  async launchChrome(options?: ChromeLaunchOptions): Promise<{ port: number; wsEndpoint: string }> {
+    if (!this.launcher) {
+      this.launcher = new ChromeLauncher();
+    }
+    return this.launcher.launch(options);
+  }
+
+  // 关闭 Chrome
+  async closeChrome(): Promise<void> {
+    if (this.launcher) {
+      await this.launcher.kill();
+      this.launcher = null;
+    }
+  }
+
+  // 启用控制台监听
+  async enableConsoleLogs(): Promise<void> {
+    const client = await this.manager.getClient();
+    if (!client) {
+      throw new Error('Chrome not available');
+    }
+
+    await client.enableConsole();
+
+    // 监听控制台消息
+    client.on('Runtime.consoleAPICalled', (params: unknown) => {
+      const p = params as { type: string; args: { value: unknown }[]; timestamp: number };
+      this.consoleLogs.push({
+        type: p.type as ConsoleMessage['type'],
+        args: p.args.map(arg => arg.value),
+        text: p.args.map(arg => JSON.stringify(arg.value)).join(' '),
+        timestamp: p.timestamp,
+      });
+    });
+  }
+
+  // 获取控制台日志
+  getConsoleLogs(): ConsoleMessage[] {
+    return [...this.consoleLogs];
+  }
+
+  // 清空控制台日志
+  clearConsoleLogs(): void {
+    this.consoleLogs = [];
   }
 
   // 获取页面内容
@@ -411,6 +537,224 @@ export class ChromeTools {
   }
 }
 
+// Chrome 启动器
+export class ChromeLauncher {
+  private process: childProcess.ChildProcess | null = null;
+  private port: number;
+  private userDataDir: string | null = null;
+  private shouldCleanup: boolean = false;
+
+  constructor() {
+    this.port = 9222; // 默认端口
+  }
+
+  // 查找 Chrome 可执行文件路径
+  private findChromePath(): string {
+    const platform = os.platform();
+    const paths: string[] = [];
+
+    if (platform === 'darwin') {
+      // macOS
+      paths.push(
+        '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+        '/Applications/Chromium.app/Contents/MacOS/Chromium',
+        '/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary'
+      );
+    } else if (platform === 'win32') {
+      // Windows
+      const programFiles = process.env['ProgramFiles'] || 'C:\\Program Files';
+      const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+      const localAppData = process.env['LOCALAPPDATA'] || '';
+
+      paths.push(
+        path.join(programFiles, 'Google\\Chrome\\Application\\chrome.exe'),
+        path.join(programFilesX86, 'Google\\Chrome\\Application\\chrome.exe'),
+        path.join(localAppData, 'Google\\Chrome\\Application\\chrome.exe'),
+        path.join(programFiles, 'Chromium\\Application\\chrome.exe')
+      );
+    } else {
+      // Linux
+      paths.push(
+        '/usr/bin/google-chrome',
+        '/usr/bin/google-chrome-stable',
+        '/usr/bin/chromium',
+        '/usr/bin/chromium-browser',
+        '/snap/bin/chromium'
+      );
+    }
+
+    for (const chromePath of paths) {
+      if (fs.existsSync(chromePath)) {
+        return chromePath;
+      }
+    }
+
+    throw new Error('Chrome executable not found');
+  }
+
+  // 启动 Chrome
+  async launch(options: ChromeLaunchOptions = {}): Promise<{ port: number; wsEndpoint: string }> {
+    if (this.process) {
+      throw new Error('Chrome is already running');
+    }
+
+    const executablePath = options.executablePath || this.findChromePath();
+    this.port = options.port || 9222;
+
+    // 创建临时用户数据目录
+    if (!options.userDataDir) {
+      this.userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'chrome-'));
+      this.shouldCleanup = true;
+    } else {
+      this.userDataDir = options.userDataDir;
+      this.shouldCleanup = false;
+    }
+
+    const args = [
+      `--remote-debugging-port=${this.port}`,
+      `--user-data-dir=${this.userDataDir}`,
+      '--no-first-run',
+      '--no-default-browser-check',
+      '--disable-background-networking',
+      '--disable-background-timer-throttling',
+      '--disable-backgrounding-occluded-windows',
+      '--disable-breakpad',
+      '--disable-client-side-phishing-detection',
+      '--disable-component-extensions-with-background-pages',
+      '--disable-default-apps',
+      '--disable-dev-shm-usage',
+      '--disable-extensions',
+      '--disable-features=TranslateUI',
+      '--disable-hang-monitor',
+      '--disable-ipc-flooding-protection',
+      '--disable-popup-blocking',
+      '--disable-prompt-on-repost',
+      '--disable-renderer-backgrounding',
+      '--disable-sync',
+      '--force-color-profile=srgb',
+      '--metrics-recording-only',
+      '--no-service-autorun',
+      '--password-store=basic',
+      '--use-mock-keychain',
+      ...(options.headless ? ['--headless=new'] : []),
+      ...(options.args || []),
+    ];
+
+    return new Promise((resolve, reject) => {
+      this.process = childProcess.spawn(executablePath, args, {
+        stdio: 'ignore',
+        detached: false,
+      });
+
+      if (!this.process) {
+        reject(new Error('Failed to spawn Chrome process'));
+        return;
+      }
+
+      this.process.on('error', (err) => {
+        reject(err);
+      });
+
+      this.process.on('exit', (code) => {
+        this.process = null;
+      });
+
+      // 等待 Chrome 启动并获取 WebSocket 端点
+      const maxRetries = 50;
+      let retries = 0;
+
+      const checkReady = async () => {
+        try {
+          const response = await this.getVersion();
+          resolve({
+            port: this.port,
+            wsEndpoint: response.webSocketDebuggerUrl,
+          });
+        } catch (err) {
+          retries++;
+          if (retries >= maxRetries) {
+            this.kill();
+            reject(new Error('Chrome failed to start within timeout'));
+          } else {
+            setTimeout(checkReady, 100);
+          }
+        }
+      };
+
+      setTimeout(checkReady, 100);
+    });
+  }
+
+  // 获取版本信息
+  private async getVersion(): Promise<{ webSocketDebuggerUrl: string }> {
+    return new Promise((resolve, reject) => {
+      const url = `http://localhost:${this.port}/json/version`;
+
+      http.get(url, (res) => {
+        let data = '';
+        res.on('data', (chunk) => data += chunk);
+        res.on('end', () => {
+          try {
+            resolve(JSON.parse(data));
+          } catch (err) {
+            reject(err);
+          }
+        });
+      }).on('error', reject);
+    });
+  }
+
+  // 关闭 Chrome
+  async kill(): Promise<void> {
+    if (this.process) {
+      this.process.kill('SIGTERM');
+
+      // 等待进程退出
+      await new Promise<void>((resolve) => {
+        if (!this.process) {
+          resolve();
+          return;
+        }
+
+        const timeout = setTimeout(() => {
+          if (this.process) {
+            this.process.kill('SIGKILL');
+          }
+          resolve();
+        }, 5000);
+
+        this.process.once('exit', () => {
+          clearTimeout(timeout);
+          resolve();
+        });
+      });
+
+      this.process = null;
+    }
+
+    // 清理临时目录
+    if (this.shouldCleanup && this.userDataDir && fs.existsSync(this.userDataDir)) {
+      try {
+        fs.rmSync(this.userDataDir, { recursive: true, force: true });
+      } catch (err) {
+        // 忽略清理错误
+      }
+      this.userDataDir = null;
+    }
+  }
+
+  // 检查 Chrome 是否正在运行
+  isRunning(): boolean {
+    return this.process !== null && !this.process.killed;
+  }
+
+  // 获取端口
+  getPort(): number {
+    return this.port;
+  }
+}
+
 // 默认实例
+export const chromeLauncher = new ChromeLauncher();
 export const chromeManager = new ChromeManager();
 export const chromeTools = new ChromeTools();

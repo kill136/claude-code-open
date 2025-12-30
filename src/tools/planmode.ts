@@ -190,35 +190,91 @@ User: "What files handle routing?"
    * 执行工具（使用 AppState 系统）
    */
   async execute(_input: Record<string, unknown>): Promise<ToolResult> {
-    // 获取当前状态
-    const appState = getGlobalAppState();
+    try {
+      // 获取当前状态
+      const appState = getGlobalAppState();
 
-    // 检查是否已经在计划模式中
-    if (appState.toolPermissionContext.mode === 'plan') {
-      return {
-        success: false,
-        error: 'Already in plan mode. Use ExitPlanMode to exit first.',
+      // 检查是否已经在计划模式中
+      if (appState.toolPermissionContext.mode === 'plan') {
+        return {
+          success: false,
+          error: 'Already in plan mode. Use ExitPlanMode to exit first.',
+        };
+      }
+
+      // Generate plan ID and file path
+      const planId = PlanPersistenceManager.generatePlanId();
+      const planPath = process.cwd() + '/PLAN.md';
+
+      // 创建初始计划到持久化存储
+      const now = Date.now();
+      const initialPlan: SavedPlan = {
+        metadata: {
+          id: planId,
+          title: 'Untitled Plan',
+          description: 'Plan created in plan mode',
+          status: 'draft',
+          createdAt: now,
+          updatedAt: now,
+          workingDirectory: process.cwd(),
+          version: 1,
+          priority: 'medium',
+        },
+        summary: 'Plan in progress',
+        requirementsAnalysis: {
+          functionalRequirements: [],
+          nonFunctionalRequirements: [],
+          technicalConstraints: [],
+          successCriteria: [],
+        },
+        architecturalDecisions: [],
+        steps: [],
+        criticalFiles: [],
+        risks: [],
+        alternatives: [],
+        estimatedComplexity: 'moderate',
+        content: '# Implementation Plan\n\n(Building plan...)',
       };
-    }
 
-    // Generate plan ID and file path
-    const planId = PlanPersistenceManager.generatePlanId();
-    const planPath = process.cwd() + '/PLAN.md';
+      // 保存到持久化存储
+      await PlanPersistenceManager.savePlan(initialPlan);
 
-    // 更新 AppState：设置计划模式
-    setGlobalAppState((state) => ({
-      ...state,
-      toolPermissionContext: { mode: 'plan' },
-      planMode: {
-        active: true,
-        planFile: planPath,
-        planId,
-      },
-    }));
+      // 更新 Session 状态
+      try {
+        const { sessionManager } = await import('../session/index.js');
+        const currentSession = sessionManager.getCurrent();
 
-    return {
-      success: true,
-      output: `Entered plan mode.
+        if (currentSession) {
+          currentSession.metadata.hasExitedPlanMode = false;
+          currentSession.metadata.needsPlanModeExitAttachment = false;
+          currentSession.metadata.activePlanId = planId;
+
+          if (!currentSession.metadata.planHistory) {
+            currentSession.metadata.planHistory = [];
+          }
+          currentSession.metadata.planHistory.push(planId);
+
+          sessionManager.save();
+        }
+      } catch (error) {
+        // Session update is optional, continue if it fails
+        console.warn('Failed to update session metadata:', error);
+      }
+
+      // 更新 AppState：设置计划模式
+      setGlobalAppState((state) => ({
+        ...state,
+        toolPermissionContext: { mode: 'plan' },
+        planMode: {
+          active: true,
+          planFile: planPath,
+          planId,
+        },
+      }));
+
+      return {
+        success: true,
+        output: `Entered plan mode.
 
 Plan ID: ${planId}
 
@@ -249,7 +305,13 @@ In plan mode, you should:
 6. When ready, use ExitPlanMode to present your plan for approval
 
 Focus on understanding the problem before proposing solutions.`,
-    };
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to enter plan mode: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
   }
 }
 
@@ -304,56 +366,76 @@ Before using this tool, ensure your plan is clear and unambiguous. If there are 
    * 执行工具（使用 AppState 系统）
    */
   async execute(_input: ExitPlanModeInput): Promise<ToolResult> {
-    // 获取当前状态
-    const appState = getGlobalAppState();
+    try {
+      // 获取当前状态
+      const appState = getGlobalAppState();
 
-    // 检查是否在计划模式中
-    if (appState.toolPermissionContext.mode !== 'plan') {
-      return {
-        success: false,
-        error: 'Not in plan mode. Use EnterPlanMode first.',
-      };
-    }
+      // 检查是否在计划模式中
+      if (appState.toolPermissionContext.mode !== 'plan') {
+        return {
+          success: false,
+          error: 'Not in plan mode. Use EnterPlanMode first.',
+        };
+      }
 
-    // 获取计划文件信息
-    const planFile = appState.planMode?.planFile || null;
-    const planId = appState.planMode?.planId || null;
+      // 获取计划文件信息
+      const planFile = appState.planMode?.planFile || null;
+      const planId = appState.planMode?.planId || null;
 
-    // 更新 AppState：退出计划模式
-    setGlobalAppState((state) => ({
-      ...state,
-      toolPermissionContext: { mode: 'normal' },
-      planMode: undefined,
-    }));
+      let planContent = '';
+      if (planFile) {
+        try {
+          const fs = await import('fs');
+          if (fs.existsSync(planFile)) {
+            planContent = fs.readFileSync(planFile, 'utf-8');
+          }
+        } catch (error) {
+          // Ignore read errors
+        }
+      }
 
-    let planContent = '';
-    if (planFile) {
+      // Parse and save plan to persistence
+      let savedPlanPath: string | undefined;
+      if (planId && planContent) {
+        try {
+          const plan = this.parsePlanContent(planId, planContent);
+          // 更新计划状态为 pending（等待用户批准）
+          plan.metadata.status = 'pending';
+          const saved = await PlanPersistenceManager.savePlan(plan);
+          if (saved) {
+            savedPlanPath = `~/.claude/plans/${planId}.json`;
+          }
+        } catch (error) {
+          console.error('Failed to save plan to persistence:', error);
+        }
+      }
+
+      // 更新 Session 状态
       try {
-        const fs = await import('fs');
-        if (fs.existsSync(planFile)) {
-          planContent = fs.readFileSync(planFile, 'utf-8');
+        const { sessionManager } = await import('../session/index.js');
+        const currentSession = sessionManager.getCurrent();
+
+        if (currentSession) {
+          currentSession.metadata.hasExitedPlanMode = true;
+          currentSession.metadata.needsPlanModeExitAttachment = true;
+          currentSession.metadata.activePlanId = undefined; // 清除活跃计划 ID
+
+          sessionManager.save();
         }
       } catch (error) {
-        // Ignore read errors
+        // Session update is optional, continue if it fails
+        console.warn('Failed to update session metadata:', error);
       }
-    }
 
-    // Parse and save plan to persistence
-    let savedPlanPath: string | undefined;
-    if (planId && planContent) {
-      try {
-        const plan = this.parsePlanContent(planId, planContent);
-        const saved = await PlanPersistenceManager.savePlan(plan);
-        if (saved) {
-          savedPlanPath = `~/.claude/plans/${planId}.json`;
-        }
-      } catch (error) {
-        console.error('Failed to save plan to persistence:', error);
-      }
-    }
+      // 更新 AppState：退出计划模式
+      setGlobalAppState((state) => ({
+        ...state,
+        toolPermissionContext: { mode: 'normal' },
+        planMode: undefined,
+      }));
 
-    const output = planFile
-      ? `Exited plan mode.
+      const output = planFile
+        ? `Exited plan mode.
 
 Your plan has been saved to:
 - Working file: ${planFile}${savedPlanPath ? `\n- Persistent storage: ${savedPlanPath}` : ''}
@@ -368,12 +450,18 @@ You can refer back to this plan using:
 ${planContent}
 
 Awaiting user approval to proceed with implementation.`
-      : `Exited plan mode. Awaiting user approval to proceed with implementation.`;
+        : `Exited plan mode. Awaiting user approval to proceed with implementation.`;
 
-    return {
-      success: true,
-      output,
-    };
+      return {
+        success: true,
+        output,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to exit plan mode: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
   }
 
   /**

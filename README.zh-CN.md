@@ -464,15 +464,27 @@ sudo pacman -S bubblewrap
 
 ## 斜杠命令
 
-- `/help` - 显示帮助
-- `/clear` - 清除对话历史
-- `/save` - 保存会话
-- `/stats` - 显示统计
-- `/tools` - 列出工具
-- `/model` - 切换模型
-- `/resume` - 恢复会话
-- `/compact` - 压缩上下文
-- `/exit` - 退出
+### 通用命令
+- `/help` - 显示帮助信息和可用命令
+- `/clear` - 清除对话历史，释放上下文
+- `/status` - 显示会话状态、模型、API 连接等信息
+- `/exit` - 退出 Claude Code
+
+### 会话管理
+- `/resume` - 查看和恢复历史会话
+- `/context` - 显示上下文使用情况
+- `/compact` - 压缩对话历史，释放上下文空间
+- `/rename` - 重命名当前会话
+- `/export` - 导出会话为 JSON 或 Markdown 格式
+- `/transcript` - 导出会话转录记录（纯文本格式）✨ **新增**
+
+### 配置管理
+- `/config` - 查看当前配置
+- `/tools` - 列出可用工具
+- `/model` - 查看当前使用的模型
+
+### 完整命令列表
+完整的命令列表和详细说明，请使用 `/help` 命令查看，或参阅 `docs/commands/` 目录下的文档。
 
 ## 测试
 

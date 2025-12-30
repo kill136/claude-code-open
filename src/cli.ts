@@ -22,6 +22,7 @@ import { getMemoryManager } from './memory/index.js';
 import { emitLifecycleEvent } from './lifecycle/index.js';
 import { runHooks } from './hooks/index.js';
 import { scheduleCleanup } from './session/cleanup.js';
+import { createPluginCommand } from './plugins/cli.js';
 import type { PermissionMode, OutputFormat, InputFormat } from './types/index.js';
 
 // 工作目录列表
@@ -656,33 +657,8 @@ mcpCommand
     }
   });
 
-// Plugin 子命令
-const pluginCommand = program.command('plugin').description('Manage Claude Code plugins');
-
-pluginCommand
-  .command('list')
-  .description('List installed plugins')
-  .action(() => {
-    console.log(chalk.bold('\nInstalled Plugins:\n'));
-    console.log(chalk.gray('  No plugins installed.'));
-    console.log(chalk.gray('\n  Use "claude plugin install <path>" to install a plugin.\n'));
-  });
-
-pluginCommand
-  .command('install <path>')
-  .description('Install a plugin from path')
-  .action((pluginPath) => {
-    console.log(chalk.yellow(`Installing plugin from: ${pluginPath}`));
-    console.log(chalk.gray('Plugin system is under development.'));
-  });
-
-pluginCommand
-  .command('remove <name>')
-  .description('Remove an installed plugin')
-  .action((name) => {
-    console.log(chalk.yellow(`Removing plugin: ${name}`));
-    console.log(chalk.gray('Plugin system is under development.'));
-  });
+// Plugin 子命令 - 使用完整实现
+program.addCommand(createPluginCommand());
 
 // 工具子命令
 program

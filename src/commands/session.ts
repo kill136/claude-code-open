@@ -857,6 +857,193 @@ Tip: Use '/export json <path>' or '/export markdown <path>' to specify output lo
   },
 };
 
+// /transcript - 导出会话转录记录 (官方风格)
+export const transcriptCommand: SlashCommand = {
+  name: 'transcript',
+  aliases: ['trans'],
+  description: 'Export conversation transcript in a clean, readable format',
+  usage: '/transcript [output-path]',
+  category: 'session',
+  execute: (ctx: CommandContext): CommandResult => {
+    const { args } = ctx;
+
+    try {
+      const stats = ctx.session.getStats();
+      const shortId = ctx.session.id.slice(0, 8);
+
+      // 生成默认文件名
+      const timestamp = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      const defaultFilename = `transcript-${shortId}-${timestamp}.txt`;
+      const outputPath = args.length > 0 ? args.join(' ') : null;
+
+      // 读取完整会话数据
+      const sessionsDir = path.join(os.homedir(), '.claude', 'sessions');
+      const sessionFile = path.join(sessionsDir, `${ctx.session.id}.json`);
+
+      let sessionData: any = null;
+      if (fs.existsSync(sessionFile)) {
+        sessionData = JSON.parse(fs.readFileSync(sessionFile, 'utf-8'));
+      }
+
+      // 生成转录文本
+      const lines: string[] = [];
+
+      // 标题
+      lines.push('=' .repeat(80));
+      lines.push('CLAUDE CODE CONVERSATION TRANSCRIPT');
+      lines.push('='.repeat(80));
+      lines.push('');
+
+      // 会话元数据
+      lines.push(`Session ID:    ${ctx.session.id}`);
+      lines.push(`Exported:      ${new Date().toISOString()}`);
+      lines.push(`Model:         ${ctx.config.model}`);
+      lines.push(`Messages:      ${stats.messageCount}`);
+      lines.push(`Duration:      ${formatDuration(stats.duration)}`);
+      lines.push(`Total Cost:    ${stats.totalCost}`);
+
+      if (sessionData?.metadata?.customTitle) {
+        lines.push(`Title:         ${sessionData.metadata.customTitle}`);
+      }
+
+      lines.push('');
+      lines.push('-'.repeat(80));
+      lines.push('');
+
+      // 导出消息内容
+      const messages = sessionData?.messages || [];
+
+      if (messages.length === 0) {
+        lines.push('No messages in this session.');
+      } else {
+        for (let i = 0; i < messages.length; i++) {
+          const msg = messages[i];
+          const timestamp = sessionData?.metadata?.created
+            ? new Date(sessionData.metadata.created + i * 1000).toISOString()
+            : '';
+
+          // 消息头
+          if (msg.role === 'user') {
+            lines.push(`[USER] ${timestamp ? `at ${timestamp}` : `Message ${i + 1}`}`);
+          } else {
+            lines.push(`[ASSISTANT] ${timestamp ? `at ${timestamp}` : `Message ${i + 1}`}`);
+          }
+          lines.push('');
+
+          // 消息内容
+          if (typeof msg.content === 'string') {
+            lines.push(msg.content);
+          } else if (Array.isArray(msg.content)) {
+            // 处理复杂消息结构
+            for (const block of msg.content) {
+              if (block.type === 'text') {
+                lines.push(block.text || '');
+              } else if (block.type === 'tool_use') {
+                lines.push(`[Tool Used: ${block.name}]`);
+                lines.push(`Input: ${JSON.stringify(block.input, null, 2)}`);
+              } else if (block.type === 'tool_result') {
+                lines.push(`[Tool Result]`);
+                const content = typeof block.content === 'string'
+                  ? block.content
+                  : JSON.stringify(block.content, null, 2);
+                // 限制工具结果长度，避免转录文件过大
+                const maxLength = 500;
+                lines.push(content.length > maxLength ? content.slice(0, maxLength) + '\n... (truncated)' : content);
+              }
+            }
+          }
+
+          lines.push('');
+          lines.push('-'.repeat(80));
+          lines.push('');
+        }
+      }
+
+      // 会话总结
+      lines.push('');
+      lines.push('='.repeat(80));
+      lines.push('END OF TRANSCRIPT');
+      lines.push('='.repeat(80));
+      lines.push('');
+      lines.push(`Total Messages:  ${messages.length}`);
+      lines.push(`Session Cost:    ${stats.totalCost}`);
+      lines.push(`Export Time:     ${new Date().toISOString()}`);
+
+      const transcriptContent = lines.join('\n');
+
+      // 如果指定了输出路径，写入文件
+      if (outputPath) {
+        const finalPath = path.resolve(outputPath);
+        const exportDir = path.dirname(finalPath);
+
+        if (!fs.existsSync(exportDir)) {
+          fs.mkdirSync(exportDir, { recursive: true });
+        }
+
+        fs.writeFileSync(finalPath, transcriptContent, 'utf-8');
+
+        const fileSize = formatBytes(Buffer.byteLength(transcriptContent, 'utf-8'));
+        const absolutePath = path.resolve(finalPath);
+
+        ctx.ui.addMessage('assistant', `✓ Transcript exported successfully!
+
+File: ${absolutePath}
+Size: ${fileSize}
+Messages: ${stats.messageCount}
+
+The transcript contains a clean, readable record of the entire conversation.
+
+You can:
+  • Share this transcript with others
+  • Archive it for documentation
+  • Use it for review or analysis
+  • Search through conversation history
+
+Tip: Use '/transcript <path>' to specify a custom output location.`);
+
+        ctx.ui.addActivity(`Exported transcript to ${path.basename(finalPath)}`);
+        return { success: true };
+      }
+
+      // 如果没有指定输出路径，直接显示转录内容（限制长度）
+      const maxDisplayLength = 3000;
+      if (transcriptContent.length > maxDisplayLength) {
+        const truncated = transcriptContent.slice(0, maxDisplayLength);
+        ctx.ui.addMessage('assistant', `${truncated}
+
+... (truncated, ${transcriptContent.length - maxDisplayLength} more characters)
+
+To save the full transcript to a file, use:
+  /transcript ${defaultFilename}
+
+Or specify a custom path:
+  /transcript /path/to/your/transcript.txt`);
+      } else {
+        ctx.ui.addMessage('assistant', `${transcriptContent}
+
+To save this transcript to a file, use:
+  /transcript ${defaultFilename}`);
+      }
+
+      return { success: true };
+
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      ctx.ui.addMessage('assistant', `Error generating transcript: ${errorMsg}
+
+Please check:
+  • Session file exists and is readable
+  • You have permission to access the session
+  • The session has been saved at least once
+
+You can try:
+  • /export markdown - Export in Markdown format
+  • /export json - Export complete session data`);
+      return { success: false };
+    }
+  },
+};
+
 // 辅助函数：格式化持续时间
 function formatDuration(ms: number): string {
   const seconds = Math.floor(ms / 1000);
@@ -880,4 +1067,5 @@ export function registerSessionCommands(): void {
   commandRegistry.register(rewindCommand);
   commandRegistry.register(renameCommand);
   commandRegistry.register(exportCommand);
+  commandRegistry.register(transcriptCommand);
 }

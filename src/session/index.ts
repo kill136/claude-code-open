@@ -36,6 +36,11 @@ export interface SessionMetadata {
   forkName?: string; // 分支名称
   mergedFrom?: string[]; // 合并自哪些会话
   cost?: number; // 会话成本（美元）
+  // Plan Mode 相关元数据
+  hasExitedPlanMode?: boolean; // 是否已退出计划模式
+  needsPlanModeExitAttachment?: boolean; // 是否需要在退出时添加附件
+  activePlanId?: string; // 当前活跃的计划 ID
+  planHistory?: string[]; // 历史计划 ID 列表
 }
 
 export interface SessionData {
@@ -1086,6 +1091,59 @@ export function cleanupSessions(options: {
   }
 
   return result;
+}
+
+/**
+ * 设置计划模式退出标志
+ */
+export function setPlanModeExited(session: SessionData, exited: boolean): void {
+  session.metadata.hasExitedPlanMode = exited;
+  if (exited) {
+    session.metadata.needsPlanModeExitAttachment = true;
+  }
+}
+
+/**
+ * 检查是否需要计划模式退出附件
+ */
+export function needsPlanModeExitAttachment(session: SessionData): boolean {
+  return session.metadata.needsPlanModeExitAttachment === true;
+}
+
+/**
+ * 清除计划模式退出附件标志
+ */
+export function clearPlanModeExitAttachment(session: SessionData): void {
+  session.metadata.needsPlanModeExitAttachment = false;
+}
+
+/**
+ * 获取当前活跃的计划 ID
+ */
+export function getActivePlanId(session: SessionData): string | undefined {
+  return session.metadata.activePlanId;
+}
+
+/**
+ * 设置活跃的计划 ID
+ */
+export function setActivePlanId(session: SessionData, planId: string | undefined): void {
+  session.metadata.activePlanId = planId;
+  if (planId) {
+    if (!session.metadata.planHistory) {
+      session.metadata.planHistory = [];
+    }
+    if (!session.metadata.planHistory.includes(planId)) {
+      session.metadata.planHistory.push(planId);
+    }
+  }
+}
+
+/**
+ * 获取计划历史
+ */
+export function getPlanHistory(session: SessionData): string[] {
+  return session.metadata.planHistory || [];
 }
 
 /**

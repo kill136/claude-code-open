@@ -1,0 +1,110 @@
+feat: 实现 Ctrl+R 反向历史搜索功能
+
+实现了类似 Bash/Zsh 的 Ctrl+R 反向历史搜索功能，大幅提升命令重用效率。
+
+## 新增功能
+
+### 核心特性
+- ✅ Ctrl+R 快捷键启动反向历史搜索
+- ✅ 增量搜索，实时过滤匹配结果
+- ✅ 高亮显示匹配关键词
+- ✅ Ctrl+R/Ctrl+S 在匹配列表中导航
+- ✅ Enter 选择，Esc 取消
+- ✅ 历史记录持久化存储（~/.claude/command_history.json）
+- ✅ 自动去重，最多保存 1000 条记录
+- ✅ 大小写不敏感搜索
+
+### UI 设计
+- 类似 Bash 的 reverse-i-search 提示格式
+- 显示匹配计数和导航提示
+- 列出最近 5 条匹配记录
+- 当前选中项高亮显示
+
+### 兼容性
+- ✅ 与 VIM 模式兼容
+- ✅ 与自动补全兼容
+- ✅ 与 IME 输入法兼容
+- ✅ 跨平台支持（Linux/macOS/Windows）
+
+## 新增文件
+
+### 核心实现
+- `src/ui/utils/history-manager.ts` - 历史记录管理器
+  - 持久化存储和加载
+  - 搜索、添加、清空 API
+  - 自动去重和排序
+
+- `src/ui/components/HistorySearch.tsx` - 搜索界面组件
+  - 显示搜索提示和匹配结果
+  - 高亮关键词
+  - 导航提示
+
+### 文档
+- `docs/CTRL_R_USAGE.md` - 详细使用指南
+- `CTRL_R_IMPLEMENTATION.md` - 完整实现说明
+- `CTRL_R_QUICKSTART.md` - 快速开始指南
+
+## 修改文件
+
+### 功能集成
+- `src/ui/components/Input.tsx`
+  - 添加 Ctrl+R 相关状态管理
+  - 实现搜索模式按键处理
+  - 集成历史管理器
+  - 修改提交逻辑保存历史
+  - 渲染 HistorySearch 组件
+
+### 模块导出
+- `src/ui/components/index.ts` - 导出 HistorySearch
+- `src/ui/utils/index.ts` - 导出 history-manager
+
+## 快捷键
+
+| 快捷键 | 功能 |
+|--------|------|
+| Ctrl+R | 进入搜索 / 下一个匹配 |
+| Ctrl+S | 上一个匹配 |
+| Enter  | 选择当前匹配 |
+| Esc    | 取消搜索 |
+| Backspace | 删除搜索字符 |
+
+## 使用示例
+
+```bash
+# 1. 输入一些命令
+> Read /src/index.ts
+> Grep "function" src/
+
+# 2. 按 Ctrl+R 搜索
+> <Ctrl+R>
+(reverse-i-search)`': Read /src/index.ts
+
+# 3. 输入搜索词
+(reverse-i-search)`src': Grep "function" src/
+
+# 4. Enter 选择或 Esc 取消
+```
+
+## 技术栈
+
+- React Hooks (useState, useEffect, useMemo)
+- TypeScript (完整类型定义)
+- Ink (终端 UI 框架)
+- Node.js fs (文件系统)
+
+## 测试
+
+- ✅ 编译通过 (TypeScript)
+- ✅ 类型检查通过
+- ✅ 与现有功能无冲突
+
+## 后续优化
+
+- 正则表达式搜索支持
+- 模糊匹配 (Fuzzy search)
+- 按使用频率排序
+- 导出/导入历史记录
+
+---
+
+Closes: #N/A (自主开发功能)

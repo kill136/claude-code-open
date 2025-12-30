@@ -7,8 +7,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { getCompletions, applyCompletion, type CompletionItem } from '../autocomplete/index.js';
-import { getHistoryManager } from '../utils/history-manager.js';
-import { HistorySearch } from './HistorySearch.js';
 
 // 官方 claude 颜色
 const CLAUDE_COLOR = '#D77757';
@@ -49,20 +47,6 @@ export const Input: React.FC<InputProps> = ({
   const [isComposing, setIsComposing] = useState(false);
   const compositionTimerRef = React.useRef<NodeJS.Timeout | null>(null);
 
-  // Ctrl+R 反向历史搜索
-  const [reverseSearchMode, setReverseSearchMode] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchMatches, setSearchMatches] = useState<string[]>([]);
-  const [searchIndex, setSearchIndex] = useState(0);
-  const [searchOriginalValue, setSearchOriginalValue] = useState('');
-  const historyManager = useMemo(() => getHistoryManager(), []);
-
-  // 初始化：从持久化存储加载历史记录
-  useEffect(() => {
-    const loadedHistory = historyManager.getHistory();
-    setHistory(loadedHistory);
-  }, [historyManager]);
-
   // 监听环境变量变化（通过轮询检测）
   useEffect(() => {
     const checkVimMode = () => {
@@ -76,15 +60,6 @@ export const Input: React.FC<InputProps> = ({
     const interval = setInterval(checkVimMode, 500); // 每500ms检查一次
     return () => clearInterval(interval);
   }, [vimModeEnabled]);
-
-  // 反向搜索：当搜索查询变化时更新匹配结果
-  useEffect(() => {
-    if (reverseSearchMode) {
-      const matches = historyManager.search(searchQuery);
-      setSearchMatches(matches);
-      setSearchIndex(0);
-    }
-  }, [searchQuery, reverseSearchMode, historyManager]);
 
   // 获取自动补全建议
   useEffect(() => {
@@ -226,75 +201,6 @@ export const Input: React.FC<InputProps> = ({
         return;
       }
 
-      // ===== Ctrl+R 反向历史搜索模式处理 =====
-      if (reverseSearchMode) {
-        // ESC - 退出搜索模式，恢复原始值
-        if (key.escape) {
-          setValue(searchOriginalValue);
-          setCursor(searchOriginalValue.length);
-          setReverseSearchMode(false);
-          setSearchQuery('');
-          setSearchMatches([]);
-          setSearchIndex(0);
-          return;
-        }
-
-        // Enter - 选择当前匹配项
-        if (key.return) {
-          if (searchMatches.length > 0) {
-            const selected = searchMatches[searchIndex];
-            setValue(selected);
-            setCursor(selected.length);
-          }
-          setReverseSearchMode(false);
-          setSearchQuery('');
-          setSearchMatches([]);
-          setSearchIndex(0);
-          return;
-        }
-
-        // Ctrl+R - 下一个匹配项（向后搜索）
-        if (key.ctrl && input === 'r') {
-          if (searchMatches.length > 0) {
-            setSearchIndex((prev) => (prev + 1) % searchMatches.length);
-          }
-          return;
-        }
-
-        // Ctrl+S - 上一个匹配项（向前搜索）
-        if (key.ctrl && input === 's') {
-          if (searchMatches.length > 0) {
-            setSearchIndex((prev) => (prev - 1 + searchMatches.length) % searchMatches.length);
-          }
-          return;
-        }
-
-        // Backspace - 删除搜索查询的最后一个字符
-        if (key.backspace || key.delete) {
-          setSearchQuery((prev) => prev.slice(0, -1));
-          return;
-        }
-
-        // 其他字符 - 添加到搜索查询
-        if (input && !key.ctrl && !key.meta) {
-          setSearchQuery((prev) => prev + input);
-          return;
-        }
-
-        return; // 在搜索模式下忽略其他按键
-      }
-
-      // Ctrl+R - 进入反向历史搜索模式（非搜索模式下）
-      if (key.ctrl && input === 'r' && !reverseSearchMode) {
-        setReverseSearchMode(true);
-        setSearchOriginalValue(value);
-        setSearchQuery('');
-        const allMatches = historyManager.search('');
-        setSearchMatches(allMatches);
-        setSearchIndex(0);
-        return;
-      }
-
       // 在补全列表显示时的特殊处理
       if (showCompletionList && !vimNormalMode) {
         if (key.upArrow) {
@@ -335,7 +241,6 @@ export const Input: React.FC<InputProps> = ({
               const finalValue = result.newText.trim();
               if (finalValue) {
                 onSubmit(finalValue);
-                historyManager.addCommand(finalValue);
                 setHistory(prev => [finalValue, ...prev.slice(0, 99)]);
                 setValue('');
                 setCursor(0);
@@ -599,10 +504,8 @@ export const Input: React.FC<InputProps> = ({
             return;
           }
           if (value.trim()) {
-            const trimmedValue = value.trim();
-            onSubmit(trimmedValue);
-            historyManager.addCommand(trimmedValue);
-            setHistory(prev => [trimmedValue, ...prev.slice(0, 99)]);
+            onSubmit(value.trim());
+            setHistory(prev => [value.trim(), ...prev.slice(0, 99)]);
             setValue('');
             setCursor(0);
             setHistoryIndex(-1);
@@ -641,10 +544,8 @@ export const Input: React.FC<InputProps> = ({
           return;
         }
         if (value.trim()) {
-          const trimmedValue = value.trim();
-          onSubmit(trimmedValue);
-          historyManager.addCommand(trimmedValue);
-          setHistory(prev => [trimmedValue, ...prev.slice(0, 99)]);
+          onSubmit(value.trim());
+          setHistory(prev => [value.trim(), ...prev.slice(0, 99)]);
           setValue('');
           setCursor(0);
           setHistoryIndex(-1);
@@ -735,18 +636,8 @@ export const Input: React.FC<InputProps> = ({
 
   return (
     <Box flexDirection="column">
-      {/* Ctrl+R 反向历史搜索界面 */}
-      {reverseSearchMode && (
-        <HistorySearch
-          query={searchQuery}
-          matches={searchMatches}
-          selectedIndex={searchIndex}
-          visible={reverseSearchMode}
-        />
-      )}
-
       {/* 补全建议列表 */}
-      {showCompletionList && !reverseSearchMode && (
+      {showCompletionList && (
         <Box flexDirection="column" marginBottom={1}>
           {completions.map((item, index) => (
             <Box key={`${item.type}-${item.label}-${index}`}>

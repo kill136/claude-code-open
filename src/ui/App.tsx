@@ -784,6 +784,12 @@ export const App: React.FC<AppProps> = ({
       {/* Todo List */}
       {(todos.length > 0 || showTodosPanel) && <TodoList todos={todos} />}
 
+      {/* Background Tasks Panel */}
+      <BackgroundTasksPanel
+        tasks={backgroundTasks}
+        isVisible={showBackgroundPanel}
+      />
+
       {/* Input with suggestion */}
       <Box marginTop={1}>
         <Input

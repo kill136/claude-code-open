@@ -19,6 +19,7 @@ export * from './multiedit.js';
 export * from './tmux.js';
 export * from './skill.js';
 export * from './lsp.js';
+export * from './chrome.js';
 
 import { toolRegistry } from './base.js';
 import { BashTool, BashOutputTool, KillShellTool } from './bash.js';
@@ -35,6 +36,7 @@ import { MultiEditTool } from './multiedit.js';
 import { TmuxTool } from './tmux.js';
 import { SkillTool, SlashCommandTool, initializeSkillsAndCommands } from './skill.js';
 import { LSPTool } from './lsp.js';
+import { ChromeTool } from './chrome.js';
 
 // 注册所有工具
 export function registerAllTools(): void {
@@ -92,6 +94,9 @@ export function registerAllTools(): void {
 
   // LSP
   toolRegistry.register(new LSPTool());
+
+  // Chrome
+  toolRegistry.register(new ChromeTool());
 }
 
 // 自动注册

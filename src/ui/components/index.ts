@@ -41,3 +41,5 @@ export { DiffView } from './DiffView.js';
 export type { DiffViewProps } from './DiffView.js';
 export { ModelSelector } from './ModelSelector.js';
 export type { ModelSelectorProps } from './ModelSelector.js';
+export { HistorySearch } from './HistorySearch.js';
+export type { HistorySearchProps } from './HistorySearch.js';
