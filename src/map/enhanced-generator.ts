@@ -354,13 +354,32 @@ export class EnhancedOntologyGenerator {
     const currentDir = path.dirname(currentModuleId);
     let targetPath = path.posix.join(currentDir, source);
 
+    // 移除已有的扩展名（.js, .mjs, .cjs, .ts, .tsx, .jsx 等）
+    // 这是因为 TypeScript 项目中导入时可能使用 .js 扩展名，但实际模块 ID 使用 .ts
+    const extToRemove = ['.js', '.mjs', '.cjs', '.ts', '.tsx', '.jsx'];
+    let basePath = targetPath;
+    for (const ext of extToRemove) {
+      if (targetPath.endsWith(ext)) {
+        basePath = targetPath.slice(0, -ext.length);
+        break;
+      }
+    }
+
     // 尝试不同的扩展名
     const extensions = ['.ts', '.tsx', '.js', '.jsx', '', '/index.ts', '/index.js'];
 
     for (const ext of extensions) {
-      const candidate = targetPath + ext;
+      const candidate = basePath + ext;
       const normalized = candidate.replace(/\\/g, '/');
 
+      if (moduleIds.has(normalized)) {
+        return normalized;
+      }
+    }
+
+    // 如果 basePath 等于 targetPath（没有移除扩展名），也尝试原始路径
+    if (basePath !== targetPath) {
+      const normalized = targetPath.replace(/\\/g, '/');
       if (moduleIds.has(normalized)) {
         return normalized;
       }

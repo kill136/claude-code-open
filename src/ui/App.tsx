@@ -701,7 +701,7 @@ export const App: React.FC<AppProps> = ({
   }, [handleSubmit, initialPrompt]); // 添加依赖项
 
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" flexShrink={0}>
       {/* 欢迎屏幕或头部 */}
       {showWelcome && messages.length === 0 ? (
         <WelcomeScreen
@@ -754,7 +754,7 @@ export const App: React.FC<AppProps> = ({
       </Static>
 
       {/* 当前活动区域 - 流式输出和动态内容 */}
-      <Box flexDirection="column" flexGrow={1} marginY={1}>
+      <Box flexDirection="column" flexGrow={0} flexShrink={0} marginY={1}>
         {/* 当前流式块（按时间顺序交织显示文本和工具）*/}
         {streamBlocks.map((block) => {
           if (block.type === 'text') {

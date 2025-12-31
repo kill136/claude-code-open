@@ -8,6 +8,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { CodeOntology } from '../types.js';
+import { EnhancedCodeBlueprint, EnhancedModule } from '../types-enhanced.js';
 
 // 获取当前目录
 const __filename = fileURLToPath(import.meta.url);
@@ -95,6 +96,106 @@ export class VisualizationServer {
   }
 
   /**
+   * 判断是否为新格式（EnhancedCodeBlueprint）
+   */
+  private isEnhancedFormat(data: any): data is EnhancedCodeBlueprint {
+    return data.meta && data.meta.version && data.views && data.references;
+  }
+
+  /**
+   * 将新格式转换为前端兼容格式
+   */
+  private convertToLegacyFormat(blueprint: EnhancedCodeBlueprint): any {
+    // 将 modules 对象转为数组
+    const modulesArray = Object.values(blueprint.modules).map((m: EnhancedModule) => ({
+      id: m.id,
+      name: m.name,
+      path: m.path,
+      language: m.language,
+      lines: m.lines,
+      size: m.size,
+      imports: m.imports,
+      exports: m.exports,
+      classes: [],
+      interfaces: [],
+      functions: [],
+      semantic: m.semantic,
+    }));
+
+    // 将 references.moduleDeps 转为 dependencyGraph.edges
+    const edges = blueprint.references.moduleDeps.map(dep => ({
+      source: dep.source,
+      target: dep.target,
+      type: dep.type,
+      symbols: dep.symbols,
+      isTypeOnly: dep.isTypeOnly,
+    }));
+
+    // 从 symbols 中提取类、接口、函数
+    for (const symbol of Object.values(blueprint.symbols)) {
+      const mod = modulesArray.find(m => m.id === symbol.moduleId);
+      if (!mod) continue;
+
+      if (symbol.kind === 'class') {
+        mod.classes.push({
+          id: symbol.id,
+          name: symbol.name,
+          location: symbol.location,
+          semantic: symbol.semantic,
+        });
+      } else if (symbol.kind === 'interface') {
+        mod.interfaces.push({
+          id: symbol.id,
+          name: symbol.name,
+          location: symbol.location,
+          semantic: symbol.semantic,
+        });
+      } else if (symbol.kind === 'function') {
+        mod.functions.push({
+          id: symbol.id,
+          name: symbol.name,
+          signature: symbol.signature,
+          location: symbol.location,
+          semantic: symbol.semantic,
+        });
+      }
+    }
+
+    // 构造兼容格式的统计信息
+    const statistics = {
+      totalModules: blueprint.statistics.totalModules,
+      totalClasses: Object.values(blueprint.symbols).filter(s => s.kind === 'class').length,
+      totalInterfaces: Object.values(blueprint.symbols).filter(s => s.kind === 'interface').length,
+      totalFunctions: Object.values(blueprint.symbols).filter(s => s.kind === 'function').length,
+      totalMethods: Object.values(blueprint.symbols).filter(s => s.kind === 'method').length,
+      totalLines: blueprint.statistics.totalLines,
+      totalDependencyEdges: blueprint.statistics.referenceStats.totalModuleDeps,
+      languageBreakdown: blueprint.statistics.languageBreakdown,
+      largestFiles: blueprint.statistics.largestFiles,
+      mostImportedModules: blueprint.statistics.mostImportedModules,
+      mostCalledFunctions: blueprint.statistics.mostCalledSymbols,
+      // 新格式独有的统计
+      semanticCoverage: blueprint.statistics.semanticCoverage,
+      layerDistribution: blueprint.statistics.layerDistribution,
+      referenceStats: blueprint.statistics.referenceStats,
+    };
+
+    return {
+      version: blueprint.meta.version,
+      generatedAt: blueprint.meta.generatedAt,
+      project: blueprint.project,
+      modules: modulesArray,
+      dependencyGraph: { edges },
+      statistics,
+      // 保留新格式的额外信息
+      views: blueprint.views,
+      symbols: blueprint.symbols,
+      references: blueprint.references,
+      isEnhanced: true,
+    };
+  }
+
+  /**
    * 处理 API 请求
    */
   private handleApiRequest(
@@ -106,7 +207,15 @@ export class VisualizationServer {
       if (pathname === '/api/ontology') {
         // 返回完整的本体数据
         const content = fs.readFileSync(this.ontologyPath, 'utf-8');
-        const ontology: CodeOntology = JSON.parse(content);
+        const data = JSON.parse(content);
+
+        // 检测格式并转换
+        let ontology;
+        if (this.isEnhancedFormat(data)) {
+          ontology = this.convertToLegacyFormat(data);
+        } else {
+          ontology = data;
+        }
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(ontology));
@@ -117,9 +226,16 @@ export class VisualizationServer {
         // 返回单个模块
         const moduleId = decodeURIComponent(pathname.slice('/api/module/'.length));
         const content = fs.readFileSync(this.ontologyPath, 'utf-8');
-        const ontology: CodeOntology = JSON.parse(content);
+        const data = JSON.parse(content);
 
-        const module = ontology.modules.find((m) => m.id === moduleId);
+        let module;
+        if (this.isEnhancedFormat(data)) {
+          // 新格式：modules 是对象
+          module = data.modules[moduleId];
+        } else {
+          // 旧格式：modules 是数组
+          module = (data as CodeOntology).modules.find((m) => m.id === moduleId);
+        }
 
         if (module) {
           res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -135,9 +251,14 @@ export class VisualizationServer {
         // 搜索
         const query = url.searchParams.get('q') || '';
         const content = fs.readFileSync(this.ontologyPath, 'utf-8');
-        const ontology: CodeOntology = JSON.parse(content);
+        const data = JSON.parse(content);
 
-        const results = this.search(ontology, query);
+        let results;
+        if (this.isEnhancedFormat(data)) {
+          results = this.searchEnhanced(data, query);
+        } else {
+          results = this.search(data as CodeOntology, query);
+        }
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(results));
@@ -147,10 +268,17 @@ export class VisualizationServer {
       if (pathname === '/api/stats') {
         // 统计信息
         const content = fs.readFileSync(this.ontologyPath, 'utf-8');
-        const ontology: CodeOntology = JSON.parse(content);
+        const data = JSON.parse(content);
+
+        let statistics;
+        if (this.isEnhancedFormat(data)) {
+          statistics = data.statistics;
+        } else {
+          statistics = (data as CodeOntology).statistics;
+        }
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(ontology.statistics));
+        res.end(JSON.stringify(statistics));
         return;
       }
 
@@ -296,6 +424,49 @@ export class VisualizationServer {
             moduleId: module.id,
           });
         }
+      }
+    }
+
+    // 限制结果数量
+    return results.slice(0, 50);
+  }
+
+  /**
+   * 增强版搜索功能（新格式）
+   */
+  private searchEnhanced(blueprint: EnhancedCodeBlueprint, query: string): any[] {
+    const results: any[] = [];
+    const lowerQuery = query.toLowerCase();
+
+    if (!lowerQuery) {
+      return results;
+    }
+
+    // 搜索模块
+    for (const module of Object.values(blueprint.modules)) {
+      if (module.name.toLowerCase().includes(lowerQuery) ||
+          module.id.toLowerCase().includes(lowerQuery)) {
+        results.push({
+          type: 'module',
+          id: module.id,
+          name: module.name,
+          path: module.path,
+          semantic: module.semantic,
+        });
+      }
+    }
+
+    // 搜索符号
+    for (const symbol of Object.values(blueprint.symbols)) {
+      if (symbol.name.toLowerCase().includes(lowerQuery)) {
+        results.push({
+          type: symbol.kind,
+          id: symbol.id,
+          name: symbol.name,
+          moduleId: symbol.moduleId,
+          signature: symbol.signature,
+          semantic: symbol.semantic,
+        });
       }
     }
 
@@ -563,16 +734,29 @@ export class VisualizationServer {
     // 渲染统计信息
     function renderStats() {
       const stats = ontology.statistics;
-      const html = [
+      const isEnhanced = ontology.isEnhanced;
+
+      // 兼容新旧格式的统计项
+      const items = [
         { label: 'Modules', value: stats.totalModules },
-        { label: 'Classes', value: stats.totalClasses },
-        { label: 'Interfaces', value: stats.totalInterfaces },
-        { label: 'Functions', value: stats.totalFunctions },
-        { label: 'Methods', value: stats.totalMethods },
-        { label: 'Lines', value: stats.totalLines.toLocaleString() },
-        { label: 'Dependencies', value: stats.totalDependencyEdges },
-      ].map(item =>
-        '<div class="stat-item"><span>' + item.label + '</span><span class="stat-value">' + item.value + '</span></div>'
+        { label: 'Classes', value: stats.totalClasses || 0 },
+        { label: 'Interfaces', value: stats.totalInterfaces || 0 },
+        { label: 'Functions', value: stats.totalFunctions || 0 },
+        { label: 'Methods', value: stats.totalMethods || 0 },
+        { label: 'Lines', value: (stats.totalLines || 0).toLocaleString() },
+        { label: 'Dependencies', value: stats.totalDependencyEdges || (stats.referenceStats ? stats.referenceStats.totalModuleDeps : 0) },
+      ];
+
+      // 新格式特有的统计
+      if (isEnhanced && stats.semanticCoverage) {
+        items.push({ label: 'Semantic Coverage', value: stats.semanticCoverage.coveragePercent + '%' });
+      }
+      if (isEnhanced && stats.referenceStats) {
+        items.push({ label: 'Symbol Calls', value: stats.referenceStats.totalSymbolCalls });
+      }
+
+      const html = items.map(item =>
+        '<div class="stat-item"><span>' + item.label + '</span><span class="stat-value">' + (item.value !== undefined ? item.value : 0) + '</span></div>'
       ).join('');
 
       document.getElementById('stats').innerHTML = html;
@@ -720,17 +904,38 @@ export class VisualizationServer {
       const panel = document.getElementById('details-panel');
       panel.classList.add('active');
 
-      const html = [
+      const items = [
         '<div class="info-item"><span class="info-label">Name:</span> <span class="info-value">' + module.name + '</span></div>',
         '<div class="info-item"><span class="info-label">Path:</span> <span class="info-value">' + module.id + '</span></div>',
         '<div class="info-item"><span class="info-label">Language:</span> <span class="info-value">' + module.language + '</span></div>',
         '<div class="info-item"><span class="info-label">Lines:</span> <span class="info-value">' + module.lines + '</span></div>',
-        '<div class="info-item"><span class="info-label">Classes:</span> <span class="info-value">' + module.classes.length + '</span></div>',
-        '<div class="info-item"><span class="info-label">Functions:</span> <span class="info-value">' + module.functions.length + '</span></div>',
-        '<div class="info-item"><span class="info-label">Imports:</span> <span class="info-value">' + module.imports.length + '</span></div>',
-      ].join('');
+      ];
 
-      document.getElementById('node-details').innerHTML = html;
+      // 兼容新旧格式
+      if (module.classes) {
+        items.push('<div class="info-item"><span class="info-label">Classes:</span> <span class="info-value">' + module.classes.length + '</span></div>');
+      }
+      if (module.functions) {
+        items.push('<div class="info-item"><span class="info-label">Functions:</span> <span class="info-value">' + module.functions.length + '</span></div>');
+      }
+      if (module.imports) {
+        items.push('<div class="info-item"><span class="info-label">Imports:</span> <span class="info-value">' + module.imports.length + '</span></div>');
+      }
+
+      // 显示新格式的语义信息
+      if (module.semantic) {
+        items.push('<hr style="border-color: #0f3460; margin: 0.5rem 0;">');
+        items.push('<div class="info-item"><span class="info-label">Description:</span></div>');
+        items.push('<div class="info-item" style="color: #aaa; font-size: 0.8rem;">' + (module.semantic.description || 'N/A') + '</div>');
+        if (module.semantic.architectureLayer) {
+          items.push('<div class="info-item"><span class="info-label">Layer:</span> <span class="info-value">' + module.semantic.architectureLayer + '</span></div>');
+        }
+        if (module.semantic.tags && module.semantic.tags.length > 0) {
+          items.push('<div class="info-item"><span class="info-label">Tags:</span> <span class="info-value">' + module.semantic.tags.join(', ') + '</span></div>');
+        }
+      }
+
+      document.getElementById('node-details').innerHTML = items.join('');
     }
 
     // 搜索功能

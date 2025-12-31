@@ -4,3 +4,7 @@
 
 export { useGlobalKeybindings } from './useGlobalKeybindings.js';
 export type { GlobalKeybinding, UseGlobalKeybindingsOptions } from './useGlobalKeybindings.js';
+
+export { useAutoScroll, useMessageAutoScroll } from './useAutoScroll.js';
+export { useTerminalSize, useTerminalWidth, useTerminalHeight } from './useTerminalSize.js';
+export type { TerminalSize } from './useTerminalSize.js';

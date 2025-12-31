@@ -3,8 +3,9 @@
  * 仿官方 Claude Code 的欢迎界面
  */
 
-import React, { useState, useEffect } from 'react';
-import { Box, Text, useStdout } from 'ink';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Box, Text } from 'ink';
+import { useTerminalWidth } from '../hooks/useTerminalSize.js';
 
 interface WelcomeScreenProps {
   version: string;
@@ -94,11 +95,8 @@ const VerticalDivider: React.FC<{ height: number; color?: string }> = ({
   );
 };
 
-// 计算终端宽度
-const useTerminalWidth = () => {
-  const { stdout } = useStdout();
-  return stdout?.columns || 80;
-};
+// 注意：useTerminalWidth 已从 hooks/useTerminalSize.js 导入
+// 该钩子会响应终端 resize 事件
 
 // 格式化时间戳
 const formatTimeAgo = (timestamp: string): string => {
@@ -131,18 +129,23 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   const claudeColor = '#D77757'; // claude/clawd_body color
 
   // 默认的 What's new 内容
-  const defaultWhatsNew = [
+  const defaultWhatsNew = useMemo(() => [
     'Added LSP (Language Server Protocol) too...',
     'Added `/terminal-setup` support for Kitt...',
     'Added ctrl+t shortcut in `/theme` to tog...',
-  ];
+  ], []);
 
   const displayWhatsNew = whatsNew.length > 0 ? whatsNew : defaultWhatsNew;
 
-  // 计算布局宽度
-  const totalWidth = Math.min(terminalWidth - 2, 100);
-  const leftPanelWidth = Math.floor(totalWidth * 0.42);
-  const rightPanelWidth = Math.floor(totalWidth * 0.55);
+  // 使用 useMemo 缓存布局计算，只在 terminalWidth 变化时重新计算
+  const { totalWidth, leftPanelWidth, rightPanelWidth } = useMemo(() => {
+    const total = Math.min(terminalWidth - 2, 100);
+    return {
+      totalWidth: total,
+      leftPanelWidth: Math.floor(total * 0.42),
+      rightPanelWidth: Math.floor(total * 0.55),
+    };
+  }, [terminalWidth]);
 
   // 欢迎消息
   const welcomeMessage = username
