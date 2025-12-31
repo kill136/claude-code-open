@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Box, Text, useApp, useInput } from 'ink';
+import { Box, Text, useApp, useInput, Static } from 'ink';
 import { Header } from './components/Header.js';
 import { Message } from './components/Message.js';
 import { Input } from './components/Input.js';
@@ -48,6 +48,7 @@ interface AppProps {
 }
 
 interface MessageItem {
+  id: string;  // 唯一标识符，用于 Static 组件
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
@@ -332,7 +333,12 @@ export const App: React.FC<AppProps> = ({
   const addMessage = useCallback((role: 'user' | 'assistant', content: string) => {
     setMessages((prev) => [
       ...prev,
-      { role, content, timestamp: new Date() },
+      {
+        id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        role,
+        content,
+        timestamp: new Date()
+      },
     ]);
   }, []);
 
@@ -679,7 +685,9 @@ export const App: React.FC<AppProps> = ({
 
       setIsProcessing(false);
       setCurrentResponse(''); // 清空当前响应，因为已添加到消息列表
-      // 注意：不清空streamBlocks，让它保留在当前会话中直到下一次提交
+      // 关键修复：清空 streamBlocks，避免消息重复显示
+      // 消息已经被添加到 messages 数组中，由 Static 组件渲染历史记录
+      setStreamBlocks([]);
     },
     [loop, showWelcome, addActivity, addMessage, handleSlashCommand, verbose] // 添加 verbose 依赖
   );
@@ -733,18 +741,20 @@ export const App: React.FC<AppProps> = ({
         <LoginSelector onSelect={handleLoginSelect} />
       )}
 
-      {/* Messages */}
-      <Box flexDirection="column" flexGrow={1} marginY={1}>
-        {/* 历史消息 */}
-        {messages.map((msg, i) => (
+      {/* 历史消息 - 使用 Static 组件固化到终端历史，允许向上滚动查看 */}
+      <Static items={messages}>
+        {(msg) => (
           <Message
-            key={`${msg.role}-${msg.timestamp.getTime()}-${i}`}
+            key={msg.id}
             role={msg.role}
             content={msg.content}
             timestamp={msg.timestamp}
           />
-        ))}
+        )}
+      </Static>
 
+      {/* 当前活动区域 - 流式输出和动态内容 */}
+      <Box flexDirection="column" flexGrow={1} marginY={1}>
         {/* 当前流式块（按时间顺序交织显示文本和工具）*/}
         {streamBlocks.map((block) => {
           if (block.type === 'text') {

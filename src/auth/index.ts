@@ -278,7 +278,7 @@ export function initAuth(): AuthConfig | null {
 
         // 检查是否有 user:inference scope（订阅用户标志）
         if (hasInferenceScope(scopes)) {
-          console.log('[Auth] Using OAuth token with user:inference scope (subscription mode)');
+          // 调试日志已移除，避免污染 UI 输出
           currentAuth = {
             type: 'oauth',
             accountType: 'subscription',
@@ -303,7 +303,7 @@ export function initAuth(): AuthConfig | null {
     try {
       const config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'));
       if (config.primaryApiKey) {
-        console.log('[Auth] Using primaryApiKey from official Claude Code config');
+        // 调试日志已移除，避免污染 UI 输出
         currentAuth = {
           type: 'api_key',
           accountType: 'api',
@@ -322,7 +322,7 @@ export function initAuth(): AuthConfig | null {
   if (Keychain.isKeychainAvailable()) {
     const keychainApiKey = Keychain.loadFromKeychain();
     if (keychainApiKey) {
-      console.log('[Auth] Using API Key from macOS Keychain');
+      // 调试日志已移除，避免污染 UI 输出
       currentAuth = {
         type: 'api_key',
         accountType: 'api',

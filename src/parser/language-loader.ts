@@ -6,11 +6,14 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
-import { Parser, Language } from 'web-tree-sitter';
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// 动态导入 web-tree-sitter 以支持正确的初始化
+let Parser: any = null;
+let Language: any = null;
 
 /**
  * Language configuration mapping file extensions to language names
@@ -121,27 +124,83 @@ export const LANGUAGE_MAPPINGS: Record<string, LanguageMapping> = {
  * Language Loader - Manages loading and caching of Tree-sitter language parsers
  */
 export class LanguageLoader {
-  private languageCache: Map<string, Language> = new Map();
-  private initPromise: Promise<void> | null = null;
+  private languageCache: Map<string, any> = new Map();
+  private initPromise: Promise<boolean> | null = null;
+  private initialized: boolean = false;
+
+  /**
+   * 获取 web-tree-sitter wasm 文件目录
+   */
+  private getWebTreeSitterWasmDir(): string {
+    const possibleDirs = [
+      path.join(__dirname, '../../node_modules/web-tree-sitter'),
+      path.join(process.cwd(), 'node_modules/web-tree-sitter'),
+    ];
+
+    for (const dir of possibleDirs) {
+      const wasmPath = path.join(dir, 'web-tree-sitter.wasm');
+      if (fs.existsSync(wasmPath)) {
+        return dir;
+      }
+    }
+
+    return possibleDirs[0];
+  }
 
   /**
    * Initialize the language loader (must be called before loading languages)
    */
-  async initialize(): Promise<void> {
+  async initialize(): Promise<boolean> {
+    if (this.initialized) {
+      return true;
+    }
+
     if (this.initPromise) {
       return this.initPromise;
     }
 
-    this.initPromise = Parser.init();
-    await this.initPromise;
+    this.initPromise = this.doInitialize();
+    return this.initPromise;
+  }
+
+  private async doInitialize(): Promise<boolean> {
+    try {
+      // 动态导入 web-tree-sitter
+      const TreeSitter = await import('web-tree-sitter');
+      // web-tree-sitter@0.22.x 使用 default export，0.26.x 使用 named exports
+      Parser = (TreeSitter as any).default || (TreeSitter as any).Parser;
+
+      // 获取 wasm 目录
+      const wasmDir = this.getWebTreeSitterWasmDir();
+
+      // 初始化 Parser，提供正确的 wasm 文件位置
+      await Parser.init({
+        locateFile(scriptName: string) {
+          return path.join(wasmDir, scriptName);
+        }
+      });
+
+      // 0.22.x: Parser.Language, 0.26.x: TreeSitter.Language
+      Language = Parser.Language || (TreeSitter as any).Language;
+
+      this.initialized = true;
+      return true;
+    } catch (error) {
+      // web-tree-sitter 初始化失败
+      return false;
+    }
   }
 
   /**
    * Load a language WASM file
    */
-  async loadLanguage(languageName: string): Promise<Language | null> {
+  async loadLanguage(languageName: string): Promise<any | null> {
     // Ensure initialized
-    await this.initialize();
+    const success = await this.initialize();
+    if (!success || !Language) {
+      // web-tree-sitter 未初始化
+      return null;
+    }
 
     // Check cache
     if (this.languageCache.has(languageName)) {
@@ -151,26 +210,35 @@ export class LanguageLoader {
     // Get language mapping
     const mapping = LANGUAGE_MAPPINGS[languageName];
     if (!mapping) {
-      console.warn(`No language mapping found for: ${languageName}`);
+      // 没有语言映射
       return null;
     }
 
     // Find WASM file
     const wasmPath = this.findWasmPath(mapping.wasmName);
     if (!wasmPath) {
-      console.warn(`WASM file not found for language: ${languageName} (${mapping.wasmName})`);
+      // WASM 文件不存在
       return null;
     }
 
     try {
-      console.log(`Loading language ${languageName} from ${wasmPath}`);
       const language = await Language.load(wasmPath);
       this.languageCache.set(languageName, language);
       return language;
     } catch (error) {
-      console.error(`Failed to load language ${languageName}:`, error);
+      // 静默处理加载失败
       return null;
     }
+  }
+
+  /**
+   * Create a new Parser instance
+   */
+  createParser(): any | null {
+    if (!this.initialized || !Parser) {
+      return null;
+    }
+    return new Parser();
   }
 
   /**

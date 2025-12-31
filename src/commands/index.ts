@@ -15,6 +15,7 @@ import { registerToolsCommands } from './tools.js';
 import { registerUtilityCommands } from './utility.js';
 import { registerDevelopmentCommands } from './development.js';
 import { registerApiCommands } from './api.js';
+import { registerMapCommands } from './map.js';
 
 let initialized = false;
 
@@ -33,6 +34,7 @@ export function initializeCommands(): void {
   registerUtilityCommands();
   registerDevelopmentCommands();
   registerApiCommands();
+  registerMapCommands();
 
   initialized = true;
 }
@@ -86,3 +88,4 @@ export { registerToolsCommands } from './tools.js';
 export { registerUtilityCommands } from './utility.js';
 export { registerDevelopmentCommands } from './development.js';
 export { registerApiCommands } from './api.js';
+export { registerMapCommands } from './map.js';

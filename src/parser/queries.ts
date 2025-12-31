@@ -61,10 +61,7 @@ export const LANGUAGE_QUERIES: Record<string, QueryDefinition> = {
       ]
     `,
     export: `
-      [
-        (export_statement) @definition
-        (export_default_declaration) @definition
-      ]
+      (export_statement) @definition
     `,
   },
 
@@ -145,10 +142,7 @@ export const LANGUAGE_QUERIES: Record<string, QueryDefinition> = {
       ]
     `,
     export: `
-      [
-        (export_statement) @definition
-        (export_default_declaration) @definition
-      ]
+      (export_statement) @definition
     `,
   },
 

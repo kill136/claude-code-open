@@ -3,7 +3,12 @@
  * Implements T-004: Enhanced symbol extraction with query-based approach
  */
 
-import { Query, QueryMatch, Language, Node, Tree } from 'web-tree-sitter';
+// 使用 any 类型以兼容不同版本的 web-tree-sitter API
+type Query = any;
+type QueryMatch = any;
+type Language = any;
+type Node = any;
+type Tree = any;
 import { CodeSymbol, SymbolKind } from './index.js';
 import { getLanguageQueries } from './queries.js';
 
@@ -56,6 +61,7 @@ export class SymbolExtractor {
 
   /**
    * Get or create a cached query
+   * web-tree-sitter 使用 language.query(queryString) 方法创建查询
    */
   private getOrCreateQuery(
     language: Language,
@@ -67,7 +73,8 @@ export class SymbolExtractor {
 
     if (!this.queryCache.has(cacheKey)) {
       try {
-        const query = new Query(language, queryString);
+        // web-tree-sitter 使用 language.query() 方法创建查询
+        const query = language.query(queryString);
         this.queryCache.set(cacheKey, query);
       } catch (error) {
         console.error(`Failed to create query for ${cacheKey}:`, error);

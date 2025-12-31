@@ -52,7 +52,16 @@
       "Bash(git checkout:*)",
       "Bash(timeout 30 npm run dev:*)",
       "Bash(git add:*)",
-      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: 修复聊天界面自动滚动问题\n\n移除顶层 Box 组件的 height=\"100%\" 限制，使内容能够自然增长并触发终端自动滚动。\n\n技术细节：\n- 移除 App.tsx 中主容器的固定高度限制\n- 添加 useAutoScroll 钩子（用于未来增强）\n- Ink 框架现在可以正确处理内容溢出时的滚动行为\n\n修复前：内容超出终端高度时无法滚动到最新消息\n修复后：内容自动滚动到底部，与官方 Claude Code 行为一致\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: 修复聊天界面自动滚动问题\n\n移除顶层 Box 组件的 height=\"100%\" 限制，使内容能够自然增长并触发终端自动滚动。\n\n技术细节：\n- 移除 App.tsx 中主容器的固定高度限制\n- 添加 useAutoScroll 钩子（用于未来增强）\n- Ink 框架现在可以正确处理内容溢出时的滚动行为\n\n修复前：内容超出终端高度时无法滚动到最新消息\n修复后：内容自动滚动到底部，与官方 Claude Code 行为一致\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(timeout 10 npx tsx:*)",
+      "Bash(timeout 30 node:*)",
+      "Bash(timeout 60 node -e:*)",
+      "Bash(npm search:*)",
+      "Bash(ls:*)",
+      "Bash(timeout 60 node:*)",
+      "Bash(timeout 120 node:*)",
+      "Bash(timeout 180 node:*)",
+      "Bash(timeout 10 node:*)"
     ]
   }
 }

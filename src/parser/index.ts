@@ -10,7 +10,12 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
 import Parser from 'web-tree-sitter';
+
+// ESM 兼容: 获取 __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 import { SymbolExtractor } from './symbol-extractor.js';
 import { ReferenceFinder, Reference } from './reference-finder.js';
 import { languageLoader, LanguageLoader } from './language-loader.js';
@@ -200,6 +205,7 @@ interface ParseCacheEntry {
 // Tree-sitter 解析器（优先使用原生，回退到 WASM）
 export class TreeSitterWasmParser {
   private ParserClass: any = null;
+  private LanguageClass: any = null;  // web-tree-sitter Language 类
   private languages: Map<string, any> = new Map();
   private initialized: boolean = false;
   private initPromise: Promise<boolean> | null = null;
@@ -221,35 +227,52 @@ export class TreeSitterWasmParser {
     return this.initPromise;
   }
 
-  private async doInitialize(): Promise<boolean> {
-    // 首先尝试原生 tree-sitter
-    try {
-      const nativeTreeSitter = await import('tree-sitter');
-      const Parser = (nativeTreeSitter as any).default || nativeTreeSitter;
-      this.ParserClass = Parser;
-      this.useNative = true;
-      this.initialized = true;
-      console.log('Tree-sitter: 使用原生模块');
-      return true;
-    } catch {
-      // 原生模块不可用，尝试 WASM
+  /**
+   * 获取 web-tree-sitter wasm 文件目录
+   */
+  private getWebTreeSitterWasmDir(): string {
+    const possibleDirs = [
+      path.join(__dirname, '../../node_modules/web-tree-sitter'),
+      path.join(process.cwd(), 'node_modules/web-tree-sitter'),
+    ];
+
+    for (const dir of possibleDirs) {
+      const wasmPath = path.join(dir, 'web-tree-sitter.wasm');
+      if (fs.existsSync(wasmPath)) {
+        return dir;
+      }
     }
 
+    return possibleDirs[0];
+  }
+
+  private async doInitialize(): Promise<boolean> {
+    // 由于原生 tree-sitter 语言包通常不可用（需要编译），
+    // 我们直接使用 web-tree-sitter WASM 模式以获得更好的跨平台兼容性
     try {
       // 动态导入 web-tree-sitter
       const TreeSitter = await import('web-tree-sitter');
-      // Parser 可能是命名导出或默认导出
-      const Parser = (TreeSitter as any).Parser || (TreeSitter as any).default || TreeSitter;
-      if (typeof Parser.init === 'function') {
-        await Parser.init();
-      }
+      // web-tree-sitter@0.22.x 使用 default export，0.26.x 使用 named exports
+      const Parser = (TreeSitter as any).default || (TreeSitter as any).Parser;
+      const wasmDir = this.getWebTreeSitterWasmDir();
+
+      // 初始化 Parser，提供正确的 wasm 文件位置
+      await Parser.init({
+        locateFile: (scriptName: string) => {
+          return path.join(wasmDir, scriptName);
+        }
+      });
+
+      // 保存 Language 类的引用用于后续加载
+      // 0.22.x: Parser.Language, 0.26.x: TreeSitter.Language
+      this.LanguageClass = Parser.Language || (TreeSitter as any).Language;
       this.ParserClass = Parser;
       this.useNative = false;
       this.initialized = true;
-      console.log('Tree-sitter: 使用 WASM 模块');
+      // Tree-sitter: 使用 WASM 模块
       return true;
     } catch (err) {
-      console.warn('Tree-sitter 初始化失败，使用 Regex 回退:', err);
+      // Tree-sitter 初始化失败，静默回退到 Regex
       return false;
     }
   }
@@ -268,17 +291,119 @@ export class TreeSitterWasmParser {
     }
 
     try {
-      const wasmPath = this.getWasmPath(languageName);
-      if (wasmPath && fs.existsSync(wasmPath)) {
-        const language = await this.ParserClass.Language.load(wasmPath);
-        this.languages.set(languageName, language);
-        return language;
+      // 原生模块和 WASM 模块使用不同的加载方式
+      if (this.useNative) {
+        // 原生 tree-sitter：通过 npm 包加载语言
+        const language = await this.loadNativeLanguage(languageName);
+        if (language) {
+          this.languages.set(languageName, language);
+          return language;
+        }
+        // 原生包不可用，尝试 WASM 回退
+        const wasmLang = await this.loadWasmLanguage(languageName);
+        if (wasmLang) {
+          this.languages.set(languageName, wasmLang);
+          return wasmLang;
+        }
+      } else {
+        // WASM 模式
+        const wasmLang = await this.loadWasmLanguage(languageName);
+        if (wasmLang) {
+          this.languages.set(languageName, wasmLang);
+          return wasmLang;
+        }
       }
     } catch (err) {
-      console.warn(`加载语言 ${languageName} 失败:`, err);
+      // 静默处理语言加载失败
     }
 
     return null;
+  }
+
+  private async loadWasmLanguage(languageName: string): Promise<any | null> {
+    try {
+      const wasmPath = this.getWasmPath(languageName);
+      if (wasmPath && fs.existsSync(wasmPath)) {
+        // 如果当前是原生模式，需要先初始化 web-tree-sitter
+        if (this.useNative && !this.LanguageClass) {
+          try {
+            const TreeSitter = await import('web-tree-sitter');
+            // web-tree-sitter@0.22.x 使用 default export
+            const Parser = (TreeSitter as any).default || (TreeSitter as any).Parser;
+            const wasmDir = this.getWebTreeSitterWasmDir();
+
+            await Parser.init({
+              locateFile: (scriptName: string) => {
+                return path.join(wasmDir, scriptName);
+              }
+            });
+
+            // 0.22.x: Parser.Language
+            this.LanguageClass = Parser.Language || (TreeSitter as any).Language;
+          } catch (initErr) {
+            // 静默处理初始化失败
+            return null;
+          }
+        }
+
+        // 使用 Language 类加载语言
+        if (this.LanguageClass) {
+          const language = await this.LanguageClass.load(wasmPath);
+          return language;
+        }
+        return null;
+      }
+    } catch (err) {
+      // 静默处理 WASM 加载失败
+    }
+    return null;
+  }
+
+  private async loadNativeLanguage(languageName: string): Promise<any | null> {
+    // 原生 tree-sitter 语言包名称映射
+    const nativePackages: Record<string, string> = {
+      typescript: 'tree-sitter-typescript',
+      javascript: 'tree-sitter-javascript',
+      tsx: 'tree-sitter-typescript',
+      python: 'tree-sitter-python',
+      go: 'tree-sitter-go',
+      rust: 'tree-sitter-rust',
+      java: 'tree-sitter-java',
+      c: 'tree-sitter-c',
+      cpp: 'tree-sitter-cpp',
+      csharp: 'tree-sitter-c-sharp',
+      ruby: 'tree-sitter-ruby',
+      php: 'tree-sitter-php',
+      bash: 'tree-sitter-bash',
+      json: 'tree-sitter-json',
+      yaml: 'tree-sitter-yaml',
+      html: 'tree-sitter-html',
+      css: 'tree-sitter-css',
+      markdown: 'tree-sitter-markdown',
+    };
+
+    const packageName = nativePackages[languageName];
+    if (!packageName) {
+      // 没有原生语言包
+      return null;
+    }
+
+    try {
+      const langModule = await import(packageName);
+      // TypeScript 包有 typescript 和 tsx 两个语言
+      if (languageName === 'tsx' && langModule.tsx) {
+        return langModule.tsx;
+      }
+      if (languageName === 'typescript' && langModule.typescript) {
+        return langModule.typescript;
+      }
+      // 其他语言通常是默认导出
+      return langModule.default || langModule;
+    } catch (err) {
+      // 原生包不可用，回退到 WASM
+      // 原生语言包不可用，尝试 WASM
+      return null;
+    }
   }
 
   private getWasmPath(languageName: string): string | null {
@@ -300,12 +425,12 @@ export class TreeSitterWasmParser {
 
     for (const p of possiblePaths) {
       if (fs.existsSync(p)) {
-        console.log(`Found WASM for ${languageName} at: ${p}`);
+        // Found WASM
         return p;
       }
     }
 
-    console.warn(`WASM not found for language: ${languageName}`);
+    // WASM not found
     return null;
   }
 
@@ -1118,6 +1243,7 @@ export const treeSitterParser = new TreeSitterWasmParser();
 
 // 导出新的模块 (T-004, T-005, T-006)
 export { SymbolExtractor } from './symbol-extractor.js';
-export { ReferenceFinder, Reference } from './reference-finder.js';
+export { ReferenceFinder } from './reference-finder.js';
+export type { Reference } from './reference-finder.js';
 export { LanguageLoader, languageLoader, LANGUAGE_MAPPINGS } from './language-loader.js';
 export { getQuery, getLanguageQueries, hasQuerySupport, getSupportedLanguagesWithQueries } from './queries.js';

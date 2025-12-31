@@ -3,7 +3,11 @@
  * Implements T-005: Method A - Text matching + scope filtering
  */
 
-import { Query, Language, Node, Tree } from 'web-tree-sitter';
+// 使用 any 类型以兼容不同版本的 web-tree-sitter API
+type Query = any;
+type Language = any;
+type Node = any;
+type Tree = any;
 
 export interface Reference {
   location: {
@@ -34,7 +38,8 @@ export class ReferenceFinder {
 
     try {
       // 1. Find all identifier nodes using a query
-      const identifierQuery = new Query(language, '(identifier) @id');
+      // web-tree-sitter 使用 language.query() 方法创建查询
+      const identifierQuery = language.query('(identifier) @id');
       const matches = identifierQuery.matches(tree.rootNode);
 
       // 2. Find the cursor position node and its definition

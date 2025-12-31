@@ -281,10 +281,9 @@ export class ClaudeClient {
     // 如果使用 OAuth，标记模式
     if (authToken) {
       this.isOAuth = true;
-      console.log('[ClaudeClient] Using OAuth mode with authToken');
-    } else if (apiKey) {
-      console.log('[ClaudeClient] Using API key mode');
+      // 调试日志已移除，避免污染 UI 输出
     }
+    // API key 模式无需日志
 
     const anthropicConfig: any = {
       apiKey: apiKey,  // OAuth 模式下为 null
@@ -844,17 +843,24 @@ export function getDefaultClient(): ClaudeClient {
     if (auth) {
       if (auth.type === 'api_key' && auth.apiKey) {
         config.apiKey = auth.apiKey;
-      } else if (auth.type === 'oauth' && auth.accessToken) {
-        // 关键修复：检查是否有 user:inference scope
-        // 官方 Claude Code 在有此 scope 时直接使用 OAuth access token
-        if (hasInferenceScope(auth.scope)) {
-          // 直接使用 OAuth access token 作为 authToken
-          // 这是官方 Claude Code 的做法
-          config.authToken = auth.accessToken;
-        } else {
-          // 没有 inference scope，需要使用创建的 API Key
-          if (auth.oauthApiKey) {
-            config.apiKey = auth.oauthApiKey;
+      } else if (auth.type === 'oauth') {
+        // OAuth 模式：支持 accessToken 或 authToken（订阅模式）
+        const oauthToken = auth.accessToken || auth.authToken;
+
+        if (oauthToken) {
+          // 关键修复：检查是否有 user:inference scope
+          // 官方 Claude Code 在有此 scope 时直接使用 OAuth access token
+          // 注意：auth.scope 或 auth.scopes 都可能存在
+          const scopes = auth.scope || auth.scopes;
+          if (hasInferenceScope(scopes)) {
+            // 直接使用 OAuth access token 作为 authToken
+            // 这是官方 Claude Code 的做法
+            config.authToken = oauthToken;
+          } else {
+            // 没有 inference scope，需要使用创建的 API Key
+            if (auth.oauthApiKey) {
+              config.apiKey = auth.oauthApiKey;
+            }
           }
         }
       }
