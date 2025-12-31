@@ -5,7 +5,8 @@
   "type": "module",
   "bin": {
     "claude": "./dist/cli.js",
-    "claude-code-open": "./dist/cli.js"
+    "claude-code-open": "./dist/cli.js",
+    "claude-web": "./dist/web-cli.js"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -19,6 +20,9 @@
     "build": "tsc",
     "start": "node dist/cli.js",
     "dev": "tsx src/cli.ts",
+    "web": "tsx src/web-cli.ts",
+    "web:start": "node dist/web-cli.js",
+    "web:dev": "tsx watch src/web-cli.ts",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:integration": "vitest tests/integration",
@@ -73,7 +77,8 @@
     "uuid": "^9.0.0",
     "web-tree-sitter": "^0.26.3",
     "ws": "^8.18.3",
-    "zod": "^3.22.0"
+    "zod": "^3.22.0",
+    "express": "^5.2.1"
   },
   "devDependencies": {
     "@anthropic-ai/claude-code": "^2.0.76",
@@ -85,7 +90,6 @@
     "@types/uuid": "^9.0.0",
     "@types/ws": "^8.18.1",
     "@vitest/ui": "^4.0.16",
-    "express": "^5.2.1",
     "tsx": "^4.7.0",
     "typescript": "^5.3.0",
     "vitest": "^4.0.16"
