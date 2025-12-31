@@ -6,7 +6,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { randomUUID } from 'crypto';
 import { ConversationManager } from './conversation.js';
-import type { ClientMessage, ServerMessage } from '../shared/types.js';
+import type { ClientMessage, ServerMessage, Attachment } from '../shared/types.js';
 
 interface ClientConnection {
   id: string;
@@ -124,7 +124,7 @@ async function handleClientMessage(
       break;
 
     case 'chat':
-      await handleChatMessage(client, message.payload.content, message.payload.images, conversationManager);
+      await handleChatMessage(client, message.payload.content, message.payload.attachments || message.payload.images, conversationManager);
       break;
 
     case 'cancel':
@@ -167,11 +167,37 @@ async function handleClientMessage(
 async function handleChatMessage(
   client: ClientConnection,
   content: string,
-  images: string[] | undefined,
+  attachments: Attachment[] | string[] | undefined,
   conversationManager: ConversationManager
 ): Promise<void> {
   const { ws, sessionId, model } = client;
   const messageId = randomUUID();
+
+  // 处理附件：转换为 images 数组（向后兼容）或增强内容
+  let images: string[] | undefined;
+  let enhancedContent = content;
+
+  if (attachments && Array.isArray(attachments)) {
+    // 检查是否是新格式的附件
+    if (attachments.length > 0 && typeof attachments[0] === 'object') {
+      const typedAttachments = attachments as Attachment[];
+      images = typedAttachments
+        .filter(att => att.type === 'image')
+        .map(att => att.data); // 已经是 base64
+
+      // 将文本附件添加到内容中
+      const textAttachments = typedAttachments.filter(att => att.type === 'text');
+      if (textAttachments.length > 0) {
+        const textParts = textAttachments.map(
+          att => `[文件: ${att.name}]\n\`\`\`\n${att.data}\n\`\`\``
+        );
+        enhancedContent = textParts.join('\n\n') + (content ? '\n\n' + content : '');
+      }
+    } else {
+      // 旧格式：直接是 base64 字符串数组
+      images = attachments as string[];
+    }
+  }
 
   // 发送消息开始
   sendMessage(ws, {
@@ -187,7 +213,7 @@ async function handleChatMessage(
 
   try {
     // 调用对话管理器，传入流式回调
-    await conversationManager.chat(sessionId, content, images, model, {
+    await conversationManager.chat(sessionId, enhancedContent, images, model, {
       onThinkingStart: () => {
         sendMessage(ws, {
           type: 'thinking_start',

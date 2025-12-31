@@ -274,7 +274,6 @@ function getInlineCSS(): string {
 
     .message.user {
       background: var(--bg-tertiary);
-      margin-left: 60px;
     }
 
     .message.assistant {
@@ -501,6 +500,7 @@ function getInlineCSS(): string {
       margin: 0 auto;
       display: flex;
       gap: 12px;
+      align-items: flex-end;
     }
 
     .input-wrapper {
@@ -552,6 +552,93 @@ function getInlineCSS(): string {
     .send-btn:disabled {
       opacity: 0.5;
       cursor: not-allowed;
+    }
+
+    /* 附件上传按钮 */
+    .attach-btn {
+      padding: 12px;
+      background: transparent;
+      color: var(--text-muted);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .attach-btn:hover {
+      color: var(--accent-primary);
+      border-color: var(--accent-primary);
+      background: rgba(122, 162, 247, 0.1);
+    }
+
+    .attach-btn input[type="file"] {
+      display: none;
+    }
+
+    /* 附件预览区域 */
+    .attachments-preview {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+      max-width: 900px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .attachment-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: var(--bg-tertiary);
+      border-radius: 6px;
+      font-size: 13px;
+    }
+
+    .attachment-item .file-icon {
+      font-size: 16px;
+    }
+
+    .attachment-item .file-name {
+      max-width: 150px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .attachment-item .remove-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 2px;
+      font-size: 14px;
+      line-height: 1;
+    }
+
+    .attachment-item .remove-btn:hover {
+      color: var(--accent-error);
+    }
+
+    /* 图片预览 */
+    .image-preview {
+      max-width: 200px;
+      max-height: 150px;
+      border-radius: 6px;
+      margin-top: 8px;
+    }
+
+    /* 消息中的图片 */
+    .message-image {
+      max-width: 400px;
+      max-height: 300px;
+      border-radius: 8px;
+      margin: 8px 0;
     }
 
     /* 状态指示器 */
@@ -769,26 +856,41 @@ function getInlineReactApp(port: number): string {
       AskUserQuestion: '❓',
     };
 
-    // WebSocket Hook
+    // WebSocket Hook with auto-reconnect and heartbeat
     function useWebSocket(url) {
       const [connected, setConnected] = useState(false);
       const [sessionId, setSessionId] = useState(null);
       const [model, setModel] = useState('sonnet');
       const wsRef = useRef(null);
       const messageHandlersRef = useRef([]);
+      const reconnectTimeoutRef = useRef(null);
+      const pingIntervalRef = useRef(null);
 
-      useEffect(() => {
+      const connect = useCallback(() => {
+        if (wsRef.current?.readyState === WebSocket.OPEN) return;
+
         const ws = new WebSocket(url);
         wsRef.current = ws;
 
         ws.onopen = () => {
           console.log('WebSocket connected');
           setConnected(true);
+
+          // 定期发送 ping 保持连接
+          pingIntervalRef.current = setInterval(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ type: 'ping' }));
+            }
+          }, 25000);
         };
 
         ws.onmessage = (event) => {
           try {
             const message = JSON.parse(event.data);
+
+            // 忽略 pong 消息
+            if (message.type === 'pong') return;
+
             messageHandlersRef.current.forEach(handler => handler(message));
 
             if (message.type === 'connected') {
@@ -803,16 +905,38 @@ function getInlineReactApp(port: number): string {
         ws.onclose = () => {
           console.log('WebSocket disconnected');
           setConnected(false);
+
+          // 清除 ping 定时器
+          if (pingIntervalRef.current) {
+            clearInterval(pingIntervalRef.current);
+            pingIntervalRef.current = null;
+          }
+
+          // 3秒后尝试重连
+          reconnectTimeoutRef.current = setTimeout(() => {
+            console.log('Attempting to reconnect...');
+            connect();
+          }, 3000);
         };
 
         ws.onerror = (error) => {
           console.error('WebSocket error:', error);
         };
+      }, [url]);
+
+      useEffect(() => {
+        connect();
 
         return () => {
-          ws.close();
+          if (reconnectTimeoutRef.current) {
+            clearTimeout(reconnectTimeoutRef.current);
+          }
+          if (pingIntervalRef.current) {
+            clearInterval(pingIntervalRef.current);
+          }
+          wsRef.current?.close();
         };
-      }, [url]);
+      }, [connect]);
 
       const send = useCallback((message) => {
         if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -893,6 +1017,22 @@ function getInlineReactApp(port: number): string {
         if (item.type === 'text') {
           return React.createElement(MarkdownContent, { key: index, content: item.text });
         }
+        if (item.type === 'image') {
+          // 渲染图片附件
+          const imgSrc = item.source?.type === 'base64'
+            ? \`data:\${item.source.media_type};base64,\${item.source.data}\`
+            : item.url;
+          return React.createElement('div', { key: index, className: 'image-container' },
+            React.createElement('img', {
+              src: imgSrc,
+              alt: item.fileName || '上传的图片',
+              className: 'message-image'
+            }),
+            item.fileName && React.createElement('div', {
+              style: { fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }
+            }, item.fileName)
+          );
+        }
         if (item.type === 'tool_use') {
           return React.createElement(ToolCall, { key: index, toolUse: item });
         }
@@ -934,8 +1074,10 @@ function getInlineReactApp(port: number): string {
       const [messages, setMessages] = useState([]);
       const [input, setInput] = useState('');
       const [status, setStatus] = useState('idle');
+      const [attachments, setAttachments] = useState([]);
       const chatContainerRef = useRef(null);
       const inputRef = useRef(null);
+      const fileInputRef = useRef(null);
 
       const { connected, sessionId, model, send, addMessageHandler } = useWebSocket(\`ws://localhost:${port}/ws\`);
 
@@ -958,15 +1100,16 @@ function getInlineReactApp(port: number): string {
 
             case 'text_delta':
               if (currentMessageRef.current) {
-                const lastContent = currentMessageRef.current.content[currentMessageRef.current.content.length - 1];
+                const currentMsg = currentMessageRef.current;
+                const lastContent = currentMsg.content[currentMsg.content.length - 1];
                 if (lastContent?.type === 'text') {
                   lastContent.text += msg.payload.text;
                 } else {
-                  currentMessageRef.current.content.push({ type: 'text', text: msg.payload.text });
+                  currentMsg.content.push({ type: 'text', text: msg.payload.text });
                 }
                 setMessages(prev => {
-                  const filtered = prev.filter(m => m.id !== currentMessageRef.current.id);
-                  return [...filtered, { ...currentMessageRef.current }];
+                  const filtered = prev.filter(m => m.id !== currentMsg.id);
+                  return [...filtered, { ...currentMsg }];
                 });
               }
               break;
@@ -980,12 +1123,13 @@ function getInlineReactApp(port: number): string {
 
             case 'thinking_delta':
               if (currentMessageRef.current) {
-                const thinkingContent = currentMessageRef.current.content.find(c => c.type === 'thinking');
+                const currentMsg = currentMessageRef.current;
+                const thinkingContent = currentMsg.content.find(c => c.type === 'thinking');
                 if (thinkingContent) {
                   thinkingContent.text += msg.payload.text;
                   setMessages(prev => {
-                    const filtered = prev.filter(m => m.id !== currentMessageRef.current.id);
-                    return [...filtered, { ...currentMessageRef.current }];
+                    const filtered = prev.filter(m => m.id !== currentMsg.id);
+                    return [...filtered, { ...currentMsg }];
                   });
                 }
               }
@@ -993,7 +1137,8 @@ function getInlineReactApp(port: number): string {
 
             case 'tool_use_start':
               if (currentMessageRef.current) {
-                currentMessageRef.current.content.push({
+                const currentMsg = currentMessageRef.current;
+                currentMsg.content.push({
                   type: 'tool_use',
                   id: msg.payload.toolUseId,
                   name: msg.payload.toolName,
@@ -1001,8 +1146,8 @@ function getInlineReactApp(port: number): string {
                   status: 'running'
                 });
                 setMessages(prev => {
-                  const filtered = prev.filter(m => m.id !== currentMessageRef.current.id);
-                  return [...filtered, { ...currentMessageRef.current }];
+                  const filtered = prev.filter(m => m.id !== currentMsg.id);
+                  return [...filtered, { ...currentMsg }];
                 });
                 setStatus('tool_executing');
               }
@@ -1010,7 +1155,8 @@ function getInlineReactApp(port: number): string {
 
             case 'tool_result':
               if (currentMessageRef.current) {
-                const toolUse = currentMessageRef.current.content.find(
+                const currentMsg = currentMessageRef.current;
+                const toolUse = currentMsg.content.find(
                   c => c.type === 'tool_use' && c.id === msg.payload.toolUseId
                 );
                 if (toolUse) {
@@ -1021,8 +1167,8 @@ function getInlineReactApp(port: number): string {
                     error: msg.payload.error
                   };
                   setMessages(prev => {
-                    const filtered = prev.filter(m => m.id !== currentMessageRef.current.id);
-                    return [...filtered, { ...currentMessageRef.current }];
+                    const filtered = prev.filter(m => m.id !== currentMsg.id);
+                    return [...filtered, { ...currentMsg }];
                   });
                 }
               }
@@ -1030,10 +1176,11 @@ function getInlineReactApp(port: number): string {
 
             case 'message_complete':
               if (currentMessageRef.current) {
-                currentMessageRef.current.usage = msg.payload.usage;
+                const currentMsg = currentMessageRef.current;
+                currentMsg.usage = msg.payload.usage;
                 setMessages(prev => {
-                  const filtered = prev.filter(m => m.id !== currentMessageRef.current.id);
-                  return [...filtered, { ...currentMessageRef.current }];
+                  const filtered = prev.filter(m => m.id !== currentMsg.id);
+                  return [...filtered, { ...currentMsg }];
                 });
                 currentMessageRef.current = null;
               }
@@ -1061,19 +1208,159 @@ function getInlineReactApp(port: number): string {
         }
       }, [messages]);
 
+      // 处理文件选择
+      const handleFileSelect = (e) => {
+        const files = Array.from(e.target.files || []);
+
+        files.forEach(file => {
+          // 检查文件类型（支持图片和文本文件）
+          const isImage = file.type.startsWith('image/');
+          const isText = file.type.startsWith('text/') ||
+                        /\\.(txt|md|json|js|ts|tsx|jsx|py|java|c|cpp|h|css|html|xml|yaml|yml|sh|bat|sql|log)$/i.test(file.name);
+
+          if (!isImage && !isText) {
+            alert(\`不支持的文件类型: \${file.name}\`);
+            return;
+          }
+
+          const reader = new FileReader();
+
+          if (isImage) {
+            reader.onload = (event) => {
+              setAttachments(prev => [...prev, {
+                id: Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+                name: file.name,
+                type: 'image',
+                mimeType: file.type,
+                data: event.target.result // base64 data URL
+              }]);
+            };
+            reader.readAsDataURL(file);
+          } else {
+            reader.onload = (event) => {
+              setAttachments(prev => [...prev, {
+                id: Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+                name: file.name,
+                type: 'text',
+                mimeType: file.type || 'text/plain',
+                data: event.target.result // 文本内容
+              }]);
+            };
+            reader.readAsText(file);
+          }
+        });
+
+        // 清空 file input
+        if (e.target) {
+          e.target.value = '';
+        }
+      };
+
+      // 移除附件
+      const handleRemoveAttachment = (id) => {
+        setAttachments(prev => prev.filter(a => a.id !== id));
+      };
+
+      // 处理粘贴事件
+      const handlePaste = (e) => {
+        const clipboardData = e.clipboardData;
+        if (!clipboardData) return;
+
+        const items = clipboardData.items;
+        const files = [];
+
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+
+          // 处理图片
+          if (item.type.startsWith('image/')) {
+            const file = item.getAsFile();
+            if (file) {
+              files.push(file);
+            }
+          }
+        }
+
+        // 如果有文件，处理它们
+        if (files.length > 0) {
+          e.preventDefault(); // 阻止默认粘贴行为
+
+          files.forEach(file => {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              setAttachments(prev => [...prev, {
+                id: Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+                name: file.name || \`粘贴的图片_\${new Date().toLocaleTimeString()}.png\`,
+                type: 'image',
+                mimeType: file.type,
+                data: event.target.result
+              }]);
+            };
+            reader.readAsDataURL(file);
+          });
+        }
+      };
+
       const handleSend = () => {
-        if (!input.trim() || !connected || status !== 'idle') return;
+        if ((!input.trim() && attachments.length === 0) || !connected || status !== 'idle') return;
+
+        // 构建消息内容
+        const contentItems = [];
+
+        // 添加图片附件
+        attachments.forEach(att => {
+          if (att.type === 'image') {
+            contentItems.push({
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: att.mimeType,
+                data: att.data.split(',')[1] // 移除 data URL 前缀
+              },
+              fileName: att.name
+            });
+          } else if (att.type === 'text') {
+            // 文本文件作为引用内容添加
+            contentItems.push({
+              type: 'text',
+              text: \`[文件: \${att.name}]\\n\\\`\\\`\\\`\\n\${att.data}\\n\\\`\\\`\\\`\`
+            });
+          }
+        });
+
+        // 添加用户输入的文本
+        if (input.trim()) {
+          contentItems.push({ type: 'text', text: input });
+        }
 
         const userMessage = {
           id: 'user-' + Date.now(),
           role: 'user',
           timestamp: Date.now(),
-          content: [{ type: 'text', text: input }]
+          content: contentItems.length === 1 && contentItems[0].type === 'text'
+            ? contentItems
+            : contentItems,
+          attachments: attachments.map(a => ({ name: a.name, type: a.type }))
         };
 
         setMessages(prev => [...prev, userMessage]);
-        send({ type: 'chat', payload: { content: input } });
+
+        // 发送到服务器，包含附件信息
+        send({
+          type: 'chat',
+          payload: {
+            content: input,
+            attachments: attachments.map(att => ({
+              name: att.name,
+              type: att.type,
+              mimeType: att.mimeType,
+              data: att.type === 'image' ? att.data.split(',')[1] : att.data
+            }))
+          }
+        });
+
         setInput('');
+        setAttachments([]);
         setStatus('thinking');
       };
 
@@ -1084,7 +1371,7 @@ function getInlineReactApp(port: number): string {
         }
       };
 
-      return React.createElement('div', { id: 'root' },
+      return React.createElement(React.Fragment, null,
         // 侧边栏
         React.createElement('div', { className: 'sidebar' },
           React.createElement('div', { className: 'sidebar-header' },
@@ -1131,7 +1418,39 @@ function getInlineReactApp(port: number): string {
               : messages.map(msg => React.createElement(Message, { key: msg.id, message: msg }))
           ),
           React.createElement('div', { className: 'input-area' },
+            // 附件预览区域
+            attachments.length > 0 && React.createElement('div', { className: 'attachments-preview' },
+              attachments.map(att => React.createElement('div', {
+                key: att.id,
+                className: 'attachment-item'
+              },
+                React.createElement('span', { className: 'file-icon' },
+                  att.type === 'image' ? '🖼️' : '📄'
+                ),
+                React.createElement('span', { className: 'file-name' }, att.name),
+                React.createElement('button', {
+                  className: 'remove-btn',
+                  onClick: () => handleRemoveAttachment(att.id)
+                }, '×'),
+                att.type === 'image' && React.createElement('img', {
+                  src: att.data,
+                  alt: att.name,
+                  className: 'image-preview'
+                })
+              ))
+            ),
             React.createElement('div', { className: 'input-container' },
+              // 附件上传按钮
+              React.createElement('label', { className: 'attach-btn' },
+                '📎',
+                React.createElement('input', {
+                  ref: fileInputRef,
+                  type: 'file',
+                  multiple: true,
+                  accept: 'image/*,.txt,.md,.json,.js,.ts,.tsx,.jsx,.py,.java,.c,.cpp,.h,.css,.html,.xml,.yaml,.yml,.sh,.bat,.sql,.log',
+                  onChange: handleFileSelect
+                })
+              ),
               React.createElement('div', { className: 'input-wrapper' },
                 React.createElement('textarea', {
                   ref: inputRef,
@@ -1139,7 +1458,8 @@ function getInlineReactApp(port: number): string {
                   value: input,
                   onChange: (e) => setInput(e.target.value),
                   onKeyDown: handleKeyDown,
-                  placeholder: status === 'idle' ? '输入消息...' : '处理中...',
+                  onPaste: handlePaste,
+                  placeholder: status === 'idle' ? '输入消息，可粘贴图片或点击 📎 上传文件...' : '处理中...',
                   disabled: status !== 'idle',
                   rows: 1
                 })
@@ -1147,7 +1467,7 @@ function getInlineReactApp(port: number): string {
               React.createElement('button', {
                 className: 'send-btn',
                 onClick: handleSend,
-                disabled: !connected || status !== 'idle' || !input.trim()
+                disabled: !connected || status !== 'idle' || (!input.trim() && attachments.length === 0)
               },
                 status !== 'idle'
                   ? React.createElement('div', { className: 'loading-dots' },

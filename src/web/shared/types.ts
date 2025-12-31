@@ -14,10 +14,20 @@ export interface WSMessage {
 }
 
 /**
+ * 附件类型
+ */
+export interface Attachment {
+  name: string;
+  type: 'image' | 'text';
+  mimeType: string;
+  data: string; // base64 for images, text content for text files
+}
+
+/**
  * 客户端发送的消息类型
  */
 export type ClientMessage =
-  | { type: 'chat'; payload: { content: string; images?: string[] } }
+  | { type: 'chat'; payload: { content: string; images?: string[]; attachments?: Attachment[] } }
   | { type: 'cancel' }
   | { type: 'ping' }
   | { type: 'get_history' }

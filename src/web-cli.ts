@@ -4,6 +4,33 @@
  * 启动 Web 服务器
  */
 
+import * as fs from 'fs';
+import * as path from 'path';
+
+// 手动加载 .env 文件（不依赖 dotenv 包）
+function loadEnvFile() {
+  const envPath = path.join(process.cwd(), '.env');
+  if (fs.existsSync(envPath)) {
+    const content = fs.readFileSync(envPath, 'utf-8');
+    for (const line of content.split('\n')) {
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith('#')) {
+        const eqIndex = trimmed.indexOf('=');
+        if (eqIndex > 0) {
+          const key = trimmed.substring(0, eqIndex).trim();
+          const value = trimmed.substring(eqIndex + 1).trim();
+          // 只设置未定义的环境变量
+          if (!process.env[key]) {
+            process.env[key] = value;
+          }
+        }
+      }
+    }
+  }
+}
+
+loadEnvFile();
+
 import { Command } from 'commander';
 import { startWebServer } from './web/index.js';
 

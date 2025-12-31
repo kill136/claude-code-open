@@ -8,6 +8,7 @@ import { Session } from '../../core/session.js';
 import { toolRegistry } from '../../tools/index.js';
 import { systemPromptBuilder } from '../../prompt/index.js';
 import { modelConfig } from '../../models/index.js';
+import { initAuth, getAuth } from '../../auth/index.js';
 import type { Message, ContentBlock, ToolUseBlock, TextBlock } from '../../types/index.js';
 import type { ChatMessage, ChatContent, ToolResultData } from '../shared/types.js';
 
@@ -55,8 +56,51 @@ export class ConversationManager {
    * 初始化
    */
   async initialize(): Promise<void> {
+    // 初始化认证系统（加载 OAuth token 或 API key）
+    const auth = initAuth();
+    if (auth) {
+      console.log(`[ConversationManager] 认证类型: ${auth.type}${auth.accountType ? ` (${auth.accountType})` : ''}`);
+    } else {
+      console.warn('[ConversationManager] 警告: 未找到认证信息，请先运行 /login 登录');
+    }
+
     // 确保工具已注册
     console.log(`[ConversationManager] 已注册 ${toolRegistry.getAll().length} 个工具`);
+  }
+
+  /**
+   * 根据认证信息构建 ClaudeClient 配置
+   * 与核心 loop.ts 逻辑保持一致
+   */
+  private buildClientConfig(model: string): { model: string; apiKey?: string; authToken?: string } {
+    const auth = getAuth();
+    const config: { model: string; apiKey?: string; authToken?: string } = {
+      model: this.getModelId(model),
+    };
+
+    if (auth) {
+      if (auth.type === 'api_key' && auth.apiKey) {
+        config.apiKey = auth.apiKey;
+      } else if (auth.type === 'oauth') {
+        // 检查是否有 user:inference scope (Claude.ai 订阅用户)
+        // 注意：auth.scopes 是数组形式，auth.scope 是旧格式
+        const scopes = auth.scopes || auth.scope || [];
+        const hasInferenceScope = scopes.includes('user:inference');
+
+        // 获取 OAuth token（可能是 authToken 或 accessToken）
+        const oauthToken = auth.authToken || auth.accessToken;
+
+        if (hasInferenceScope && oauthToken) {
+          // Claude.ai 订阅用户可以直接使用 OAuth token
+          config.authToken = oauthToken;
+        } else if (auth.oauthApiKey) {
+          // Console 用户使用创建的 API Key
+          config.apiKey = auth.oauthApiKey;
+        }
+      }
+    }
+
+    return config;
   }
 
   /**
@@ -69,9 +113,9 @@ export class ConversationManager {
       const session = new Session(this.cwd);
       await session.initializeGitInfo();
 
-      const client = new ClaudeClient({
-        model: this.getModelId(model || this.defaultModel),
-      });
+      // 使用与核心 loop.ts 一致的认证逻辑
+      const clientConfig = this.buildClientConfig(model || this.defaultModel);
+      const client = new ClaudeClient(clientConfig);
 
       state = {
         session,
@@ -107,9 +151,9 @@ export class ConversationManager {
     const state = this.sessions.get(sessionId);
     if (state) {
       state.model = model;
-      state.client = new ClaudeClient({
-        model: this.getModelId(model),
-      });
+      // 使用与核心 loop.ts 一致的认证逻辑
+      const clientConfig = this.buildClientConfig(model);
+      state.client = new ClaudeClient(clientConfig);
     }
   }
 
