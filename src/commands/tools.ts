@@ -8,21 +8,68 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 
-// /mcp - MCP 服务器管理（基于官方源码完善）
+// /mcp - MCP 服务器管理（官方 local-jsx 风格 - 交互式界面）
 export const mcpCommand: SlashCommand = {
   name: 'mcp',
   description: 'Manage MCP (Model Context Protocol) servers',
-  usage: '/mcp [list|add|remove|get|test]',
+  usage: '/mcp [list|add|remove|get|test|enable|disable]',
   category: 'tools',
-  execute: (ctx: CommandContext): CommandResult => {
+  execute: async (ctx: CommandContext): Promise<CommandResult> => {
     const { args } = ctx;
-    const action = args[0] || 'list';
+    const action = args[0];
+
+    // 如果没有参数或是 list，显示交互式 UI
+    if (!action || action === 'list') {
+      try {
+        // 动态导入 React、McpSettings 组件和 MCP 运行时状态
+        const React = await import('react');
+        const { default: McpSettings } = await import('../ui/McpSettings.js');
+        const { getMcpServers } = await import('../tools/mcp.js');
+
+        // 获取运行时 MCP 服务器状态
+        const runtimeServers = getMcpServers();
+
+        // 将运行时状态转换为可序列化的对象
+        const runtimeState: Record<string, {
+          connected: boolean;
+          connecting: boolean;
+          tools: Array<{ name: string; description?: string }>;
+          resources: Array<{ uri: string; name: string }>;
+          config: Record<string, unknown>;
+        }> = {};
+
+        for (const [name, state] of runtimeServers) {
+          runtimeState[name] = {
+            connected: state.connected,
+            connecting: state.connecting,
+            tools: state.tools || [],
+            resources: state.resources || [],
+            config: { ...state.config } as Record<string, unknown>,
+          };
+        }
+
+        // 返回 JSX 组件，由 App.tsx 在主 UI 中显示（官方 local-jsx 模式）
+        return {
+          success: true,
+          action: 'showJsx',
+          jsx: React.createElement(McpSettings, {
+            cwd: ctx.config.cwd,
+            onDone: () => {},
+            runtimeState, // 传递运行时状态
+          }),
+          shouldHidePromptInput: true,
+        };
+      } catch (error) {
+        // 如果 JSX 组件加载失败，回退到文本模式
+        console.error('Failed to load MCP Settings UI:', error);
+      }
+    }
 
     // 读取配置文件（支持多个 scope）
     const homeDir = os.homedir();
-    const userConfigFile = path.join(homeDir, '.claude', 'settings.json');
-    const projectConfigFile = path.join(ctx.config.cwd, '.claude', 'settings.json');
-    const localConfigFile = path.join(homeDir, '.claude', 'local.json');
+    const userConfigFile = path.join(homeDir, '.claude.json');
+    const projectConfigFile = path.join(ctx.config.cwd, '.mcp.json');
+    const localConfigFile = path.join(homeDir, '.claude', 'settings.json');
 
     const loadConfig = (file: string): any => {
       if (fs.existsSync(file)) {
@@ -787,31 +834,42 @@ Or /ide status to see all options.`;
   },
 };
 
-// /chrome - Chrome 集成 (官方风格 - 检查实际状态)
+// /chrome - Chrome 集成 (官方 local-jsx 风格 - 交互式界面)
 export const chromeCommand: SlashCommand = {
   name: 'chrome',
   description: 'Claude in Chrome (Beta) settings',
   category: 'tools',
-  execute: (ctx: CommandContext): CommandResult => {
-    // 检查 Chrome 扩展配置
-    const configFile = path.join(os.homedir(), '.claude', 'settings.json');
-    let chromeEnabled = false;
-    let chromeConfig: any = null;
+  execute: async (ctx: CommandContext): Promise<CommandResult> => {
+    try {
+      // 动态导入 React 和 ChromeSettings 组件
+      const React = await import('react');
+      const { default: ChromeSettings } = await import('../ui/ChromeSettings.js');
 
-    if (fs.existsSync(configFile)) {
-      try {
-        const config = JSON.parse(fs.readFileSync(configFile, 'utf-8'));
-        chromeEnabled = config.chrome?.enabled || false;
-        chromeConfig = config.chrome || null;
-      } catch {
-        // 忽略解析错误
+      // 返回 JSX 组件，由 App.tsx 在主 UI 中显示（官方 local-jsx 模式）
+      return {
+        success: true,
+        action: 'showJsx',
+        jsx: React.createElement(ChromeSettings, { onDone: () => {} }),
+        shouldHidePromptInput: true,
+      };
+    } catch (error) {
+      // 如果 JSX 组件加载失败，回退到静态显示
+      const configFile = path.join(os.homedir(), '.claude', 'settings.json');
+      let chromeEnabled = false;
+
+      if (fs.existsSync(configFile)) {
+        try {
+          const config = JSON.parse(fs.readFileSync(configFile, 'utf-8'));
+          chromeEnabled = config.chrome?.enabled || config.claudeInChromeDefaultEnabled || false;
+        } catch {
+          // 忽略解析错误
+        }
       }
-    }
 
-    const statusIcon = chromeEnabled ? '✓' : '○';
-    const statusText = chromeEnabled ? 'Enabled' : 'Not connected';
+      const statusIcon = chromeEnabled ? '✓' : '○';
+      const statusText = chromeEnabled ? 'Enabled' : 'Not connected';
 
-    const chromeInfo = `╭─ Claude in Chrome (Beta) ───────────────────────────╮
+      const chromeInfo = `╭─ Claude in Chrome (Beta) ───────────────────────────╮
 │                                                     │
 │  Status: ${statusIcon} ${statusText.padEnd(40)}│
 │                                                     │
@@ -844,8 +902,9 @@ export const chromeCommand: SlashCommand = {
 Note: This feature is in Beta. Some functionality may be limited.
 Documentation: https://docs.anthropic.com/claude-code/chrome`;
 
-    ctx.ui.addMessage('assistant', chromeInfo);
-    return { success: true };
+      ctx.ui.addMessage('assistant', chromeInfo);
+      return { success: true };
+    }
   },
 };
 

@@ -1,0 +1,45 @@
+{
+  "typescript-language-server": {
+    "command": "typescript-language-server",
+    "args": ["--stdio"],
+    "extensionToLanguage": {
+      ".ts": "typescript",
+      ".tsx": "typescriptreact",
+      ".js": "javascript",
+      ".jsx": "javascriptreact"
+    },
+    "initializationOptions": {
+      "preferences": {
+        "includeCompletionsForModuleExports": true,
+        "includeCompletionsWithInsertText": true
+      }
+    },
+    "restartOnCrash": true,
+    "maxRestarts": 3
+  },
+  "pyright": {
+    "command": "pyright-langserver",
+    "args": ["--stdio"],
+    "extensionToLanguage": {
+      ".py": "python"
+    },
+    "settings": {
+      "python": {
+        "analysis": {
+          "typeCheckingMode": "basic"
+        }
+      }
+    }
+  },
+  "custom-server": {
+    "command": "${HOME}/.local/bin/my-lsp",
+    "args": ["--stdio", "--workspace=${WORKSPACE_ROOT}"],
+    "extensionToLanguage": {
+      ".custom": "custom"
+    },
+    "env": {
+      "MY_VAR": "${MY_ENV_VAR:-default_value}"
+    },
+    "workspaceFolder": "${WORKSPACE_ROOT}/src"
+  }
+}

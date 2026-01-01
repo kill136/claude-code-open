@@ -61,7 +61,15 @@
       "Bash(timeout 60 node:*)",
       "Bash(timeout 120 node:*)",
       "Bash(timeout 180 node:*)",
-      "Bash(timeout 10 node:*)"
+      "Bash(timeout 10 node:*)",
+      "Bash(del:*)",
+      "Bash(timeout 15 npx tsx:*)",
+      "Bash(timeout 5 node:*)",
+      "Bash(timeout 8 node:*)",
+      "Bash(timeout 5 npm run dev:*)",
+      "Bash(timeout 15 node:*)",
+      "Bash(where:*)",
+      "Bash(timeout 90 node:*)"
     ]
   }
 }

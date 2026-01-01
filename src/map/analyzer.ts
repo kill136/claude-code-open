@@ -1,6 +1,10 @@
 /**
  * 代码分析器
  * 负责分析代码文件，提取符号和结构信息
+ *
+ * 符号提取策略：
+ * 1. Tree-sitter - 语法层面解析（主要方案）
+ * 2. 正则表达式 - 处理 re-export 文件（补充方案）
  */
 
 import * as fs from 'fs';
@@ -138,6 +142,10 @@ export class CodeMapAnalyzer {
 
   /**
    * 分析单个文件
+   *
+   * 符号提取优先级：
+   * 1. Tree-sitter - 主要方案，语法层面解析
+   * 2. 正则表达式 - 补充方案，处理 re-export 文件
    */
   async analyzeFile(filePath: string): Promise<ModuleNode> {
     const content = fs.readFileSync(filePath, 'utf-8');
@@ -146,13 +154,22 @@ export class CodeMapAnalyzer {
     const relativePath = path.relative(this.rootPath, filePath).replace(/\\/g, '/');
     const lines = content.split('\n').length;
 
-    // 使用 Tree-sitter 解析器提取符号
+    // 使用 Tree-sitter 提取符号
     let symbols: CodeSymbol[] = [];
     try {
       symbols = await codeAnalyzer.analyzeFile(filePath);
     } catch (error) {
       // Tree-sitter 解析失败时记录警告但继续
       console.warn(`Warning: Failed to analyze ${filePath}:`, error);
+    }
+
+    // 对于 re-export 文件，使用正则表达式补充提取符号
+    // （Tree-sitter 对纯 re-export 文件支持不完整，可能返回匿名 export 符号）
+    const hasOnlyAnonymousSymbols = symbols.length === 0 ||
+      symbols.every(s => s.name.startsWith('<anonymous') || s.name.includes('anonymous'));
+
+    if (hasOnlyAnonymousSymbols && this.isReExportFile(content, language)) {
+      symbols = this.extractReExportSymbols(content, relativePath, language);
     }
 
     // 构建模块节点
@@ -174,6 +191,150 @@ export class CodeMapAnalyzer {
     };
 
     return module;
+  }
+
+  /**
+   * 检查文件是否只包含 re-export 语句
+   * 支持多行 export 语句
+   */
+  private isReExportFile(content: string, language: string): boolean {
+    if (language !== 'typescript' && language !== 'javascript') {
+      return false;
+    }
+
+    // 移除所有注释
+    const noComments = content
+      .replace(/\/\*[\s\S]*?\*\//g, '')  // 块注释
+      .replace(/\/\/[^\n]*/g, '');        // 行注释
+
+    // 移除所有 export { ... } from '...' 语句（多行）
+    const noExports = noComments
+      .replace(/export\s*\{[\s\S]*?\}\s*from\s*['"][^'"]+['"]\s*;?/g, '')
+      .replace(/export\s+type\s*\{[\s\S]*?\}\s*from\s*['"][^'"]+['"]\s*;?/g, '')
+      .replace(/export\s*\*\s*from\s*['"][^'"]+['"]\s*;?/g, '');
+
+    // 移除所有 import 语句
+    const noImports = noExports.replace(/import\s+[\s\S]*?from\s*['"][^'"]+['"]\s*;?/g, '');
+
+    // 检查剩余内容是否只有空白
+    const remaining = noImports.trim();
+
+    // 如果剩余内容为空，且原文件有 export，则是纯 re-export 文件
+    const hasExport = /export\s*\{/.test(noComments) || /export\s*\*/.test(noComments);
+
+    return hasExport && remaining === '';
+  }
+
+  /**
+   * 从 re-export 语句中提取符号名称
+   * 支持多行 export 语句
+   */
+  private extractReExportSymbols(content: string, moduleId: string, language: string): CodeSymbol[] {
+    const symbols: CodeSymbol[] = [];
+
+    if (language !== 'typescript' && language !== 'javascript') {
+      return symbols;
+    }
+
+    // 使用多行正则匹配 export { ... } from '...'
+    // 支持跨多行的 export 语句
+    const namedExportRegex = /export\s*\{([^}]+)\}\s*from\s*['"][^'"]+['"]/gs;
+    let match;
+
+    while ((match = namedExportRegex.exec(content)) !== null) {
+      const exportList = match[1];
+      const startIndex = match.index;
+
+      // 计算起始行号
+      const beforeMatch = content.substring(0, startIndex);
+      const startLine = beforeMatch.split('\n').length;
+
+      // 提取每个导出的符号（跳过注释）
+      const symbolNames = exportList
+        .replace(/\/\/[^\n]*/g, '')  // 移除行注释
+        .replace(/\/\*[\s\S]*?\*\//g, '')  // 移除块注释
+        .split(',')
+        .map(s => {
+          const trimmed = s.trim();
+          if (!trimmed) return '';
+          const parts = trimmed.split(/\s+as\s+/);
+          return parts[parts.length - 1].trim();
+        })
+        .filter(s => s && !s.startsWith('//'));
+
+      for (const name of symbolNames) {
+        symbols.push({
+          name,
+          kind: 'export' as SymbolKind,
+          location: {
+            file: moduleId,
+            startLine,
+            startColumn: 0,
+            endLine: startLine,
+            endColumn: 100,
+          },
+        });
+      }
+    }
+
+    // 匹配 export type { TypeName } from 'source' (多行)
+    const typeExportRegex = /export\s+type\s*\{([^}]+)\}\s*from\s*['"][^'"]+['"]/gs;
+
+    while ((match = typeExportRegex.exec(content)) !== null) {
+      const exportList = match[1];
+      const startIndex = match.index;
+      const beforeMatch = content.substring(0, startIndex);
+      const startLine = beforeMatch.split('\n').length;
+
+      const typeNames = exportList
+        .replace(/\/\/[^\n]*/g, '')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .split(',')
+        .map(s => {
+          const trimmed = s.trim();
+          if (!trimmed) return '';
+          const parts = trimmed.split(/\s+as\s+/);
+          return parts[parts.length - 1].trim();
+        })
+        .filter(s => s && !s.startsWith('//'));
+
+      for (const name of typeNames) {
+        symbols.push({
+          name,
+          kind: 'type' as SymbolKind,
+          location: {
+            file: moduleId,
+            startLine,
+            startColumn: 0,
+            endLine: startLine,
+            endColumn: 100,
+          },
+        });
+      }
+    }
+
+    // 匹配 export * from 'source'
+    const starExportRegex = /export\s*\*\s*from\s*['"]([^'"]+)['"]/g;
+
+    while ((match = starExportRegex.exec(content)) !== null) {
+      const startIndex = match.index;
+      const beforeMatch = content.substring(0, startIndex);
+      const startLine = beforeMatch.split('\n').length;
+
+      symbols.push({
+        name: `* from ${match[1]}`,
+        kind: 'export' as SymbolKind,
+        location: {
+          file: moduleId,
+          startLine,
+          startColumn: 0,
+          endLine: startLine,
+          endColumn: 100,
+        },
+      });
+    }
+
+    return symbols;
   }
 
   /**
@@ -364,15 +525,33 @@ export class CodeMapAnalyzer {
 
     for (const symbol of symbols) {
       if (symbol.kind === 'export') {
+        // 区分 re-export 和普通导出
+        const isReExport = symbol.name.includes(' from ') || symbol.signature?.includes('from');
         exports.push({
           name: symbol.name,
-          type: symbol.name === 'default' ? 'default' : 'named',
+          type: symbol.name === 'default' ? 'default' : (isReExport ? 'reexport' : 'named'),
+          location: this.convertLocation(symbol.location, moduleId),
+        });
+      } else if (symbol.kind === 'type' && this.isFromReExport(symbol)) {
+        // 从 re-export 语句提取的类型
+        exports.push({
+          name: symbol.name,
+          type: 'reexport',
           location: this.convertLocation(symbol.location, moduleId),
         });
       }
     }
 
     return exports;
+  }
+
+  /**
+   * 检查符号是否来自 re-export 语句
+   */
+  private isFromReExport(symbol: CodeSymbol): boolean {
+    // 检查位置信息 - 如果整行被标记为位置，可能是 re-export
+    return symbol.location.startColumn === 0 &&
+           symbol.location.endColumn > 0;
   }
 
   /**

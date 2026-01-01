@@ -2,6 +2,8 @@
  * 斜杠命令类型定义
  */
 
+import type React from 'react';
+
 export interface CommandContext {
   // 会话相关
   session: {
@@ -65,8 +67,12 @@ export interface CommandContext {
 export interface CommandResult {
   success: boolean;
   message?: string;
-  action?: 'exit' | 'clear' | 'reload' | 'login' | 'logout' | 'reinitClient' | 'none';
+  action?: 'exit' | 'clear' | 'reload' | 'login' | 'logout' | 'reinitClient' | 'showJsx' | 'none';
   data?: any;
+  // 官方 local-jsx 类型支持：命令可以返回一个 JSX 组件在主 UI 中显示
+  jsx?: React.ReactElement;
+  // 是否隐藏输入框（显示 JSX 时通常需要）
+  shouldHidePromptInput?: boolean;
 }
 
 export interface SlashCommand {

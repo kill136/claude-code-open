@@ -158,12 +158,58 @@ program
       loadMcpConfigs(options.mcpConfig);
     }
 
+    // 加载 Chrome 集成配置（如果启用）
+    // 与官方实现一致：在启动时自动检测并加载 Chrome MCP
+    let chromeSystemPrompt: string | undefined;
+    try {
+      const { getChromeIntegrationConfig } = await import('./chrome-mcp/index.js');
+      // options.chrome 可能是 true（--chrome）、false（--no-chrome）或 undefined
+      const chromeConfig = await getChromeIntegrationConfig(options.chrome);
+
+      if (chromeConfig) {
+        // 导入 MCP 注册函数和 Chrome 工具定义
+        const { registerMcpServer } = await import('./tools/mcp.js');
+        const { CHROME_MCP_TOOLS } = await import('./chrome-mcp/tools.js');
+
+        // 添加 Chrome MCP 服务器配置并注册到 MCP 系统
+        for (const [name, config] of Object.entries(chromeConfig.mcpConfig)) {
+          // 保存到配置文件（持久化）
+          try {
+            configManager.addMcpServer(name, config as any);
+          } catch {
+            // 可能已存在，忽略
+          }
+
+          // 注册到 MCP 服务器映射（运行时），使用预加载的工具定义
+          // 这样工具可以立即被发现，无需连接 MCP 服务器
+          registerMcpServer(name, config as any, CHROME_MCP_TOOLS as any);
+        }
+
+        // 保存 Chrome 系统提示以便后续合并
+        chromeSystemPrompt = chromeConfig.systemPrompt;
+
+        if (options.verbose) {
+          console.log(chalk.dim('[Chrome] Browser automation tools loaded'));
+        }
+      }
+    } catch (error) {
+      // Chrome 集成失败不应该阻止程序运行
+      if (options.debug) {
+        console.warn(chalk.yellow('[Chrome] Failed to load browser integration:'), error);
+      }
+    }
+
     // T507: action_mcp_configs_loaded - MCP 配置加载完成
     await emitLifecycleEvent('action_mcp_configs_loaded');
     await runHooks({ event: 'McpConfigsLoaded' });
 
     // 构建系统提示
     let systemPrompt = options.systemPrompt;
+
+    // 如果 Chrome 集成已启用，添加 Chrome 系统提示
+    if (chromeSystemPrompt) {
+      systemPrompt = systemPrompt ? `${chromeSystemPrompt}\n\n${systemPrompt}` : chromeSystemPrompt;
+    }
 
     // 处理 --system-prompt-file（互斥性已在前面验证）
     if (options.systemPromptFile) {

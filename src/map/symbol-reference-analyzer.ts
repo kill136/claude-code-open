@@ -171,6 +171,33 @@ export class SymbolReferenceAnalyzer {
         };
         this.addSymbol(info);
       }
+
+      // 导出的符号（包括 re-export）
+      // 对于纯 re-export 文件，这是主要的符号来源
+      for (const exp of module.exports) {
+        // 跳过通配符导出 (export * from ...)
+        if (exp.name.startsWith('*')) continue;
+
+        // 检查该导出是否已经被其他类型覆盖
+        const existingId = `${module.id}::${exp.name}`;
+        if (this.symbolIndex.has(existingId)) continue;
+
+        // 推断符号类型：
+        // - 检查名称是否以大写开头（可能是类型、类、接口）
+        // - reexport 类型的导出需要特殊处理
+        const startsWithUppercase = /^[A-Z]/.test(exp.name);
+        const looksLikeType = startsWithUppercase && !exp.name.includes('_');
+
+        const info: SymbolInfo = {
+          id: existingId,
+          name: exp.name,
+          // 根据命名约定推断符号类型
+          kind: looksLikeType ? 'type' : 'variable',
+          moduleId: module.id,
+          location: exp.location,
+        };
+        this.addSymbol(info);
+      }
     }
   }
 

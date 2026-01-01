@@ -11,7 +11,8 @@ import {
   isExtensionInstalled,
   setupChromeNativeHost,
   CHROME_INSTALL_URL,
-  CHROME_RECONNECT_URL
+  CHROME_RECONNECT_URL,
+  CHROME_PERMISSIONS_URL
 } from '../chrome-mcp/index.js';
 
 interface ChromeSettingsProps {
@@ -79,32 +80,73 @@ export function ChromeSettings({ onDone }: ChromeSettingsProps): React.ReactElem
     value: 'toggle-default'
   });
 
+  // 跨平台打开 URL 的辅助函数 - 对齐官方实现
+  const openUrl = useCallback(async (url: string): Promise<boolean> => {
+    const { spawn } = await import('child_process');
+    const platform = process.platform;
+    const browserEnv = process.env.BROWSER;
+
+    return new Promise<boolean>((resolve) => {
+      try {
+        if (platform === 'win32') {
+          // Windows: 使用 rundll32 url,OpenURL (官方实现)
+          if (browserEnv) {
+            const proc = spawn(browserEnv, [`"${url}"`], { shell: true });
+            proc.on('close', (code) => resolve(code === 0));
+            proc.on('error', () => resolve(false));
+          } else {
+            const proc = spawn('rundll32', ['url,OpenURL', url], { shell: true });
+            proc.on('close', (code) => resolve(code === 0));
+            proc.on('error', () => resolve(false));
+          }
+        } else if (platform === 'darwin') {
+          // macOS: 使用 open
+          const command = browserEnv || 'open';
+          const proc = spawn(command, [url]);
+          proc.on('close', (code) => resolve(code === 0));
+          proc.on('error', () => resolve(false));
+        } else {
+          // Linux: 使用 xdg-open
+          const command = browserEnv || 'xdg-open';
+          const proc = spawn(command, [url]);
+          proc.on('close', (code) => resolve(code === 0));
+          proc.on('error', () => resolve(false));
+        }
+      } catch {
+        resolve(false);
+      }
+    });
+  }, []);
+
   // 处理选择
   const handleSelect = useCallback(async (value: string) => {
     switch (value) {
       case 'install-extension':
         console.log(`\nOpening: ${CHROME_INSTALL_URL}\n`);
-        // 可以使用 open 命令打开浏览器
         try {
-          const { exec } = await import('child_process');
-          exec(`xdg-open "${CHROME_INSTALL_URL}" 2>/dev/null || open "${CHROME_INSTALL_URL}" 2>/dev/null || start "${CHROME_INSTALL_URL}"`);
-        } catch {}
+          await openUrl(CHROME_INSTALL_URL);
+        } catch (err) {
+          console.error('Failed to open URL:', err);
+        }
         break;
 
       case 'reconnect':
         console.log(`\nOpening: ${CHROME_RECONNECT_URL}\n`);
         try {
-          const { exec } = await import('child_process');
-          exec(`xdg-open "${CHROME_RECONNECT_URL}" 2>/dev/null || open "${CHROME_RECONNECT_URL}" 2>/dev/null || start "${CHROME_RECONNECT_URL}"`);
-        } catch {}
+          await openUrl(CHROME_RECONNECT_URL);
+        } catch (err) {
+          console.error('Failed to open URL:', err);
+        }
         break;
 
       case 'manage-permissions':
-        console.log('\nOpening Chrome extension settings...\n');
+        // 官方实现：打开 https://clau.de/chrome/permissions
+        // 这个 URL 会重定向到 chrome-extension://fcoeoabgfenejglbffodgkkbkcdhcgfn/options.html#permissions
         try {
-          const { exec } = await import('child_process');
-          exec(`xdg-open "chrome://extensions/?id=fcoeoabgfenejglbffodgkkbkcdhcgfn" 2>/dev/null || open "chrome://extensions/?id=fcoeoabgfenejglbffodgkkbkcdhcgfn" 2>/dev/null`);
-        } catch {}
+          await openUrl(CHROME_PERMISSIONS_URL);
+        } catch (err) {
+          console.error('Failed to open URL:', err);
+        }
         break;
 
       case 'toggle-default':
@@ -123,12 +165,13 @@ export function ChromeSettings({ onDone }: ChromeSettingsProps): React.ReactElem
           settings.claudeInChromeDefaultEnabled = newValue;
           fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
           fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+          console.log(`\nChrome integration ${newValue ? 'enabled' : 'disabled'} by default.\n`);
         } catch (err) {
           console.error('Failed to save setting:', err);
         }
         break;
     }
-  }, [enabledByDefault]);
+  }, [enabledByDefault, openUrl]);
 
   // 键盘输入处理
   useInput((input, key) => {

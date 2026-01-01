@@ -150,6 +150,10 @@ export const App: React.FC<AppProps> = ({
   const [showLoginScreen, setShowLoginScreen] = useState(false);
   const [loginPreselect, setLoginPreselect] = useState<'claudeai' | 'console' | null>(null);
 
+  // 官方 local-jsx 命令支持：用于显示命令返回的 JSX 组件
+  const [commandJsx, setCommandJsx] = useState<React.ReactElement | null>(null);
+  const [hidePromptForJsx, setHidePromptForJsx] = useState(false);
+
   // 会话 ID
   const sessionId = useRef(uuidv4());
 
@@ -443,6 +447,10 @@ export const App: React.FC<AppProps> = ({
           addMessage('assistant', '\n⚠️ Could not reinitialize client. Please restart the application.');
           addActivity('Client reinitialization failed');
         }
+      } else if (result.action === 'showJsx' && result.jsx) {
+        // 官方 local-jsx 类型支持：显示命令返回的 JSX 组件
+        setCommandJsx(result.jsx);
+        setHidePromptForJsx(result.shouldHidePromptInput ?? true);
       }
 
       return result.success;
@@ -741,6 +749,18 @@ export const App: React.FC<AppProps> = ({
         <LoginSelector onSelect={handleLoginSelect} />
       )}
 
+      {/* 官方 local-jsx 命令：显示命令返回的 JSX 组件（如 /chrome 设置界面）*/}
+      {commandJsx && (
+        <Box flexDirection="column">
+          {React.cloneElement(commandJsx, {
+            onDone: () => {
+              setCommandJsx(null);
+              setHidePromptForJsx(false);
+            },
+          })}
+        </Box>
+      )}
+
       {/* 历史消息 - 使用 Static 组件固化到终端历史，允许向上滚动查看 */}
       <Static items={messages}>
         {(msg) => (
@@ -800,14 +820,16 @@ export const App: React.FC<AppProps> = ({
         isVisible={showBackgroundPanel}
       />
 
-      {/* Input with suggestion */}
-      <Box marginTop={1}>
-        <Input
-          onSubmit={handleSubmit}
-          disabled={isProcessing}
-          suggestion={showWelcome ? currentSuggestion : undefined}
-        />
-      </Box>
+      {/* Input with suggestion - 当显示 JSX 命令组件时隐藏输入框 */}
+      {!hidePromptForJsx && (
+        <Box marginTop={1}>
+          <Input
+            onSubmit={handleSubmit}
+            disabled={isProcessing}
+            suggestion={showWelcome ? currentSuggestion : undefined}
+          />
+        </Box>
+      )}
 
       {/* Status Bar - 底部状态栏 */}
       <Box justifyContent="space-between" paddingX={1} marginTop={1}>

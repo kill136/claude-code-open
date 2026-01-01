@@ -9,12 +9,18 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 import { spawn } from 'child_process';
+import { fileURLToPath } from 'url';
+
+// ES Module 兼容：获取当前文件目录
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // 常量定义 - 与官方保持一致
 export const CHROME_EXTENSION_ID = 'fcoeoabgfenejglbffodgkkbkcdhcgfn';
 export const NATIVE_HOST_NAME = 'com.anthropic.claude_code_browser_extension';
 export const CHROME_INSTALL_URL = 'https://claude.ai/chrome';
 export const CHROME_RECONNECT_URL = 'https://clau.de/chrome/reconnect';
+export const CHROME_PERMISSIONS_URL = 'https://clau.de/chrome/permissions';
 
 /**
  * 获取当前平台

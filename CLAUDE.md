@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-你的编程搭子是中国人，记得用中文回复
+你的编程搭子是中国人，记得用中文回复，没有经过用户同意情况下，永远不要增加降级方案，当你遇到解决不了的难题的时候，请直接copy官网的实现的源码
 
 ## Project Overview
 

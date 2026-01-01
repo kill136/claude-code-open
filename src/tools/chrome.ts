@@ -1,44 +1,70 @@
 /**
- * Chrome DevTools 工具
- * 支持浏览器自动化和页面交互
+ * Chrome 浏览器工具
+ *
+ * 与官方 Claude Code 保持一致，使用 MCP + Native Messaging 模式
+ * 通过 Chrome 插件控制用户的浏览器
+ *
+ * 官方实现方式：
+ * Chrome 扩展 ↔ Native Messaging ↔ Native Host ↔ MCP Server ↔ Claude CLI
+ *
+ * 用户需要安装官方 Chrome 扩展：
+ * https://chrome.google.com/webstore/detail/fcoeoabgfenejglbffodgkkbkcdhcgfn
  */
 
 import { BaseTool } from './base.js';
-import { ChromeTools, ChromeLauncher, type ChromeLaunchOptions } from '../chrome/index.js';
+import {
+  isChromeIntegrationSupported,
+  isChromeIntegrationConfigured,
+  isExtensionInstalled,
+  CHROME_INSTALL_URL,
+  getMcpToolNames,
+  shouldEnableChromeIntegration,
+  enableChromeIntegration,
+  disableChromeIntegration,
+} from '../chrome/index.js';
+import { configManager } from '../config/index.js';
 import type { ToolResult, ToolDefinition } from '../types/index.js';
 
 // Chrome 工具输入类型
 interface ChromeToolInput {
-  action: 'launch' | 'close' | 'screenshot' | 'navigate' | 'execute' | 'getContent' |
-          'getHTML' | 'click' | 'type' | 'listTabs' | 'getConsoleLogs' | 'enableConsoleLogs';
-  headless?: boolean;
-  port?: number;
-  url?: string;
-  script?: string;
-  selector?: string;
-  text?: string;
+  action: 'status' | 'enable' | 'disable';
 }
 
 /**
- * Chrome DevTools Tool
+ * Chrome 工具
+ * 管理 Claude in Chrome 集成状态
+ *
+ * 实际的浏览器操作通过 mcp__claude-in-chrome__* 工具完成
  */
 export class ChromeTool extends BaseTool<ChromeToolInput, ToolResult> {
   name = 'Chrome';
-  description = `与 Chrome 浏览器交互，支持：
-- 启动/关闭 Chrome (headless 或 GUI 模式)
-- 网页截图
-- 页面导航
-- 执行 JavaScript
-- DOM 操作（点击、输入）
-- 获取控制台日志
-- 管理标签页`;
+  description = `管理 Claude in Chrome 浏览器集成。
 
-  private chromeTools: ChromeTools;
-  private launcher: ChromeLauncher | null = null;
+这个工具用于检查和管理 Claude in Chrome 功能。
+启用后，可以使用 mcp__claude-in-chrome__* 工具进行浏览器操作。
+
+**可用操作：**
+- status: 检查 Claude in Chrome 状态
+- enable: 启用 Claude in Chrome（立即生效，无需重启）
+- disable: 禁用 Claude in Chrome
+
+**浏览器操作工具（启用后可用）：**
+- mcp__claude-in-chrome__tabs_context_mcp - 获取当前标签页信息
+- mcp__claude-in-chrome__tabs_create_mcp - 创建新标签页
+- mcp__claude-in-chrome__navigate - 导航到 URL
+- mcp__claude-in-chrome__computer - 鼠标、键盘操作和截图
+- mcp__claude-in-chrome__javascript_tool - 执行 JavaScript
+- mcp__claude-in-chrome__read_page - 读取页面内容
+- mcp__claude-in-chrome__find - 查找页面元素
+- mcp__claude-in-chrome__form_input - 填写表单
+- mcp__claude-in-chrome__get_page_text - 获取页面文本
+- mcp__claude-in-chrome__read_console_messages - 读取控制台日志
+- mcp__claude-in-chrome__read_network_requests - 读取网络请求
+- mcp__claude-in-chrome__gif_creator - 录制 GIF
+- mcp__claude-in-chrome__resize_window - 调整窗口大小`;
 
   constructor() {
     super();
-    this.chromeTools = new ChromeTools();
   }
 
   getInputSchema(): ToolDefinition['inputSchema'] {
@@ -47,33 +73,8 @@ export class ChromeTool extends BaseTool<ChromeToolInput, ToolResult> {
       properties: {
         action: {
           type: 'string',
-          enum: ['launch', 'close', 'screenshot', 'navigate', 'execute', 'getContent',
-                 'getHTML', 'click', 'type', 'listTabs', 'getConsoleLogs', 'enableConsoleLogs'],
-          description: '要执行的操作',
-        },
-        headless: {
-          type: 'boolean',
-          description: '是否以无头模式启动 Chrome',
-        },
-        port: {
-          type: 'number',
-          description: 'Chrome 调试端口',
-        },
-        url: {
-          type: 'string',
-          description: '要导航到的 URL',
-        },
-        script: {
-          type: 'string',
-          description: '要执行的 JavaScript 代码',
-        },
-        selector: {
-          type: 'string',
-          description: 'CSS 选择器',
-        },
-        text: {
-          type: 'string',
-          description: '要输入的文本',
+          enum: ['status', 'enable', 'disable'],
+          description: '要执行的操作：status（检查状态）、enable（启用）、disable（禁用）',
         },
       },
       required: ['action'],
@@ -83,329 +84,146 @@ export class ChromeTool extends BaseTool<ChromeToolInput, ToolResult> {
   async execute(input: ChromeToolInput): Promise<ToolResult> {
     try {
       switch (input.action) {
-        case 'launch':
-          return await this.launchChrome(input);
+        case 'status':
+          return await this.getStatus();
 
-        case 'close':
-          return await this.closeChrome();
+        case 'enable':
+          return await this.handleEnable();
 
-        case 'screenshot':
-          return await this.takeScreenshot();
-
-        case 'navigate':
-          if (!input.url) {
-            throw new Error('URL is required for navigate action');
-          }
-          return await this.navigate(input.url);
-
-        case 'execute':
-          if (!input.script) {
-            throw new Error('Script is required for execute action');
-          }
-          return await this.executeScript(input.script);
-
-        case 'getContent':
-          return await this.getPageContent(input.url);
-
-        case 'getHTML':
-          return await this.getHTML();
-
-        case 'click':
-          if (!input.selector) {
-            throw new Error('Selector is required for click action');
-          }
-          return await this.click(input.selector);
-
-        case 'type':
-          if (!input.selector || !input.text) {
-            throw new Error('Selector and text are required for type action');
-          }
-          return await this.type(input.selector, input.text);
-
-        case 'listTabs':
-          return await this.listTabs();
-
-        case 'getConsoleLogs':
-          return await this.getConsoleLogs();
-
-        case 'enableConsoleLogs':
-          return await this.enableConsoleLogs();
+        case 'disable':
+          return await this.handleDisable();
 
         default:
           return {
             success: false,
-            error: `Unknown action: ${input.action}`,
+            error: `Unknown action: ${input.action}. Use 'status', 'enable', or 'disable'.`,
           };
       }
     } catch (error) {
-      if (error instanceof Error) {
-        return {
-          success: false,
-          error: error.message,
-        };
-      }
       return {
         success: false,
-        error: 'Unknown error occurred',
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
       };
     }
   }
 
-  private async launchChrome(input: ChromeToolInput): Promise<ToolResult> {
-    try {
-      const options: ChromeLaunchOptions = {
-        headless: input.headless ?? true,
-        port: input.port,
-      };
+  private async getStatus(): Promise<ToolResult> {
+    const supported = isChromeIntegrationSupported();
+    const configured = await isChromeIntegrationConfigured();
+    const extensionInstalled = await isExtensionInstalled();
+    const enabled = shouldEnableChromeIntegration();
+    const ready = enabled && configured && extensionInstalled;
 
-      const result = await this.chromeTools.launchChrome(options);
+    let output = `Claude in Chrome Status:\n\n`;
+    output += `Platform Supported: ${supported ? '✓ Yes' : '✗ No'}\n`;
+    output += `Enabled: ${enabled ? '✓ Yes' : '○ No'}\n`;
+    output += `Native Host Configured: ${configured ? '✓ Yes' : '○ No'}\n`;
+    output += `Chrome Extension Installed: ${extensionInstalled ? '✓ Yes' : '○ No'}\n`;
+    output += `Ready: ${ready ? '✓ Yes' : '○ No'}\n`;
 
-      return {
-        success: true,
-        output: `Chrome launched successfully on port ${result.port}\nWebSocket endpoint: ${result.wsEndpoint}`,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to launch Chrome',
-      };
-    }
-  }
-
-  private async closeChrome(): Promise<ToolResult> {
-    try {
-      await this.chromeTools.closeChrome();
-      return {
-        success: true,
-        output: 'Chrome closed successfully',
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to close Chrome',
-      };
-    }
-  }
-
-  private async takeScreenshot(): Promise<ToolResult> {
-    try {
-      const buffer = await this.chromeTools.screenshot();
-      const base64 = buffer.toString('base64');
-
-      return {
-        success: true,
-        output: `Screenshot captured (${buffer.length} bytes)`,
-        newMessages: [{
-          role: 'user' as const,
-          content: [{
-            type: 'image' as const,
-            source: {
-              type: 'base64' as const,
-              media_type: 'image/png' as const,
-              data: base64,
-            },
-          }],
-        }],
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to capture screenshot',
-      };
-    }
-  }
-
-  private async navigate(url: string): Promise<ToolResult> {
-    try {
-      const client = await this.chromeTools['manager'].getClient();
-      if (!client) {
-        return {
-          success: false,
-          error: 'Chrome not available. Please launch Chrome first.',
-        };
-      }
-
-      await client.navigate(url);
-      await client.waitForPageLoad().catch(() => {
-        // 忽略超时错误，某些页面可能不会触发 load 事件
+    if (!supported) {
+      output += `\n⚠ Your platform does not support Claude in Chrome.\n`;
+      output += `Supported platforms: macOS, Linux, Windows\n`;
+    } else if (!enabled) {
+      output += `\nTo enable Claude in Chrome:\n`;
+      output += `  Use Chrome({ action: 'enable' })\n`;
+      output += `  Or start Claude Code with --chrome flag\n`;
+    } else if (!extensionInstalled) {
+      output += `\n⚠ Chrome extension not detected.\n`;
+      output += `Please install the Claude Chrome extension:\n`;
+      output += `  ${CHROME_INSTALL_URL}\n`;
+    } else if (ready) {
+      output += `\n✓ Claude in Chrome is ready!\n`;
+      output += `\nAvailable browser tools:\n`;
+      const tools = getMcpToolNames().slice(0, 5);
+      tools.forEach(tool => {
+        output += `  - ${tool}\n`;
       });
-
-      return {
-        success: true,
-        output: `Navigated to ${url}`,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Navigation failed',
-      };
+      output += `  ... and more\n`;
+      output += `\nUse mcp__claude-in-chrome__tabs_context_mcp to get started.\n`;
     }
+
+    return {
+      success: true,
+      output,
+    };
   }
 
-  private async executeScript(script: string): Promise<ToolResult> {
+  private async handleEnable(): Promise<ToolResult> {
     try {
-      const result = await this.chromeTools.executeScript(script);
-      return {
-        success: true,
-        output: `Script executed. Result: ${JSON.stringify(result, null, 2)}`,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Script execution failed',
-      };
-    }
-  }
+      // 检查平台支持
+      if (!isChromeIntegrationSupported()) {
+        return {
+          success: false,
+          error: 'Claude in Chrome is not supported on this platform.',
+        };
+      }
 
-  private async getPageContent(url?: string): Promise<ToolResult> {
-    try {
-      const content = await this.chromeTools.getPageContent(url);
+      // 启用 Chrome 集成并获取配置
+      const chromeConfig = await enableChromeIntegration();
 
-      return {
-        success: true,
-        output: `Page: ${content.title}\nURL: ${content.url}\n\nContent:\n${content.content}`,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to get page content',
-      };
-    }
-  }
+      if (!chromeConfig) {
+        return {
+          success: false,
+          error: 'Failed to enable Chrome integration.',
+        };
+      }
 
-  private async getHTML(): Promise<ToolResult> {
-    try {
-      const html = await this.chromeTools.getHTML();
-      return {
-        success: true,
-        output: html,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to get HTML',
-      };
-    }
-  }
+      // 动态添加 MCP 服务器配置
+      for (const [name, config] of Object.entries(chromeConfig.mcpConfig)) {
+        try {
+          configManager.addMcpServer(name, config as any);
+        } catch {
+          // 服务器可能已存在
+        }
+      }
 
-  private async click(selector: string): Promise<ToolResult> {
-    try {
-      const success = await this.chromeTools.click(selector);
+      // 检查扩展
+      const extensionInstalled = await isExtensionInstalled();
 
-      if (success) {
+      if (extensionInstalled) {
         return {
           success: true,
-          output: `Clicked element: ${selector}`,
+          output: `✓ Claude in Chrome enabled successfully!\n\nBrowser tools are now available. Use mcp__claude-in-chrome__tabs_context_mcp to get started.\n\nAvailable tools:\n${getMcpToolNames().slice(0, 5).map(t => `  - ${t}`).join('\n')}\n  ... and more`,
         };
       } else {
         return {
-          success: false,
-          error: `Failed to click element: ${selector}`,
+          success: true,
+          output: `✓ Claude in Chrome enabled. Native Host installed.\n\n⚠ Chrome extension not detected.\nPlease install the extension:\n${CHROME_INSTALL_URL}\n\nAfter installing, the browser tools will be ready to use.`,
         };
       }
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Click operation failed',
+        error: `Failed to enable Claude in Chrome: ${error instanceof Error ? error.message : String(error)}`,
       };
     }
   }
 
-  private async type(selector: string, text: string): Promise<ToolResult> {
+  private async handleDisable(): Promise<ToolResult> {
     try {
-      const success = await this.chromeTools.type(selector, text);
+      disableChromeIntegration();
 
-      if (success) {
-        return {
-          success: true,
-          output: `Typed "${text}" into element: ${selector}`,
-        };
-      } else {
-        return {
-          success: false,
-          error: `Failed to type into element: ${selector}`,
-        };
-      }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Type operation failed',
-      };
-    }
-  }
-
-  private async listTabs(): Promise<ToolResult> {
-    try {
-      const tabs = await this.chromeTools.listTabs();
-
-      if (tabs.length === 0) {
-        return {
-          success: true,
-          output: 'No tabs found',
-        };
+      // 尝试移除 MCP 服务器配置
+      try {
+        configManager.removeMcpServer('claude-in-chrome');
+      } catch {
+        // 服务器可能不存在
       }
 
       return {
         success: true,
-        output: `Found ${tabs.length} tab(s):\n\n` +
-          tabs.map((tab, index) =>
-            `${index + 1}. ${tab.title}\n   URL: ${tab.url}\n   Type: ${tab.type}\n   ID: ${tab.id}`
-          ).join('\n\n'),
+        output: 'Claude in Chrome disabled.\n\nBrowser tools are no longer available.',
       };
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to list tabs',
-      };
-    }
-  }
-
-  private async getConsoleLogs(): Promise<ToolResult> {
-    try {
-      const logs = this.chromeTools.getConsoleLogs();
-
-      if (logs.length === 0) {
-        return {
-          success: true,
-          output: 'No console logs recorded',
-        };
-      }
-
-      return {
-        success: true,
-        output: `Console logs (${logs.length} messages):\n\n` +
-          logs.map((log, index) =>
-            `${index + 1}. [${log.type}] ${log.text}`
-          ).join('\n'),
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to get console logs',
-      };
-    }
-  }
-
-  private async enableConsoleLogs(): Promise<ToolResult> {
-    try {
-      await this.chromeTools.enableConsoleLogs();
-      return {
-        success: true,
-        output: 'Console logging enabled',
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to enable console logging',
+        error: `Failed to disable Claude in Chrome: ${error instanceof Error ? error.message : String(error)}`,
       };
     }
   }
 
   async cleanup(): Promise<void> {
-    try {
-      await this.chromeTools.closeChrome();
-    } catch (error) {
-      // Ignore cleanup errors
-    }
+    // No cleanup needed for MCP mode
   }
 }

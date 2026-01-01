@@ -1,15 +1,28 @@
 /**
  * LSP Server Manager - Language Server Protocol 服务器管理
  * 负责启动、管理和与LSP服务器通信
+ *
+ * 功能特性：
+ * - 支持 .lsp.json 配置文件
+ * - 支持自动检测和安装 LSP 服务器
+ * - 支持环境变量展开 (${VAR_NAME})
+ * - 支持 ContentModified 错误自动重试
+ * - 支持服务器崩溃自动重启
  */
 
 import { EventEmitter } from 'events';
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, ChildProcess, execSync, spawnSync } from 'child_process';
 import * as path from 'path';
 import { pathToFileURL } from 'url';
+import * as fs from 'fs';
+import * as os from 'os';
+
+// ============================================================================
+// 类型定义
+// ============================================================================
 
 /**
- * LSP 服务器配置
+ * LSP 服务器配置 (完整版，与官方一致)
  */
 export interface LSPServerConfig {
   /** 服务器名称 */
@@ -20,10 +33,297 @@ export interface LSPServerConfig {
   args?: string[];
   /** 支持的文件扩展名 */
   fileExtensions: string[];
+  /** 文件扩展名到语言ID的映射 */
+  extensionToLanguage?: Record<string, string>;
+  /** 通信方式: stdio 或 socket */
+  transport?: 'stdio' | 'socket';
   /** 初始化选项 */
   initializationOptions?: any;
+  /** 服务器设置 (workspace/didChangeConfiguration) */
+  settings?: any;
   /** 环境变量 */
   env?: Record<string, string>;
+  /** 工作区文件夹路径 */
+  workspaceFolder?: string;
+  /** 启动超时时间 (毫秒) */
+  startupTimeout?: number;
+  /** 关闭超时时间 (毫秒) */
+  shutdownTimeout?: number;
+  /** 崩溃后是否自动重启 */
+  restartOnCrash?: boolean;
+  /** 最大重启次数 */
+  maxRestarts?: number;
+  /** npm 包名 (用于自动安装) */
+  npmPackage?: string;
+  /** 额外的 npm 包依赖 */
+  npmDependencies?: string[];
+  /** 配置来源 */
+  source?: string;
+  /** 作用域: static (内置) 或 dynamic (插件) */
+  scope?: 'static' | 'dynamic';
+}
+
+/**
+ * .lsp.json 配置文件格式
+ */
+interface LSPConfigFile {
+  [serverName: string]: Omit<LSPServerConfig, 'name'>;
+}
+
+/**
+ * LSP 服务器安装信息
+ */
+interface LSPServerInstallInfo {
+  name: string;
+  npmPackage: string;
+  npmDependencies?: string[];
+  command: string;
+}
+
+/**
+ * 已知的 LSP 服务器及其安装信息
+ */
+const KNOWN_LSP_SERVERS: Record<string, LSPServerInstallInfo> = {
+  'typescript-language-server': {
+    name: 'typescript-language-server',
+    npmPackage: 'typescript-language-server',
+    npmDependencies: ['typescript'],
+    command: 'typescript-language-server',
+  },
+  'pyright': {
+    name: 'pyright',
+    npmPackage: 'pyright',
+    command: 'pyright-langserver',
+  },
+  'vscode-json-languageserver': {
+    name: 'vscode-json-languageserver',
+    npmPackage: 'vscode-json-languageserver',
+    command: 'vscode-json-languageserver',
+  },
+  'vscode-css-languageserver': {
+    name: 'vscode-css-languageserver',
+    npmPackage: 'vscode-langservers-extracted',
+    command: 'vscode-css-language-server',
+  },
+  'vscode-html-languageserver': {
+    name: 'vscode-html-languageserver',
+    npmPackage: 'vscode-langservers-extracted',
+    command: 'vscode-html-language-server',
+  },
+};
+
+// ============================================================================
+// 环境变量展开
+// ============================================================================
+
+/**
+ * 展开字符串中的环境变量
+ * 支持 ${VAR_NAME} 和 ${VAR_NAME:-default} 语法
+ */
+function expandEnvVariables(str: string, extraVars?: Record<string, string>): {
+  expanded: string;
+  missingVars: string[];
+} {
+  const missingVars: string[] = [];
+  const allVars = { ...process.env, ...extraVars };
+
+  const expanded = str.replace(/\$\{([^}]+)\}/g, (match, expr) => {
+    // 支持默认值语法: ${VAR:-default}
+    const [varName, defaultValue] = expr.split(':-');
+    const value = allVars[varName];
+
+    if (value !== undefined) {
+      return value;
+    } else if (defaultValue !== undefined) {
+      return defaultValue;
+    } else {
+      missingVars.push(varName);
+      return match; // 保持原样
+    }
+  });
+
+  return { expanded, missingVars };
+}
+
+/**
+ * 展开配置中的所有环境变量
+ */
+function expandConfigEnvVars(
+  config: LSPServerConfig,
+  workspaceRoot: string
+): LSPServerConfig {
+  const extraVars: Record<string, string> = {
+    WORKSPACE_ROOT: workspaceRoot,
+    HOME: os.homedir(),
+  };
+
+  const expandStr = (s: string): string => {
+    const { expanded, missingVars } = expandEnvVariables(s, extraVars);
+    if (missingVars.length > 0) {
+      console.warn(`[LSP] 缺少环境变量: ${missingVars.join(', ')}`);
+    }
+    return expanded;
+  };
+
+  return {
+    ...config,
+    command: expandStr(config.command),
+    args: config.args?.map(expandStr),
+    workspaceFolder: config.workspaceFolder ? expandStr(config.workspaceFolder) : undefined,
+    env: config.env
+      ? Object.fromEntries(
+          Object.entries(config.env).map(([k, v]) => [k, expandStr(v)])
+        )
+      : undefined,
+  };
+}
+
+// ============================================================================
+// .lsp.json 配置文件加载
+// ============================================================================
+
+/**
+ * 查找并加载 .lsp.json 配置文件
+ * 搜索顺序: 工作区根目录 -> .claude 目录 -> 用户目录
+ */
+function loadLSPConfigFile(workspaceRoot: string): LSPServerConfig[] {
+  const configs: LSPServerConfig[] = [];
+  const searchPaths = [
+    path.join(workspaceRoot, '.lsp.json'),
+    path.join(workspaceRoot, '.claude', 'lsp.json'),
+    path.join(os.homedir(), '.claude', 'lsp.json'),
+  ];
+
+  for (const configPath of searchPaths) {
+    try {
+      if (fs.existsSync(configPath)) {
+        const content = fs.readFileSync(configPath, 'utf-8');
+        const configFile: LSPConfigFile = JSON.parse(content);
+
+        for (const [name, serverConfig] of Object.entries(configFile)) {
+          // 验证必需字段
+          if (!serverConfig.command) {
+            console.warn(`[LSP] 配置 ${name} 缺少 command 字段，跳过`);
+            continue;
+          }
+
+          // 从 extensionToLanguage 提取 fileExtensions
+          let fileExtensions = serverConfig.fileExtensions || [];
+          if (serverConfig.extensionToLanguage && fileExtensions.length === 0) {
+            fileExtensions = Object.keys(serverConfig.extensionToLanguage);
+          }
+
+          if (fileExtensions.length === 0) {
+            console.warn(`[LSP] 配置 ${name} 缺少 fileExtensions，跳过`);
+            continue;
+          }
+
+          configs.push({
+            name,
+            ...serverConfig,
+            fileExtensions,
+            source: configPath,
+            scope: 'dynamic',
+          });
+        }
+
+        console.log(`[LSP] 从 ${configPath} 加载了 ${Object.keys(configFile).length} 个配置`);
+      }
+    } catch (error) {
+      console.error(`[LSP] 加载配置文件 ${configPath} 失败:`, error);
+    }
+  }
+
+  return configs;
+}
+
+// ============================================================================
+// 命令检测和安装
+// ============================================================================
+
+/**
+ * 检查命令是否可用
+ */
+function isCommandAvailable(command: string): boolean {
+  try {
+    // 在 Windows 上使用 where，在其他系统上使用 which
+    const checkCmd = process.platform === 'win32' ? 'where' : 'which';
+    const result = spawnSync(checkCmd, [command], {
+      stdio: 'pipe',
+      shell: true,
+    });
+    return result.status === 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 安装 npm 包 (全局安装)
+ */
+async function installNpmPackage(packageName: string, dependencies?: string[]): Promise<boolean> {
+  console.log(`[LSP] 正在安装 ${packageName}...`);
+
+  try {
+    // 安装主包和依赖
+    const packages = [packageName, ...(dependencies || [])];
+    const installCmd = `npm install -g ${packages.join(' ')}`;
+
+    execSync(installCmd, {
+      stdio: 'pipe',
+      encoding: 'utf-8',
+    });
+
+    console.log(`[LSP] ${packageName} 安装成功`);
+    return true;
+  } catch (error) {
+    console.error(`[LSP] 安装 ${packageName} 失败:`, error);
+    return false;
+  }
+}
+
+/**
+ * 确保 LSP 服务器已安装
+ * 如果未安装则尝试自动安装
+ */
+async function ensureLSPServerInstalled(config: LSPServerConfig): Promise<boolean> {
+  // 检查命令是否已可用
+  if (isCommandAvailable(config.command)) {
+    return true;
+  }
+
+  console.log(`[LSP] ${config.name} 未安装，尝试自动安装...`);
+
+  // 查找安装信息
+  const installInfo = KNOWN_LSP_SERVERS[config.name] || {
+    name: config.name,
+    npmPackage: config.npmPackage || config.name,
+    npmDependencies: config.npmDependencies,
+    command: config.command,
+  };
+
+  if (!installInfo.npmPackage) {
+    console.error(`[LSP] 无法自动安装 ${config.name}: 未知的 npm 包名`);
+    return false;
+  }
+
+  // 尝试安装
+  const installed = await installNpmPackage(
+    installInfo.npmPackage,
+    installInfo.npmDependencies
+  );
+
+  if (!installed) {
+    return false;
+  }
+
+  // 再次检查命令是否可用
+  if (isCommandAvailable(config.command)) {
+    return true;
+  }
+
+  console.error(`[LSP] 安装完成但命令 ${config.command} 仍不可用`);
+  return false;
 }
 
 /**
@@ -45,9 +345,20 @@ export interface LSPDiagnostic {
   code?: string | number;
 }
 
+// LSP 错误码
+const LSP_ERROR_CONTENT_MODIFIED = -32801;
+const LSP_MAX_RETRIES = 3;
+const LSP_RETRY_DELAY_MS = 500;
+
 /**
  * LSP 服务器实例
  * 管理单个语言服务器的生命周期和通信
+ *
+ * 功能：
+ * - 进程管理和通信
+ * - 请求/响应匹配
+ * - ContentModified 错误自动重试
+ * - 崩溃自动重启
  */
 export class LSPServer extends EventEmitter {
   private config: LSPServerConfig;
@@ -59,6 +370,10 @@ export class LSPServer extends EventEmitter {
     reject: (error: Error) => void;
   }>();
   private messageBuffer = '';
+  private workspaceRoot: string = '';
+  private restartCount = 0;
+  private startTime?: Date;
+  private lastError?: Error;
 
   // 已打开的文档
   private openDocuments = new Map<string, {
@@ -74,6 +389,34 @@ export class LSPServer extends EventEmitter {
   }
 
   /**
+   * 获取重启次数
+   */
+  getRestartCount(): number {
+    return this.restartCount;
+  }
+
+  /**
+   * 获取启动时间
+   */
+  getStartTime(): Date | undefined {
+    return this.startTime;
+  }
+
+  /**
+   * 获取最后一次错误
+   */
+  getLastError(): Error | undefined {
+    return this.lastError;
+  }
+
+  /**
+   * 检查服务器是否健康
+   */
+  isHealthy(): boolean {
+    return this.state === 'ready' && this.process !== null;
+  }
+
+  /**
    * 启动 LSP 服务器
    */
   async start(workspaceRoot: string): Promise<void> {
@@ -81,14 +424,21 @@ export class LSPServer extends EventEmitter {
       throw new Error(`Server already started (state: ${this.state})`);
     }
 
+    this.workspaceRoot = workspaceRoot;
     this.state = 'initializing';
 
     try {
+      // 展开配置中的环境变量
+      const expandedConfig = expandConfigEnvVars(this.config, workspaceRoot);
+      const cwd = expandedConfig.workspaceFolder || workspaceRoot;
+
       // 启动进程
-      this.process = spawn(this.config.command, this.config.args || [], {
-        cwd: workspaceRoot,
-        env: { ...process.env, ...this.config.env },
+      // 在 Windows 上需要使用 shell: true 来正确解析 .cmd 文件
+      this.process = spawn(expandedConfig.command, expandedConfig.args || [], {
+        cwd,
+        env: { ...process.env, ...expandedConfig.env },
         stdio: ['pipe', 'pipe', 'pipe'],
+        shell: process.platform === 'win32',
       });
 
       // 监听输出
@@ -101,12 +451,19 @@ export class LSPServer extends EventEmitter {
       });
 
       this.process.on('exit', (code) => {
+        const wasReady = this.state === 'ready';
         this.state = 'stopped';
         this.emit('exit', code);
+
+        // 如果配置了崩溃重启且服务器曾经正常运行
+        if (wasReady && code !== 0 && this.config.restartOnCrash) {
+          this.handleCrash();
+        }
       });
 
       this.process.on('error', (err) => {
         this.state = 'error';
+        this.lastError = err;
         this.emit('error', err);
       });
 
@@ -148,10 +505,20 @@ export class LSPServer extends EventEmitter {
       // 发送 initialized 通知
       this.sendNotification('initialized', {});
 
+      // 如果有设置，发送配置
+      if (this.config.settings) {
+        this.sendNotification('workspace/didChangeConfiguration', {
+          settings: this.config.settings,
+        });
+      }
+
       this.state = 'ready';
+      this.startTime = new Date();
       this.emit('ready', initResult);
+      console.log(`[LSP] ${this.config.name} 启动成功`);
     } catch (err) {
       this.state = 'error';
+      this.lastError = err as Error;
       throw err;
     }
   }
@@ -179,6 +546,85 @@ export class LSPServer extends EventEmitter {
     }
 
     this.state = 'stopped';
+    console.log(`[LSP] ${this.config.name} 已停止`);
+  }
+
+  /**
+   * 重启服务器
+   */
+  async restart(): Promise<void> {
+    console.log(`[LSP] 正在重启 ${this.config.name}...`);
+
+    try {
+      await this.stop();
+    } catch (err) {
+      console.error(`[LSP] 停止 ${this.config.name} 失败:`, err);
+    }
+
+    this.restartCount++;
+    const maxRestarts = this.config.maxRestarts ?? 3;
+
+    if (this.restartCount > maxRestarts) {
+      const error = new Error(`${this.config.name} 超过最大重启次数 (${maxRestarts})`);
+      this.lastError = error;
+      throw error;
+    }
+
+    await this.start(this.workspaceRoot);
+  }
+
+  /**
+   * 处理服务器崩溃
+   */
+  private handleCrash(): void {
+    const maxRestarts = this.config.maxRestarts ?? 3;
+
+    if (this.restartCount >= maxRestarts) {
+      console.error(`[LSP] ${this.config.name} 崩溃次数过多，不再重启`);
+      return;
+    }
+
+    console.log(`[LSP] ${this.config.name} 崩溃，尝试重启 (${this.restartCount + 1}/${maxRestarts})...`);
+
+    // 延迟重启，避免快速循环
+    setTimeout(async () => {
+      try {
+        await this.restart();
+      } catch (err) {
+        console.error(`[LSP] ${this.config.name} 重启失败:`, err);
+      }
+    }, 1000);
+  }
+
+  /**
+   * 发送请求 (带自动重试)
+   * 当收到 ContentModified 错误时自动重试
+   */
+  async sendRequestWithRetry<T = any>(method: string, params: any): Promise<T> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt <= LSP_MAX_RETRIES; attempt++) {
+      try {
+        return await this.sendRequest(method, params) as T;
+      } catch (err: any) {
+        lastError = err;
+
+        // 检查是否是 ContentModified 错误
+        const errorCode = err?.code ?? err?.data?.code;
+        if (typeof errorCode === 'number' && errorCode === LSP_ERROR_CONTENT_MODIFIED) {
+          if (attempt < LSP_MAX_RETRIES) {
+            const delay = LSP_RETRY_DELAY_MS * Math.pow(2, attempt);
+            console.log(`[LSP] ${method} 收到 ContentModified，${delay}ms 后重试 (${attempt + 1}/${LSP_MAX_RETRIES})...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            continue;
+          }
+        }
+
+        throw err;
+      }
+    }
+
+    throw lastError || new Error(`${method} 请求失败`);
   }
 
   /**
@@ -434,6 +880,8 @@ export class LSPServerManager extends EventEmitter {
   private workspaceRoot: string;
   private state: 'initializing' | 'ready' | 'failed' = 'initializing';
   private diagnosticsCache = new Map<string, LSPDiagnostic[]>();
+  // 扩展名到服务器名的映射 (用于快速查找)
+  private extensionToServer = new Map<string, string[]>();
 
   constructor(workspaceRoot: string) {
     super();
@@ -450,14 +898,45 @@ export class LSPServerManager extends EventEmitter {
    */
   registerServer(config: LSPServerConfig): void {
     this.serverConfigs.push(config);
+
+    // 建立扩展名索引
+    for (const ext of config.fileExtensions) {
+      const normalizedExt = ext.startsWith('.') ? ext.toLowerCase() : `.${ext.toLowerCase()}`;
+      const servers = this.extensionToServer.get(normalizedExt) || [];
+      if (!servers.includes(config.name)) {
+        servers.push(config.name);
+      }
+      this.extensionToServer.set(normalizedExt, servers);
+    }
+  }
+
+  /**
+   * 从 .lsp.json 加载配置
+   */
+  loadConfigFromFile(): LSPServerConfig[] {
+    const configs = loadLSPConfigFile(this.workspaceRoot);
+    for (const config of configs) {
+      this.registerServer(config);
+    }
+    return configs;
   }
 
   /**
    * 初始化所有服务器
+   * 会自动检测并安装缺失的 LSP 服务器
    */
   async initialize(): Promise<void> {
+    console.log(`[LSP] 开始初始化，共 ${this.serverConfigs.length} 个服务器配置`);
+
     try {
       for (const config of this.serverConfigs) {
+        // 检查并安装 LSP 服务器
+        const isInstalled = await ensureLSPServerInstalled(config);
+        if (!isInstalled) {
+          console.error(`[LSP] 跳过 ${config.name}: 未安装且无法自动安装`);
+          continue;
+        }
+
         const server = new LSPServer(config);
 
         // 监听诊断
@@ -465,14 +944,23 @@ export class LSPServerManager extends EventEmitter {
           this.emit('diagnostics', params);
         });
 
+        // 监听错误
+        server.on('error', (err) => {
+          console.error(`[LSP] ${config.name} 错误:`, err);
+          this.emit('serverError', { server: config.name, error: err });
+        });
+
         try {
           await server.start(this.workspaceRoot);
           this.servers.set(config.name, server);
-          console.log(`[LSP] Started ${config.name}`);
         } catch (err) {
-          console.error(`[LSP] Failed to start ${config.name}:`, err);
+          console.error(`[LSP] 启动 ${config.name} 失败:`, err);
         }
       }
+
+      const successCount = this.servers.size;
+      const totalCount = this.serverConfigs.length;
+      console.log(`[LSP] 初始化完成: ${successCount}/${totalCount} 个服务器启动成功`);
 
       this.state = 'ready';
       this.emit('ready');
@@ -625,7 +1113,7 @@ export class LSPServerManager extends EventEmitter {
 }
 
 /**
- * 默认 LSP 服务器配置
+ * 默认 LSP 服务器配置 (内置)
  */
 export const defaultLSPConfigs: LSPServerConfig[] = [
   {
@@ -633,12 +1121,27 @@ export const defaultLSPConfigs: LSPServerConfig[] = [
     command: 'typescript-language-server',
     args: ['--stdio'],
     fileExtensions: ['.ts', '.tsx', '.js', '.jsx'],
+    extensionToLanguage: {
+      '.ts': 'typescript',
+      '.tsx': 'typescriptreact',
+      '.js': 'javascript',
+      '.jsx': 'javascriptreact',
+    },
+    restartOnCrash: true,
+    maxRestarts: 3,
+    scope: 'static',
   },
   {
     name: 'pyright',
     command: 'pyright-langserver',
     args: ['--stdio'],
     fileExtensions: ['.py'],
+    extensionToLanguage: {
+      '.py': 'python',
+    },
+    restartOnCrash: true,
+    maxRestarts: 3,
+    scope: 'static',
   },
 ];
 
@@ -646,18 +1149,60 @@ export const defaultLSPConfigs: LSPServerConfig[] = [
 let globalManager: LSPServerManager | null = null;
 
 /**
- * 初始化全局 LSP 管理器
+ * 初始化选项
  */
-export async function initializeLSPManager(workspaceRoot: string): Promise<LSPServerManager> {
+export interface InitializeLSPOptions {
+  /** 是否加载 .lsp.json 配置文件 */
+  loadConfigFile?: boolean;
+  /** 是否注册默认服务器 */
+  useDefaults?: boolean;
+  /** 自定义服务器配置 */
+  customConfigs?: LSPServerConfig[];
+}
+
+/**
+ * 初始化全局 LSP 管理器
+ *
+ * @param workspaceRoot 工作区根目录
+ * @param options 初始化选项
+ */
+export async function initializeLSPManager(
+  workspaceRoot: string,
+  options: InitializeLSPOptions = {}
+): Promise<LSPServerManager> {
+  const {
+    loadConfigFile = true,
+    useDefaults = true,
+    customConfigs = [],
+  } = options;
+
   if (globalManager) {
     await globalManager.shutdown();
   }
 
   globalManager = new LSPServerManager(workspaceRoot);
 
-  // 注册默认服务器
-  for (const config of defaultLSPConfigs) {
+  // 1. 加载 .lsp.json 配置 (优先级最高)
+  if (loadConfigFile) {
+    const fileConfigs = globalManager.loadConfigFromFile();
+    if (fileConfigs.length > 0) {
+      console.log(`[LSP] 从配置文件加载了 ${fileConfigs.length} 个服务器`);
+    }
+  }
+
+  // 2. 注册自定义配置
+  for (const config of customConfigs) {
     globalManager.registerServer(config);
+  }
+
+  // 3. 注册默认服务器 (只注册未被覆盖的)
+  if (useDefaults) {
+    const existingNames = new Set(globalManager['serverConfigs'].map(c => c.name));
+    for (const config of defaultLSPConfigs) {
+      if (!existingNames.has(config.name)) {
+        globalManager.registerServer(config);
+      }
+    }
   }
 
   await globalManager.initialize();
@@ -670,4 +1215,56 @@ export async function initializeLSPManager(workspaceRoot: string): Promise<LSPSe
  */
 export function getLSPManager(): LSPServerManager | null {
   return globalManager;
+}
+
+/**
+ * 检查指定的 LSP 服务器是否已安装
+ */
+export function checkLSPServerInstalled(serverName: string): boolean {
+  const config = defaultLSPConfigs.find(c => c.name === serverName);
+  if (!config) {
+    const installInfo = KNOWN_LSP_SERVERS[serverName];
+    if (installInfo) {
+      return isCommandAvailable(installInfo.command);
+    }
+    return false;
+  }
+  return isCommandAvailable(config.command);
+}
+
+/**
+ * 手动安装 LSP 服务器
+ */
+export async function installLSPServer(serverName: string): Promise<boolean> {
+  const installInfo = KNOWN_LSP_SERVERS[serverName];
+  if (!installInfo) {
+    console.error(`[LSP] 未知的服务器: ${serverName}`);
+    console.log(`[LSP] 支持的服务器: ${Object.keys(KNOWN_LSP_SERVERS).join(', ')}`);
+    return false;
+  }
+
+  return installNpmPackage(installInfo.npmPackage, installInfo.npmDependencies);
+}
+
+/**
+ * 获取所有已知的 LSP 服务器列表
+ */
+export function getKnownLSPServers(): string[] {
+  return Object.keys(KNOWN_LSP_SERVERS);
+}
+
+/**
+ * 获取 LSP 服务器安装状态
+ */
+export function getLSPServerStatus(): Record<string, { installed: boolean; command: string }> {
+  const status: Record<string, { installed: boolean; command: string }> = {};
+
+  for (const [name, info] of Object.entries(KNOWN_LSP_SERVERS)) {
+    status[name] = {
+      installed: isCommandAvailable(info.command),
+      command: info.command,
+    };
+  }
+
+  return status;
 }

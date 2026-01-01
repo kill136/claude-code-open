@@ -49,7 +49,7 @@ export async function executeCommand(
     config: any;
     ui: any;
   }
-): Promise<{ success: boolean; message?: string; action?: string }> {
+): Promise<import('./types.js').CommandResult> {
   // 确保命令已初始化
   initializeCommands();
 

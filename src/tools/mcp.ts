@@ -64,7 +64,7 @@ const mcpServers: Map<string, McpServerState> = new Map();
 let messageId = 1;
 
 // 配置常量
-const MCP_TIMEOUT = parseInt(process.env.MCP_TIMEOUT || '30000', 10); // 默认 30 秒超时
+const MCP_TIMEOUT = parseInt(process.env.MCP_TIMEOUT || '10000', 10); // 默认 10 秒超时（减少等待时间）
 const RESOURCE_CACHE_TTL = 60000; // 资源缓存 1 分钟
 const HEALTH_CHECK_INTERVAL = 30000; // 健康检查间隔 30 秒
 const MAX_RECONNECT_ATTEMPTS = 3; // 最大重连次数
@@ -72,15 +72,23 @@ const RECONNECT_DELAY_BASE = 1000; // 重连延迟基数（毫秒）
 
 /**
  * 注册 MCP 服务器配置
+ *
+ * @param name 服务器名称
+ * @param config 服务器配置
+ * @param preloadedTools 预加载的工具定义（可选，用于不需要连接就能发现的工具）
  */
-export function registerMcpServer(name: string, config: McpServerConfig): void {
+export function registerMcpServer(
+  name: string,
+  config: McpServerConfig,
+  preloadedTools?: McpToolDefinition[]
+): void {
   mcpServers.set(name, {
     config,
     connected: false,
     connecting: false,
     reconnectAttempts: 0,
-    capabilities: {},
-    tools: [],
+    capabilities: preloadedTools ? { tools: true } : {},
+    tools: preloadedTools || [],
     resources: [],
   });
 }
@@ -102,7 +110,7 @@ function sleep(ms: number): Promise<void> {
 /**
  * 断开 MCP 服务器连接
  */
-async function disconnectMcpServer(name: string): Promise<void> {
+export async function disconnectMcpServer(name: string): Promise<void> {
   const server = mcpServers.get(name);
   if (!server) return;
 
@@ -145,7 +153,7 @@ async function checkServerHealth(name: string): Promise<boolean> {
 /**
  * 连接到 MCP 服务器（带重试机制）
  */
-async function connectMcpServer(name: string, retry = true): Promise<boolean> {
+export async function connectMcpServer(name: string, retry = true): Promise<boolean> {
   const server = mcpServers.get(name);
   if (!server) return false;
 
@@ -323,7 +331,7 @@ async function sendMcpMessage(
   method: string,
   params: unknown,
   timeout = MCP_TIMEOUT,
-  retries = 2
+  retries = 1 // 减少重试次数，让失败更快返回
 ): Promise<unknown | null> {
   const server = mcpServers.get(serverName);
   if (!server?.process?.stdin || !server.process.stdout) {
