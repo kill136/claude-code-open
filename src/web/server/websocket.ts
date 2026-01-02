@@ -213,6 +213,34 @@ async function handleClientMessage(
       await handleSessionResume(client, message.payload.sessionId, conversationManager);
       break;
 
+    case 'task_list':
+      await handleTaskList(client, message.payload, conversationManager);
+      break;
+
+    case 'task_cancel':
+      await handleTaskCancel(client, message.payload.taskId, conversationManager);
+      break;
+
+    case 'task_output':
+      await handleTaskOutput(client, message.payload.taskId, conversationManager);
+      break;
+
+    case 'tool_filter_update':
+      await handleToolFilterUpdate(client, message.payload, conversationManager);
+      break;
+
+    case 'tool_list_get':
+      await handleToolListGet(client, conversationManager);
+      break;
+
+    case 'system_prompt_update':
+      await handleSystemPromptUpdate(client, message.payload.config, conversationManager);
+      break;
+
+    case 'system_prompt_get':
+      await handleSystemPromptGet(client, conversationManager);
+      break;
+
     default:
       console.warn('[WebSocket] 未知消息类型:', (message as any).type);
   }
@@ -730,6 +758,325 @@ async function handleSessionResume(
       type: 'error',
       payload: {
         message: error instanceof Error ? error.message : '恢复会话失败',
+      },
+    });
+  }
+}
+
+/**
+ * 处理工具过滤更新请求
+ */
+async function handleToolFilterUpdate(
+  client: ClientConnection,
+  payload: any,
+  conversationManager: ConversationManager
+): Promise<void> {
+  const { ws, sessionId } = client;
+
+  try {
+    const { config } = payload;
+
+    if (!config || !config.mode) {
+      sendMessage(ws, {
+        type: 'error',
+        payload: {
+          message: '无效的工具过滤配置',
+        },
+      });
+      return;
+    }
+
+    conversationManager.updateToolFilter(sessionId, config);
+
+    sendMessage(ws, {
+      type: 'tool_filter_updated',
+      payload: {
+        success: true,
+        config,
+      },
+    });
+  } catch (error) {
+    console.error('[WebSocket] 更新工具过滤配置失败:', error);
+    sendMessage(ws, {
+      type: 'error',
+      payload: {
+        message: error instanceof Error ? error.message : '更新工具过滤配置失败',
+      },
+    });
+  }
+}
+
+/**
+ * 处理获取工具列表请求
+ */
+async function handleToolListGet(
+  client: ClientConnection,
+  conversationManager: ConversationManager
+): Promise<void> {
+  const { ws, sessionId } = client;
+
+  try {
+    const tools = conversationManager.getAvailableTools(sessionId);
+
+    // 获取当前会话的工具过滤配置
+    const config = conversationManager.getToolFilterConfig(sessionId);
+
+    sendMessage(ws, {
+      type: 'tool_list_response',
+      payload: {
+        tools,
+        config,
+      },
+    });
+  } catch (error) {
+    console.error('[WebSocket] 获取工具列表失败:', error);
+    sendMessage(ws, {
+      type: 'error',
+      payload: {
+        message: error instanceof Error ? error.message : '获取工具列表失败',
+      },
+    });
+  }
+}
+
+/**
+ * 处理系统提示更新请求
+ */
+async function handleSystemPromptUpdate(
+  client: ClientConnection,
+  config: import('../shared/types.js').SystemPromptConfig,
+  conversationManager: ConversationManager
+): Promise<void> {
+  const { ws } = client;
+
+  try {
+    const success = conversationManager.updateSystemPrompt(client.sessionId, config);
+
+    if (success) {
+      // 获取更新后的完整提示
+      const result = await conversationManager.getSystemPrompt(client.sessionId);
+      sendMessage(ws, {
+        type: 'system_prompt_response',
+        payload: result,
+      });
+    } else {
+      sendMessage(ws, {
+        type: 'error',
+        payload: {
+          message: '更新系统提示失败',
+        },
+      });
+    }
+  } catch (error) {
+    console.error('[WebSocket] 更新系统提示失败:', error);
+    sendMessage(ws, {
+      type: 'error',
+      payload: {
+        message: error instanceof Error ? error.message : '更新系统提示失败',
+      },
+    });
+  }
+}
+
+/**
+ * 处理获取系统提示请求
+ */
+async function handleSystemPromptGet(
+  client: ClientConnection,
+  conversationManager: ConversationManager
+): Promise<void> {
+  const { ws } = client;
+
+  try {
+    const result = await conversationManager.getSystemPrompt(client.sessionId);
+
+    sendMessage(ws, {
+      type: 'system_prompt_response',
+      payload: result,
+    });
+  } catch (error) {
+    console.error('[WebSocket] 获取系统提示失败:', error);
+    sendMessage(ws, {
+      type: 'error',
+      payload: {
+        message: error instanceof Error ? error.message : '获取系统提示失败',
+      },
+    });
+  }
+}
+
+
+/**
+ * 处理任务列表请求
+ */
+async function handleTaskList(
+  client: ClientConnection,
+  payload: any,
+  conversationManager: ConversationManager
+): Promise<void> {
+  const { ws, sessionId } = client;
+
+  try {
+    const taskManager = conversationManager.getTaskManager(sessionId);
+    if (!taskManager) {
+      sendMessage(ws, {
+        type: 'error',
+        payload: {
+          message: '任务管理器未初始化',
+        },
+      });
+      return;
+    }
+
+    const statusFilter = payload?.statusFilter;
+    const includeCompleted = payload?.includeCompleted !== false;
+
+    let tasks = taskManager.listTasks();
+
+    // 过滤任务
+    if (statusFilter) {
+      tasks = tasks.filter(t => t.status === statusFilter);
+    }
+
+    if (!includeCompleted) {
+      tasks = tasks.filter(t => t.status !== 'completed');
+    }
+
+    // 转换为任务摘要
+    const taskSummaries = tasks.map(task => ({
+      id: task.id,
+      description: task.description,
+      agentType: task.agentType,
+      status: task.status,
+      startTime: task.startTime.getTime(),
+      endTime: task.endTime?.getTime(),
+      progress: task.progress,
+    }));
+
+    sendMessage(ws, {
+      type: 'task_list_response',
+      payload: {
+        tasks: taskSummaries,
+      },
+    });
+  } catch (error) {
+    console.error('[WebSocket] 获取任务列表失败:', error);
+    sendMessage(ws, {
+      type: 'error',
+      payload: {
+        message: error instanceof Error ? error.message : '获取任务列表失败',
+      },
+    });
+  }
+}
+
+/**
+ * 处理取消任务请求
+ */
+async function handleTaskCancel(
+  client: ClientConnection,
+  taskId: string,
+  conversationManager: ConversationManager
+): Promise<void> {
+  const { ws, sessionId } = client;
+
+  try {
+    const taskManager = conversationManager.getTaskManager(sessionId);
+    if (!taskManager) {
+      sendMessage(ws, {
+        type: 'error',
+        payload: {
+          message: '任务管理器未初始化',
+        },
+      });
+      return;
+    }
+
+    const success = taskManager.cancelTask(taskId);
+
+    sendMessage(ws, {
+      type: 'task_cancelled',
+      payload: {
+        taskId,
+        success,
+      },
+    });
+
+    // 如果成功取消，发送状态更新
+    if (success) {
+      const task = taskManager.getTask(taskId);
+      if (task) {
+        sendMessage(ws, {
+          type: 'task_status',
+          payload: {
+            taskId: task.id,
+            status: task.status,
+            error: task.error,
+          },
+        });
+      }
+    }
+  } catch (error) {
+    console.error('[WebSocket] 取消任务失败:', error);
+    sendMessage(ws, {
+      type: 'error',
+      payload: {
+        message: error instanceof Error ? error.message : '取消任务失败',
+      },
+    });
+  }
+}
+
+/**
+ * 处理任务输出请求
+ */
+async function handleTaskOutput(
+  client: ClientConnection,
+  taskId: string,
+  conversationManager: ConversationManager
+): Promise<void> {
+  const { ws, sessionId } = client;
+
+  try {
+    const taskManager = conversationManager.getTaskManager(sessionId);
+    if (!taskManager) {
+      sendMessage(ws, {
+        type: 'error',
+        payload: {
+          message: '任务管理器未初始化',
+        },
+      });
+      return;
+    }
+
+    const task = taskManager.getTask(taskId);
+    if (!task) {
+      sendMessage(ws, {
+        type: 'error',
+        payload: {
+          message: `任务 ${taskId} 不存在`,
+        },
+      });
+      return;
+    }
+
+    const output = taskManager.getTaskOutput(taskId);
+
+    sendMessage(ws, {
+      type: 'task_output_response',
+      payload: {
+        taskId: task.id,
+        output,
+        status: task.status,
+        error: task.error,
+      },
+    });
+  } catch (error) {
+    console.error('[WebSocket] 获取任务输出失败:', error);
+    sendMessage(ws, {
+      type: 'error',
+      payload: {
+        message: error instanceof Error ? error.message : '获取任务输出失败',
       },
     });
   }

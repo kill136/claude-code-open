@@ -286,6 +286,171 @@ export function setupApiRoutes(app: Express, conversationManager: ConversationMa
     }
   });
 
+  // ============ 工具过滤配置API ============
+
+  // 获取工具过滤配置
+  app.get('/api/tools/config', (req: Request, res: Response) => {
+    try {
+      const sessionId = req.query.sessionId as string;
+      if (!sessionId) {
+        res.status(400).json({
+          error: '缺少 sessionId 参数',
+        });
+        return;
+      }
+
+      const tools = conversationManager.getAvailableTools(sessionId);
+      const config = conversationManager.getToolFilterConfig(sessionId);
+
+      res.json({
+        config,
+        tools,
+      });
+    } catch (error) {
+      console.error('[API] 获取工具过滤配置失败:', error);
+      res.status(500).json({
+        error: '获取工具过滤配置失败',
+        message: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  });
+
+  // 更新工具过滤配置
+  app.put('/api/tools/config', (req: Request, res: Response) => {
+    try {
+      const { sessionId, config } = req.body;
+
+      if (!sessionId) {
+        res.status(400).json({
+          error: '缺少 sessionId',
+        });
+        return;
+      }
+
+      if (!config || !config.mode) {
+        res.status(400).json({
+          error: '无效的工具过滤配置',
+        });
+        return;
+      }
+
+      conversationManager.updateToolFilter(sessionId, config);
+
+      res.json({
+        success: true,
+        config,
+      });
+    } catch (error) {
+      console.error('[API] 更新工具过滤配置失败:', error);
+      res.status(500).json({
+        success: false,
+        error: '更新工具过滤配置失败',
+        message: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  });
+
+  // 获取当前可用工具列表
+  app.get('/api/tools/available', (req: Request, res: Response) => {
+    try {
+      const sessionId = req.query.sessionId as string;
+      if (!sessionId) {
+        res.status(400).json({
+          error: '缺少 sessionId 参数',
+        });
+        return;
+      }
+
+      const tools = conversationManager.getAvailableTools(sessionId);
+
+      // 按分类分组
+      const byCategory: Record<string, any[]> = {};
+      for (const tool of tools) {
+        if (!byCategory[tool.category]) {
+          byCategory[tool.category] = [];
+        }
+        byCategory[tool.category].push(tool);
+      }
+
+      res.json({
+        tools,
+        byCategory,
+        total: tools.length,
+        enabled: tools.filter(t => t.enabled).length,
+        disabled: tools.filter(t => !t.enabled).length,
+      });
+    } catch (error) {
+      console.error('[API] 获取可用工具列表失败:', error);
+      res.status(500).json({
+        error: '获取可用工具列表失败',
+        message: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  });
+
+  // ============ 系统提示API ============
+
+  // 获取当前系统提示
+  app.get('/api/system-prompt', async (req: Request, res: Response) => {
+    try {
+      // 获取当前会话ID（假设从查询参数或默认会话）
+      const sessionId = (req.query.sessionId as string) || 'default';
+
+      const result = await conversationManager.getSystemPrompt(sessionId);
+
+      res.json({
+        success: true,
+        ...result,
+      });
+    } catch (error) {
+      console.error('[API] 获取系统提示失败:', error);
+      res.status(500).json({
+        success: false,
+        error: '获取系统提示失败',
+        message: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  });
+
+  // 更新系统提示配置
+  app.put('/api/system-prompt', async (req: Request, res: Response) => {
+    try {
+      const { config, sessionId } = req.body;
+
+      if (!config || typeof config !== 'object') {
+        res.status(400).json({
+          success: false,
+          error: '无效的配置',
+        });
+        return;
+      }
+
+      const targetSessionId = sessionId || 'default';
+      const success = conversationManager.updateSystemPrompt(targetSessionId, config);
+
+      if (success) {
+        const result = await conversationManager.getSystemPrompt(targetSessionId);
+        res.json({
+          success: true,
+          message: '系统提示已更新',
+          ...result,
+        });
+      } else {
+        res.status(404).json({
+          success: false,
+          error: '会话不存在',
+        });
+      }
+    } catch (error) {
+      console.error('[API] 更新系统提示失败:', error);
+      res.status(500).json({
+        success: false,
+        error: '更新系统提示失败',
+        message: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  });
+
   // 注意：Express 5 不再支持 /api/* 这样的通配符路由
   // 404 处理将由主路由的 SPA fallback 处理
 }

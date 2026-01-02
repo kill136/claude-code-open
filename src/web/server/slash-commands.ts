@@ -603,6 +603,284 @@ const versionCommand: SlashCommand = {
   },
 };
 
+// /tools - 工具管理命令
+const toolsCommand: SlashCommand = {
+  name: 'tools',
+  aliases: ['t'],
+  description: '管理可用工具',
+  usage: '/tools [list|enable|disable|reset] [工具名]',
+  category: 'config',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    const { args, conversationManager, sessionId } = ctx;
+
+    // 无参数或 list 子命令 - 列出所有工具
+    if (!args || args.length === 0 || args[0] === 'list') {
+      const tools = conversationManager.getAvailableTools(sessionId);
+      const config = conversationManager.getToolFilterConfig(sessionId);
+
+      let message = '工具列表\n\n';
+      message += `当前模式: ${config.mode === 'all' ? '全部启用' : config.mode === 'whitelist' ? '白名单' : '黑名单'}\n\n`;
+
+      // 按分类分组
+      const byCategory: Record<string, any[]> = {};
+      for (const tool of tools) {
+        if (!byCategory[tool.category]) {
+          byCategory[tool.category] = [];
+        }
+        byCategory[tool.category].push(tool);
+      }
+
+      const categoryNames: Record<string, string> = {
+        system: '系统工具',
+        file: '文件工具',
+        search: '搜索工具',
+        web: 'Web工具',
+        task: '任务管理',
+        notebook: '笔记本',
+        plan: '计划模式',
+        mcp: 'MCP',
+        interaction: '交互',
+        skill: '技能',
+        lsp: 'LSP',
+        browser: '浏览器',
+        other: '其他',
+      };
+
+      for (const [category, categoryTools] of Object.entries(byCategory)) {
+        message += `\n${categoryNames[category] || category}:\n`;
+        for (const tool of categoryTools) {
+          const status = tool.enabled ? '✓' : '✗';
+          message += `  ${status} ${tool.name.padEnd(20)} ${tool.description.slice(0, 50)}...\n`;
+        }
+      }
+
+      message += `\n总计: ${tools.length} 个工具\n`;
+      message += `启用: ${tools.filter(t => t.enabled).length} | 禁用: ${tools.filter(t => !t.enabled).length}\n\n`;
+      message += '用法:\n';
+      message += '  /tools list           - 列出所有工具\n';
+      message += '  /tools enable <名称>  - 启用工具\n';
+      message += '  /tools disable <名称> - 禁用工具\n';
+      message += '  /tools reset          - 重置为默认配置\n';
+
+      return { success: true, message };
+    }
+
+    const subCommand = args[0].toLowerCase();
+
+    // enable - 启用工具
+    if (subCommand === 'enable') {
+      if (args.length < 2) {
+        return {
+          success: false,
+          message: '用法: /tools enable <工具名>\n\n示例: /tools enable Bash',
+        };
+      }
+
+      const toolName = args[1];
+      const config = conversationManager.getToolFilterConfig(sessionId);
+
+      // 如果是 all 模式，切换到黑名单模式
+      if (config.mode === 'all') {
+        config.mode = 'blacklist';
+        config.disallowedTools = [];
+      }
+
+      // 从黑名单中移除或添加到白名单
+      if (config.mode === 'blacklist') {
+        if (!config.disallowedTools) config.disallowedTools = [];
+        config.disallowedTools = config.disallowedTools.filter((t: string) => t !== toolName);
+      } else if (config.mode === 'whitelist') {
+        if (!config.allowedTools) config.allowedTools = [];
+        if (!config.allowedTools.includes(toolName)) {
+          config.allowedTools.push(toolName);
+        }
+      }
+
+      conversationManager.updateToolFilter(sessionId, config);
+
+      return {
+        success: true,
+        message: `已启用工具: ${toolName}`,
+      };
+    }
+
+    // disable - 禁用工具
+    if (subCommand === 'disable') {
+      if (args.length < 2) {
+        return {
+          success: false,
+          message: '用法: /tools disable <工具名>\n\n示例: /tools disable Write',
+        };
+      }
+
+      const toolName = args[1];
+      const config = conversationManager.getToolFilterConfig(sessionId);
+
+      // 如果是 all 模式，切换到黑名单模式
+      if (config.mode === 'all') {
+        config.mode = 'blacklist';
+        config.disallowedTools = [toolName];
+      } else if (config.mode === 'blacklist') {
+        if (!config.disallowedTools) config.disallowedTools = [];
+        if (!config.disallowedTools.includes(toolName)) {
+          config.disallowedTools.push(toolName);
+        }
+      } else if (config.mode === 'whitelist') {
+        if (!config.allowedTools) config.allowedTools = [];
+        config.allowedTools = config.allowedTools.filter((t: string) => t !== toolName);
+      }
+
+      conversationManager.updateToolFilter(sessionId, config);
+
+      return {
+        success: true,
+        message: `已禁用工具: ${toolName}`,
+      };
+    }
+
+    // reset - 重置配置
+    if (subCommand === 'reset') {
+      const defaultConfig = { mode: 'all' as const };
+      conversationManager.updateToolFilter(sessionId, defaultConfig);
+
+      return {
+        success: true,
+        message: '已重置工具配置为默认状态（全部启用）',
+      };
+    }
+
+    return {
+      success: false,
+      message: `未知子命令: ${subCommand}\n\n使用 /tools 查看帮助。`,
+    };
+  },
+};
+
+// /prompt - 管理系统提示
+const promptCommand: SlashCommand = {
+  name: 'prompt',
+  description: '管理系统提示配置',
+  usage: '/prompt [set|append|reset] [内容]',
+  category: 'config',
+  execute: async (ctx: ExtendedCommandContext): Promise<CommandResult> => {
+    const { args, conversationManager, sessionId } = ctx;
+
+    // 没有参数，显示当前系统提示
+    if (!args || args.length === 0) {
+      try {
+        const result = await conversationManager.getSystemPrompt(sessionId);
+        const config = result.config;
+
+        let message = '系统提示配置\n\n';
+
+        if (!config.useDefault && config.customPrompt) {
+          message += '模式: 自定义提示\n\n';
+          message += '当前提示:\n';
+          message += '```\n';
+          message += config.customPrompt.slice(0, 500);
+          if (config.customPrompt.length > 500) {
+            message += '\n...(已截断，总长度: ' + config.customPrompt.length + ' 字符)';
+          }
+          message += '\n```';
+        } else if (config.useDefault && config.appendPrompt) {
+          message += '模式: 默认提示 + 追加内容\n\n';
+          message += '追加内容:\n';
+          message += '```\n';
+          message += config.appendPrompt;
+          message += '\n```';
+        } else {
+          message += '模式: 默认提示\n';
+        }
+
+        message += '\n\n可用命令:\n';
+        message += '  /prompt set <内容>    - 设置自定义提示（完全替换）\n';
+        message += '  /prompt append <内容> - 追加到默认提示后\n';
+        message += '  /prompt reset         - 重置为默认提示';
+
+        return { success: true, message };
+      } catch (error) {
+        return {
+          success: false,
+          message: `获取系统提示失败: ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+    }
+
+    const action = args[0].toLowerCase();
+    const content = args.slice(1).join(' ');
+
+    try {
+      switch (action) {
+        case 'set': {
+          if (!content) {
+            return {
+              success: false,
+              message: '用法: /prompt set <内容>\n\n请提供要设置的系统提示内容。',
+            };
+          }
+
+          const config = {
+            useDefault: false,
+            customPrompt: content,
+          };
+
+          conversationManager.updateSystemPrompt(sessionId, config);
+
+          return {
+            success: true,
+            message: `系统提示已设置为自定义内容 (${content.length} 字符)。\n\n下次对话将使用新的系统提示。`,
+          };
+        }
+
+        case 'append': {
+          if (!content) {
+            return {
+              success: false,
+              message: '用法: /prompt append <内容>\n\n请提供要追加的内容。',
+            };
+          }
+
+          const config = {
+            useDefault: true,
+            appendPrompt: content,
+          };
+
+          conversationManager.updateSystemPrompt(sessionId, config);
+
+          return {
+            success: true,
+            message: `已将内容追加到默认系统提示后 (${content.length} 字符)。\n\n下次对话将使用更新后的提示。`,
+          };
+        }
+
+        case 'reset': {
+          const config = {
+            useDefault: true,
+          };
+
+          conversationManager.updateSystemPrompt(sessionId, config);
+
+          return {
+            success: true,
+            message: '系统提示已重置为默认配置。\n\n下次对话将使用默认系统提示。',
+          };
+        }
+
+        default:
+          return {
+            success: false,
+            message: `未知的操作: ${action}\n\n可用操作: set, append, reset\n使用 /help prompt 查看详细帮助。`,
+          };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        message: `操作失败: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+  },
+};
+
 // ============ 注册所有命令 ============
 
 export const registry = new SlashCommandRegistry();
@@ -620,6 +898,177 @@ registry.register(sessionsCommand);
 registry.register(resumeCommand);
 registry.register(statusCommand);
 registry.register(versionCommand);
+
+// /tasks - 管理后台任务
+const tasksCommand: SlashCommand = {
+  name: 'tasks',
+  aliases: ['task'],
+  description: '列出和管理后台 Agent 任务',
+  usage: '/tasks [list|cancel <id>|output <id>]',
+  category: 'utility',
+  execute: async (ctx: ExtendedCommandContext): Promise<CommandResult> => {
+    const { args, conversationManager, sessionId } = ctx;
+
+    const taskManager = conversationManager.getTaskManager(sessionId);
+    if (!taskManager) {
+      return {
+        success: false,
+        message: '任务管理器未初始化。',
+      };
+    }
+
+    // 默认行为：列出所有任务
+    if (!args || args.length === 0) {
+      const tasks = taskManager.listTasks();
+
+      if (tasks.length === 0) {
+        return {
+          success: true,
+          message: '没有后台任务。',
+        };
+      }
+
+      let message = '后台任务列表\n\n';
+
+      tasks.forEach((task, idx) => {
+        const duration = task.endTime
+          ? ((task.endTime.getTime() - task.startTime.getTime()) / 1000).toFixed(1) + 's'
+          : '运行中...';
+
+        const statusEmoji = {
+          running: '⏳',
+          completed: '✅',
+          failed: '❌',
+          cancelled: '🚫',
+        }[task.status] || '?';
+
+        message += `${idx + 1}. ${statusEmoji} ${task.description}\n`;
+        message += `   ID: ${task.id.slice(0, 8)}\n`;
+        message += `   类型: ${task.agentType}\n`;
+        message += `   状态: ${task.status}\n`;
+        message += `   时长: ${duration}\n`;
+
+        if (task.progress) {
+          message += `   进度: ${task.progress.current}/${task.progress.total}`;
+          if (task.progress.message) {
+            message += ` - ${task.progress.message}`;
+          }
+          message += '\n';
+        }
+
+        message += '\n';
+      });
+
+      message += '使用 /tasks output <id> 查看任务输出\n';
+      message += '使用 /tasks cancel <id> 取消运行中的任务';
+
+      return { success: true, message };
+    }
+
+    const subcommand = args[0].toLowerCase();
+
+    // /tasks cancel <id>
+    if (subcommand === 'cancel') {
+      if (args.length < 2) {
+        return {
+          success: false,
+          message: '用法: /tasks cancel <task-id>',
+        };
+      }
+
+      const taskId = args[1];
+      const task = taskManager.getTask(taskId);
+
+      if (!task) {
+        return {
+          success: false,
+          message: `任务 ${taskId} 不存在`,
+        };
+      }
+
+      const success = taskManager.cancelTask(taskId);
+
+      if (success) {
+        return {
+          success: true,
+          message: `任务 ${taskId.slice(0, 8)} 已取消`,
+        };
+      } else {
+        return {
+          success: false,
+          message: `无法取消任务 ${taskId.slice(0, 8)}（可能已经完成）`,
+        };
+      }
+    }
+
+    // /tasks output <id>
+    if (subcommand === 'output' || subcommand === 'o') {
+      if (args.length < 2) {
+        return {
+          success: false,
+          message: '用法: /tasks output <task-id>',
+        };
+      }
+
+      const taskId = args[1];
+      const task = taskManager.getTask(taskId);
+
+      if (!task) {
+        return {
+          success: false,
+          message: `任务 ${taskId} 不存在`,
+        };
+      }
+
+      let message = `任务详情: ${task.description}\n`;
+      message += `=`.repeat(50) + '\n\n';
+      message += `ID: ${task.id}\n`;
+      message += `类型: ${task.agentType}\n`;
+      message += `状态: ${task.status}\n`;
+      message += `开始时间: ${task.startTime.toLocaleString('zh-CN')}\n`;
+
+      if (task.endTime) {
+        const duration = ((task.endTime.getTime() - task.startTime.getTime()) / 1000).toFixed(1);
+        message += `结束时间: ${task.endTime.toLocaleString('zh-CN')}\n`;
+        message += `耗时: ${duration}s\n`;
+      }
+
+      if (task.progress) {
+        message += `\n进度: ${task.progress.current}/${task.progress.total}\n`;
+        if (task.progress.message) {
+          message += `消息: ${task.progress.message}\n`;
+        }
+      }
+
+      const output = taskManager.getTaskOutput(taskId);
+      if (output) {
+        message += `\n输出:\n${'-'.repeat(50)}\n${output}\n`;
+      } else if (task.status === 'running') {
+        message += `\n任务正在运行中，暂无输出。\n`;
+      } else if (task.error) {
+        message += `\n错误:\n${task.error}\n`;
+      }
+
+      return { success: true, message };
+    }
+
+    // /tasks list (等同于默认行为)
+    if (subcommand === 'list' || subcommand === 'ls') {
+      // 重新调用默认行为
+      return tasksCommand.execute({ ...ctx, args: [] });
+    }
+
+    return {
+      success: false,
+      message: `未知子命令: ${subcommand}\n\n用法:\n  /tasks          - 列出所有任务\n  /tasks cancel <id>  - 取消任务\n  /tasks output <id>  - 查看任务输出`,
+    };
+  },
+};
+
+// 注册工具和提示命令
+registry.register(tasksCommand);
+registry.register(toolsCommand);
+registry.register(promptCommand);
 
 /**
  * 检查输入是否为斜杠命令

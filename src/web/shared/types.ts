@@ -43,7 +43,14 @@ export type ClientMessage =
   | { type: 'session_delete'; payload: { sessionId: string } }
   | { type: 'session_rename'; payload: { sessionId: string; name: string } }
   | { type: 'session_export'; payload: { sessionId: string; format?: 'json' | 'md' } }
-  | { type: 'session_resume'; payload: { sessionId: string } };
+  | { type: 'session_resume'; payload: { sessionId: string } }
+  | { type: 'tool_filter_update'; payload: ToolFilterUpdatePayload }
+  | { type: 'tool_list_get' }
+  | { type: 'system_prompt_update'; payload: SystemPromptUpdatePayload }
+  | { type: 'system_prompt_get' }
+  | { type: 'task_list'; payload?: TaskListRequestPayload }
+  | { type: 'task_cancel'; payload: { taskId: string } }
+  | { type: 'task_output'; payload: { taskId: string } };
 
 /**
  * 服务端发送的消息类型
@@ -71,7 +78,14 @@ export type ServerMessage =
   | { type: 'session_switched'; payload: { sessionId: string } }
   | { type: 'session_deleted'; payload: { sessionId: string; success: boolean } }
   | { type: 'session_renamed'; payload: { sessionId: string; name: string; success: boolean } }
-  | { type: 'session_exported'; payload: { sessionId: string; content: string; format: 'json' | 'md' } };
+  | { type: 'session_exported'; payload: { sessionId: string; content: string; format: 'json' | 'md' } }
+  | { type: 'tool_list_response'; payload: ToolListPayload }
+  | { type: 'tool_filter_updated'; payload: { success: boolean; config: ToolFilterConfig } }
+  | { type: 'system_prompt_response'; payload: SystemPromptGetPayload }
+  | { type: 'task_list_response'; payload: TaskListPayload }
+  | { type: 'task_status'; payload: TaskStatusPayload }
+  | { type: 'task_cancelled'; payload: { taskId: string; success: boolean } }
+  | { type: 'task_output_response'; payload: TaskOutputPayload };
 
 // ============ 消息负载类型 ============
 
@@ -446,6 +460,65 @@ export interface SessionCreatedPayload {
   createdAt: number;
 }
 
+// ============ 任务相关 Payload ============
+
+/**
+ * 任务列表请求负载
+ */
+export interface TaskListRequestPayload {
+  statusFilter?: 'running' | 'completed' | 'failed' | 'cancelled';
+  includeCompleted?: boolean;
+}
+
+/**
+ * 任务列表响应负载
+ */
+export interface TaskListPayload {
+  tasks: TaskSummary[];
+}
+
+/**
+ * 任务摘要信息
+ */
+export interface TaskSummary {
+  id: string;
+  description: string;
+  agentType: string;
+  status: 'running' | 'completed' | 'failed' | 'cancelled';
+  startTime: number;
+  endTime?: number;
+  progress?: {
+    current: number;
+    total: number;
+    message?: string;
+  };
+}
+
+/**
+ * 任务状态更新负载
+ */
+export interface TaskStatusPayload {
+  taskId: string;
+  status: 'running' | 'completed' | 'failed' | 'cancelled';
+  result?: string;
+  error?: string;
+  progress?: {
+    current: number;
+    total: number;
+    message?: string;
+  };
+}
+
+/**
+ * 任务输出响应负载
+ */
+export interface TaskOutputPayload {
+  taskId: string;
+  output?: string;
+  status: 'running' | 'completed' | 'failed' | 'cancelled';
+  error?: string;
+}
+
 // ============ 工具名称映射 ============
 
 export const TOOL_DISPLAY_NAMES: Record<string, string> = {
@@ -509,3 +582,73 @@ export const TOOL_ICONS: Record<string, string> = {
   LSP: '🔤',
   Chrome: '🌐',
 };
+
+// ============ 工具过滤配置 ============
+
+/**
+ * 工具过滤配置
+ */
+export interface ToolFilterConfig {
+  /** 允许的工具列表（白名单） */
+  allowedTools?: string[];
+  /** 禁止的工具列表（黑名单） */
+  disallowedTools?: string[];
+  /** 过滤模式 */
+  mode: 'whitelist' | 'blacklist' | 'all';
+}
+
+/**
+ * 工具过滤更新负载
+ */
+export interface ToolFilterUpdatePayload {
+  config: ToolFilterConfig;
+}
+
+/**
+ * 工具列表负载
+ */
+export interface ToolListPayload {
+  tools: ToolInfo[];
+  config: ToolFilterConfig;
+}
+
+/**
+ * 工具信息
+ */
+export interface ToolInfo {
+  name: string;
+  description: string;
+  enabled: boolean;
+  category: string;
+}
+
+// ============ 系统提示配置 ============
+
+/**
+ * 系统提示配置
+ */
+export interface SystemPromptConfig {
+  /** 自定义系统提示（完全替换默认提示） */
+  customPrompt?: string;
+  /** 追加到默认提示后的内容 */
+  appendPrompt?: string;
+  /** 是否使用默认提示 */
+  useDefault: boolean;
+}
+
+/**
+ * 更新系统提示请求负载
+ */
+export interface SystemPromptUpdatePayload {
+  config: SystemPromptConfig;
+}
+
+/**
+ * 获取系统提示响应负载
+ */
+export interface SystemPromptGetPayload {
+  /** 当前完整的系统提示 */
+  current: string;
+  /** 当前配置 */
+  config: SystemPromptConfig;
+}
