@@ -2,11 +2,11 @@
  * 代码解析模块
  * 使用 LSP (Language Server Protocol) 进行代码分析
  *
- * 增强功能：
- * - 基于 LSP 的符号提取 (更准确的语义分析)
+ * 增强功能�?
+ * - 基于 LSP 的符号提�?(更准确的语义分析)
  * - 引用查找 (通过 LSP textDocument/references)
- * - 跳转到定义 (通过 LSP textDocument/definition)
- * - 自动安装 LSP 服务器
+ * - 跳转到定�?(通过 LSP textDocument/definition)
+ * - 自动安装 LSP 服务�?
  */
 
 import * as fs from 'fs';
@@ -19,13 +19,13 @@ import {
 import {
   LSPSymbolExtractor,
   lspSymbolExtractor,
-  CodeSymbol,
-  SymbolKind,
-  Reference,
 } from './lsp/lsp-symbol-extractor.js';
 
-// 重新导出类型
-export { CodeSymbol, SymbolKind, Reference };
+// 为了在本文件中使用这些类型，需要使用 import type
+import type { CodeSymbol, SymbolKind, Reference } from './lsp/lsp-symbol-extractor.js';
+
+// 重新导出类型 - 使用 export type 避免运行时导入错误
+export type { CodeSymbol, SymbolKind, Reference } from './lsp/lsp-symbol-extractor.js';
 
 // 语法错误
 export interface SyntaxError {
@@ -48,7 +48,7 @@ export interface LanguageConfig {
   languageId: string;
 }
 
-// 从 LSP 服务器配置生成语言配置
+// �?LSP 服务器配置生成语言配置
 const LANGUAGE_CONFIGS: Record<string, LanguageConfig> = {};
 for (const [lang, server] of Object.entries(LSP_SERVERS)) {
   LANGUAGE_CONFIGS[lang] = {
@@ -58,7 +58,7 @@ for (const [lang, server] of Object.entries(LSP_SERVERS)) {
 }
 
 /**
- * 代码解析器 (基于 LSP)
+ * 代码解析�?(基于 LSP)
  */
 export class CodeParser {
   private extractor: LSPSymbolExtractor;
@@ -72,7 +72,7 @@ export class CodeParser {
 
   /**
    * 初始化解析器
-   * 会自动安装需要的 LSP 服务器，安装失败时抛出错误
+   * 会自动安装需要的 LSP 服务器，安装失败时抛出错�?
    */
   async initialize(languages?: string[]): Promise<void> {
     if (this.initialized) return;
@@ -80,7 +80,7 @@ export class CodeParser {
     // 如果没有指定语言，使用默认语言
     const defaultLanguages = languages || ['typescript', 'javascript'];
 
-    // 初始化 LSP 服务器（失败时会抛出 LSPServerError）
+    // 初始�?LSP 服务器（失败时会抛出 LSPServerError�?
     await this.manager.initializeServers(defaultLanguages);
     this.initialized = true;
   }
@@ -89,7 +89,7 @@ export class CodeParser {
    * 解析文件获取符号
    */
   async parseFile(filePath: string): Promise<CodeSymbol[]> {
-    // 确保对应语言的 LSP 已初始化
+    // 确保对应语言�?LSP 已初始化
     const ext = path.extname(filePath);
     const language = this.detectLanguage(ext);
 
@@ -111,7 +111,7 @@ export class CodeParser {
   }
 
   /**
-   * 获取 LSP 管理器
+   * 获取 LSP 管理�?
    */
   getManager(): LSPManager {
     return this.manager;
@@ -119,7 +119,7 @@ export class CodeParser {
 }
 
 /**
- * 代码分析器
+ * 代码分析�?
  */
 export class CodeAnalyzer {
   private parser: CodeParser;
@@ -205,7 +205,7 @@ export class CodeAnalyzer {
   }
 
   /**
-   * 跳转到定义 (通过 LSP)
+   * 跳转到定�?(通过 LSP)
    */
   async getDefinition(
     filePath: string,
@@ -219,16 +219,16 @@ export class CodeAnalyzer {
   }
 
   /**
-   * 检测语法错误 (简化版，基于 Regex)
+   * 检测语法错�?(简化版，基�?Regex)
    */
   async detectSyntaxErrors(filePath: string): Promise<SyntaxError[]> {
-    // LSP 通常通过 publishDiagnostics 推送诊断
-    // 这里返回空数组，实际应用中可以订阅诊断事件
+    // LSP 通常通过 publishDiagnostics 推送诊�?
+    // 这里返回空数组，实际应用中可以订阅诊断事�?
     return [];
   }
 
   /**
-   * 识别代码折叠区域 (简化版，基于缩进)
+   * 识别代码折叠区域 (简化版，基于缩�?
    */
   async detectFoldingRanges(filePath: string): Promise<FoldingRange[]> {
     const content = fs.readFileSync(filePath, 'utf-8');
@@ -281,14 +281,14 @@ export class CodeAnalyzer {
   }
 
   /**
-   * 停止所有 LSP 服务器
+   * 停止所�?LSP 服务�?
    */
   async shutdown(): Promise<void> {
     await this.extractor.shutdown();
   }
 
   /**
-   * 获取 LSP 管理器
+   * 获取 LSP 管理�?
    */
   getManager(): LSPManager {
     return this.parser.getManager();

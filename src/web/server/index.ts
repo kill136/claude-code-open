@@ -1,6 +1,6 @@
 /**
- * WebUI 服务器入口
- * Express + WebSocket 服务器
+ * WebUI 服务器入�?
+ * Express + WebSocket 服务�?
  */
 
 import express from 'express';
@@ -34,14 +34,14 @@ export async function startWebServer(options: WebServerOptions = {}): Promise<vo
   const app = express();
   const server = createServer(app);
 
-  // 创建 WebSocket 服务器
+  // 创建 WebSocket 服务�?
   const wss = new WebSocketServer({ server, path: '/ws' });
 
-  // 创建对话管理器
+  // 创建对话管理�?
   const conversationManager = new ConversationManager(cwd, model);
   await conversationManager.initialize();
 
-  // 中间件
+  // 中间�?
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ extended: true }));
 
@@ -59,14 +59,14 @@ export async function startWebServer(options: WebServerOptions = {}): Promise<vo
   // API 路由
   setupApiRoutes(app, conversationManager);
 
-  // 静态文件服务（生产模式）
+  // 静态文件服务（生产模式�?
   const clientDistPath = path.join(__dirname, '../client/dist');
   app.use(express.static(clientDistPath));
 
-  // 内联 HTML（所有请求返回 SPA）
-  // 使用 use 中间件作为 catch-all（Express 5 兼容）
+  // 内联 HTML（所有请求返�?SPA�?
+  // 使用 use 中间件作�?catch-all（Express 5 兼容�?
   app.use((req, res, next) => {
-    // 跳过 API 路由和静态资源
+    // 跳过 API 路由和静态资�?
     if (req.path.startsWith('/api/') || req.path.startsWith('/ws')) {
       return next();
     }
@@ -76,7 +76,7 @@ export async function startWebServer(options: WebServerOptions = {}): Promise<vo
   // 设置 WebSocket 处理
   setupWebSocket(wss, conversationManager);
 
-  // 启动服务器
+  // 启动服务�?
   server.listen(port, host, () => {
     console.log(`\n🌐 Claude Code WebUI 已启动`);
     console.log(`   地址: http://${host}:${port}`);
@@ -87,7 +87,7 @@ export async function startWebServer(options: WebServerOptions = {}): Promise<vo
 
   // 优雅关闭
   process.on('SIGINT', () => {
-    console.log('\n正在关闭服务器...');
+    console.log('\n正在关闭服务�?..');
     wss.close();
     server.close(() => {
       console.log('服务器已关闭');
@@ -98,7 +98,7 @@ export async function startWebServer(options: WebServerOptions = {}): Promise<vo
 
 /**
  * 获取内联 HTML
- * 包含完整的前端应用
+ * 包含完整的前端应�?
  */
 function getInlineHTML(port: number): string {
   return `<!DOCTYPE html>
@@ -164,7 +164,7 @@ function getInlineCSS(): string {
       height: 100vh;
     }
 
-    /* 侧边栏 */
+    /* 侧边�?*/
     .sidebar {
       width: 260px;
       background: var(--bg-secondary);
@@ -315,7 +315,7 @@ function getInlineCSS(): string {
       color: var(--text-muted);
     }
 
-    /* 主聊天区域 */
+    /* 主聊天区�?*/
     .main-content {
       flex: 1;
       display: flex;
@@ -857,7 +857,7 @@ function getInlineCSS(): string {
       color: var(--text-secondary);
     }
 
-    /* 滚动条样式 */
+    /* 滚动条样�?*/
     ::-webkit-scrollbar {
       width: 8px;
       height: 8px;
@@ -939,7 +939,7 @@ function getInlineCSS(): string {
       line-height: 1.6;
     }
 
-    /* 权限对话框样式 */
+    /* 权限对话框样�?*/
     .permission-dialog-overlay {
       position: fixed;
       top: 0;
@@ -1096,7 +1096,7 @@ function getInlineCSS(): string {
       opacity: 0.9;
     }
 
-    /* 用户问答对话框样式 */
+    /* 用户问答对话框样�?*/
     .question-dialog-overlay {
       position: fixed;
       top: 0;
@@ -1275,7 +1275,7 @@ function getInlineCSS(): string {
       text-align: center;
     }
 
-    /* 响应式 */
+    /* 响应�?*/
     @media (max-width: 768px) {
       .sidebar {
         display: none;
@@ -1307,6 +1307,374 @@ function getInlineCSS(): string {
         width: 100%;
       }
     }
+
+    /* 设置面板样式 */
+    .settings-panel-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      backdrop-filter: blur(4px);
+    }
+
+    .settings-panel {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      width: 90%;
+      max-width: 800px;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    }
+
+    .settings-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .settings-header h2 {
+      margin: 0;
+      font-size: 18px;
+      color: var(--text-primary);
+    }
+
+    .settings-close-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 24px;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+
+    .settings-close-btn:hover {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+    }
+
+    .settings-body {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .settings-nav {
+      width: 180px;
+      border-right: 1px solid var(--border-color);
+      padding: 12px;
+    }
+
+    .settings-nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      color: var(--text-secondary);
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+
+    .settings-nav-item:hover {
+      background: var(--bg-tertiary);
+    }
+
+    .settings-nav-item.active {
+      background: var(--accent-primary);
+      color: var(--bg-primary);
+    }
+
+    .settings-content {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+    }
+
+    .settings-section h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 12px;
+    }
+
+    .settings-section p {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    .mcp-server-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .mcp-server-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+    }
+
+    .mcp-server-info { flex: 1; }
+
+    .mcp-server-name {
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .mcp-server-command {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: monospace;
+    }
+
+    .mcp-server-status {
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      margin-right: 12px;
+    }
+
+    .mcp-server-status.enabled {
+      background: rgba(158, 206, 106, 0.2);
+      color: var(--accent-success);
+    }
+
+    .mcp-server-status.disabled {
+      background: rgba(247, 118, 142, 0.2);
+      color: var(--accent-error);
+    }
+
+    .mcp-server-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .mcp-server-actions button {
+      padding: 6px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .mcp-server-actions button:hover {
+      background: var(--bg-tertiary);
+    }
+
+    .mcp-server-actions button.danger:hover {
+      background: rgba(247, 118, 142, 0.2);
+      color: var(--accent-error);
+    }
+
+    .mcp-add-form {
+      padding: 16px;
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      margin-top: 12px;
+    }
+
+    .mcp-add-form .form-row {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .mcp-add-form .form-group {
+      flex: 1;
+    }
+
+    .mcp-add-form label {
+      display: block;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .mcp-add-form input {
+      width: 100%;
+      padding: 10px 12px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      color: var(--text-primary);
+      font-size: 14px;
+    }
+
+    .mcp-add-form input:focus {
+      outline: none;
+      border-color: var(--accent-primary);
+    }
+
+    .mcp-add-form .form-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .mcp-add-form button {
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .mcp-add-form button.cancel {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-secondary);
+    }
+
+    .mcp-add-form button.submit {
+      background: var(--accent-primary);
+      border: none;
+      color: var(--bg-primary);
+    }
+
+    .add-mcp-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px;
+      background: transparent;
+      border: 2px dashed var(--border-color);
+      border-radius: 8px;
+      color: var(--text-muted);
+      font-size: 14px;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 12px;
+    }
+
+    .add-mcp-btn:hover {
+      border-color: var(--accent-primary);
+      color: var(--accent-primary);
+    }
+
+    .prompt-editor {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .prompt-mode-selector {
+      display: flex;
+      gap: 8px;
+    }
+
+    .prompt-mode-btn {
+      padding: 8px 16px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .prompt-mode-btn.active {
+      background: var(--accent-primary);
+      border-color: var(--accent-primary);
+      color: var(--bg-primary);
+    }
+
+    .prompt-textarea {
+      width: 100%;
+      min-height: 200px;
+      padding: 12px;
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-size: 14px;
+      font-family: monospace;
+      resize: vertical;
+    }
+
+    .prompt-textarea:focus {
+      outline: none;
+      border-color: var(--accent-primary);
+    }
+
+    .prompt-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .prompt-actions button {
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .prompt-actions button.reset {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-secondary);
+    }
+
+    .prompt-actions button.save {
+      background: var(--accent-primary);
+      border: none;
+      color: var(--bg-primary);
+    }
+
+    .settings-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 8px;
+      background: transparent;
+      color: var(--text-muted);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .settings-btn:hover {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      border-color: var(--accent-primary);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-muted);
+    }
+
+    .empty-state .empty-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
   `;
 }
 
@@ -1319,17 +1687,17 @@ function getInlineReactApp(port: number): string {
 
     // 斜杠命令列表
     const SLASH_COMMANDS = [
-      { name: '/help', description: '显示所有可用命令', aliases: ['/?'] },
+      { name: '/help', description: '显示所有可用命�?, aliases: ['/?'] },
       { name: '/clear', description: '清空当前对话', aliases: ['/reset', '/new'] },
-      { name: '/model', description: '查看或切换模型', usage: '/model [opus|sonnet|haiku]' },
+      { name: '/model', description: '查看或切换模�?, usage: '/model [opus|sonnet|haiku]' },
       { name: '/cost', description: '显示当前会话费用' },
       { name: '/compact', description: '压缩对话历史' },
-      { name: '/undo', description: '撤销上一次操作' },
+      { name: '/undo', description: '撤销上一次操�? },
       { name: '/diff', description: '显示未提交的git更改' },
       { name: '/config', description: '显示当前配置' },
       { name: '/sessions', description: '列出历史会话' },
       { name: '/resume', description: '恢复指定会话', usage: '/resume [id]' },
-      { name: '/status', description: '显示系统状态' },
+      { name: '/status', description: '显示系统状�? },
       { name: '/version', description: '显示版本信息' },
       { name: '/prompt', description: '管理系统提示', usage: '/prompt [set|append|reset]' },
       { name: '/tools', description: '管理工具配置', usage: '/tools [enable|disable|reset]' },
@@ -1350,8 +1718,8 @@ function getInlineReactApp(port: number): string {
       WebFetch: '网页获取',
       WebSearch: '网页搜索',
       TodoWrite: '任务管理',
-      Task: '子任务',
-      NotebookEdit: '笔记本编辑',
+      Task: '子任�?,
+      NotebookEdit: '笔记本编�?,
       AskUserQuestion: '询问用户',
     };
 
@@ -1366,10 +1734,10 @@ function getInlineReactApp(port: number): string {
       Grep: '🔎',
       WebFetch: '🌐',
       WebSearch: '🔍',
-      TodoWrite: '✅',
+      TodoWrite: '�?,
       Task: '🤖',
       NotebookEdit: '📓',
-      AskUserQuestion: '❓',
+      AskUserQuestion: '�?,
     };
 
     // WebSocket Hook with auto-reconnect and heartbeat
@@ -1392,7 +1760,7 @@ function getInlineReactApp(port: number): string {
           console.log('WebSocket connected');
           setConnected(true);
 
-          // 定期发送 ping 保持连接
+          // 定期发�?ping 保持连接
           pingIntervalRef.current = setInterval(() => {
             if (ws.readyState === WebSocket.OPEN) {
               ws.send(JSON.stringify({ type: 'ping' }));
@@ -1422,7 +1790,7 @@ function getInlineReactApp(port: number): string {
           console.log('WebSocket disconnected');
           setConnected(false);
 
-          // 清除 ping 定时器
+          // 清除 ping 定时�?
           if (pingIntervalRef.current) {
             clearInterval(pingIntervalRef.current);
             pingIntervalRef.current = null;
@@ -1491,7 +1859,7 @@ function getInlineReactApp(port: number): string {
       const [selectedIndex, setSelectedIndex] = useState(0);
       const paletteRef = useRef(null);
 
-      // 过滤匹配的命令
+      // 过滤匹配的命�?
       const query = input.slice(1).toLowerCase();
       const filteredCommands = SLASH_COMMANDS.filter(cmd =>
         cmd.name.slice(1).startsWith(query) ||
@@ -1550,7 +1918,8 @@ function getInlineReactApp(port: number): string {
 
     // 工具调用组件
     function ToolCall({ toolUse }) {
-      const [expanded, setExpanded] = useState(true);
+      // 默认折叠，用户点击可展开
+      const [expanded, setExpanded] = useState(false);
       const { name, input, status, result } = toolUse;
 
       const icon = TOOL_ICONS[name] || '🔧';
@@ -1564,11 +1933,11 @@ function getInlineReactApp(port: number): string {
           React.createElement('span', { className: 'tool-icon' }, icon),
           React.createElement('span', { className: 'tool-name' }, displayName),
           React.createElement('span', { className: \`tool-status \${status}\` },
-            status === 'running' ? '执行中...' :
+            status === 'running' ? '执行�?..' :
             status === 'completed' ? '完成' :
-            status === 'error' ? '错误' : '等待中'
+            status === 'error' ? '错误' : '等待�?
           ),
-          React.createElement('span', null, expanded ? '▼' : '▶')
+          React.createElement('span', null, expanded ? '�? : '�?)
         ),
         expanded && React.createElement('div', { className: 'tool-call-body' },
           React.createElement('div', { className: 'tool-input' },
@@ -1580,7 +1949,7 @@ function getInlineReactApp(port: number): string {
           result && React.createElement('div', { className: 'tool-output' },
             React.createElement('div', { className: 'tool-label' }, result.success ? '输出结果' : '错误信息'),
             React.createElement('pre', null,
-              React.createElement('code', null, result.output || result.error || '(无输出)')
+              React.createElement('code', null, result.output || result.error || '(无输�?')
             )
           )
         )
@@ -1603,7 +1972,7 @@ function getInlineReactApp(port: number): string {
           return React.createElement('div', { key: index, className: 'image-container' },
             React.createElement('img', {
               src: imgSrc,
-              alt: item.fileName || '上传的图片',
+              alt: item.fileName || '上传的图�?,
               className: 'message-image'
             }),
             item.fileName && React.createElement('div', {
@@ -1626,7 +1995,7 @@ function getInlineReactApp(port: number): string {
       return React.createElement('div', { className: \`message \${role}\` },
         React.createElement('div', { className: 'message-header' },
           React.createElement('span', { className: 'message-role' },
-            role === 'user' ? '你' : 'Claude'
+            role === 'user' ? '�? : 'Claude'
           ),
           message.model && React.createElement('span', null, \`(\${message.model})\`)
         ),
@@ -1642,12 +2011,12 @@ function getInlineReactApp(port: number): string {
         React.createElement('div', { className: 'welcome-icon' }, '🤖'),
         React.createElement('h2', { className: 'welcome-title' }, 'Claude Code WebUI'),
         React.createElement('p', { className: 'welcome-subtitle' },
-          '欢迎使用 Claude Code 的 Web 界面。在下方输入框中输入你的问题或指令，我会帮助你完成编程任务。'
+          '欢迎使用 Claude Code �?Web 界面。在下方输入框中输入你的问题或指令，我会帮助你完成编程任务�?
         )
       );
     }
 
-    // 用户问答对话框组件
+    // 用户问答对话框组�?
     function UserQuestionDialog({ question, onAnswer }) {
       const [answer, setAnswer] = useState('');
       const [selectedOptions, setSelectedOptions] = useState([]);
@@ -1689,7 +2058,7 @@ function getInlineReactApp(port: number): string {
       return React.createElement('div', { className: 'question-dialog-overlay' },
         React.createElement('div', { className: 'question-dialog' },
           React.createElement('div', { className: 'question-header' },
-            React.createElement('h3', null, '❓ ', question.header || '请回答问题')
+            React.createElement('h3', null, '�?', question.header || '请回答问�?)
           ),
           React.createElement('div', { className: 'question-content' },
             React.createElement('p', { className: 'question-text' }, question.question),
@@ -1720,7 +2089,7 @@ function getInlineReactApp(port: number): string {
             !question.options && React.createElement('textarea', {
               value: answer,
               onChange: (e) => setAnswer(e.target.value),
-              placeholder: '请输入您的回答...',
+              placeholder: '请输入您的回�?..',
               autoFocus: true
             })
           ),
@@ -1735,7 +2104,7 @@ function getInlineReactApp(port: number): string {
       );
     }
 
-    // 权限对话框组件
+    // 权限对话框组�?
     function PermissionDialog({ request, onRespond }) {
       const [remember, setRemember] = useState(false);
       const { requestId, tool, args, description, riskLevel } = request;
@@ -1760,8 +2129,8 @@ function getInlineReactApp(port: number): string {
           // 头部
           React.createElement('div', { className: 'permission-header' },
             React.createElement('span', { className: \`risk-badge risk-\${riskLevel}\` },
-              riskLevel === 'high' ? '高风险' :
-              riskLevel === 'medium' ? '中风险' : '低风险'
+              riskLevel === 'high' ? '高风�? :
+              riskLevel === 'medium' ? '中风�? : '低风�?
             ),
             React.createElement('h3', null, '权限请求')
           ),
@@ -1784,7 +2153,7 @@ function getInlineReactApp(port: number): string {
                 checked: remember,
                 onChange: (e) => setRemember(e.target.checked)
               }),
-              '记住此决定'
+              '记住此决�?
             ),
             React.createElement('button', { onClick: handleDeny }, '拒绝'),
             React.createElement('button', { onClick: handleApprove }, '允许')
@@ -1793,9 +2162,9 @@ function getInlineReactApp(port: number): string {
       );
     }
 
-    // 主应用组件
+    // 主应用组�?
 
-    // 格式化日期
+    // 格式化日�?
     function formatDate(timestamp) {
       const date = new Date(timestamp);
       const now = new Date();
@@ -1819,7 +2188,7 @@ function getInlineReactApp(port: number): string {
 
       const handleRenameStart = (session) => {
         setEditingId(session.id);
-        setNewTitle(session.name || '未命名会话');
+        setNewTitle(session.name || '未命名会话);
       };
 
       const handleRenameSubmit = (sessionId) => {
@@ -1863,11 +2232,11 @@ function getInlineReactApp(port: number): string {
                   onClick: (e) => e.stopPropagation(),
                   autoFocus: true
                 })
-              : React.createElement(React.Fragment, null,
-                  React.createElement('div', { className: 'session-title' },
+              : [
+                  React.createElement('div', { key: 'title', className: 'session-title' },
                     session.name || '未命名会话'
                   ),
-                  React.createElement('div', { className: 'session-meta' },
+                  React.createElement('div', { key: 'meta', className: 'session-meta' },
                     React.createElement('span', { className: 'session-date' },
                       formatDate(session.updatedAt)
                     ),
@@ -1875,7 +2244,7 @@ function getInlineReactApp(port: number): string {
                       \`\${session.messageCount} 消息\`
                     )
                   ),
-                  React.createElement('div', { className: 'session-actions' },
+                  React.createElement('div', { key: 'actions', className: 'session-actions' },
                     React.createElement('button', {
                       className: 'session-action-btn',
                       onClick: (e) => {
@@ -1895,7 +2264,7 @@ function getInlineReactApp(port: number): string {
                       title: '删除'
                     }, '🗑️')
                   )
-                )
+                ]
           )
         )
       );
@@ -1916,7 +2285,7 @@ function getInlineReactApp(port: number): string {
 
       const { connected, sessionId, model, send, addMessageHandler } = useWebSocket(\`ws://localhost:${port}/ws\`);
 
-      // 当前正在构建的消息
+      // 当前正在构建的消�?
       const currentMessageRef = useRef(null);
 
       useEffect(() => {
@@ -2032,7 +2401,7 @@ function getInlineReactApp(port: number): string {
               break;
 
             case 'permission_request':
-              // 收到权限请求,显示对话框
+              // 收到权限请求,显示对话�?
               setPermissionRequest(msg.payload);
               break;
 
@@ -2049,7 +2418,7 @@ function getInlineReactApp(port: number): string {
               break;
 
             case 'session_switched':
-              // 会话切换成功，重新加载消息
+              // 会话切换成功，重新加载消�?
               setMessages([]);
               send({ type: 'get_history' });
               // 刷新会话列表
@@ -2064,7 +2433,7 @@ function getInlineReactApp(port: number): string {
               break;
 
             case 'session_renamed':
-              // 会话重命名成功
+              // 会话重命名成�?
               if (msg.payload.success) {
                 setSessions(prev => prev.map(s =>
                   s.id === msg.payload.sessionId ? { ...s, name: msg.payload.name } : s
@@ -2078,7 +2447,7 @@ function getInlineReactApp(port: number): string {
         return unsubscribe;
       }, [addMessageHandler, model]);
 
-      // 自动滚动到底部
+      // 自动滚动到底�?
       useEffect(() => {
         if (chatContainerRef.current) {
           chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
@@ -2234,7 +2603,7 @@ function getInlineReactApp(port: number): string {
           }
         });
 
-        // 添加用户输入的文本
+        // 添加用户输入的文�?
         if (input.trim()) {
           contentItems.push({ type: 'text', text: input });
         }
@@ -2296,7 +2665,7 @@ function getInlineReactApp(port: number): string {
         const value = e.target.value;
         setInput(value);
 
-        // 检测是否显示命令面板
+        // 检测是否显示命令面�?
         if (value.startsWith('/') && !value.includes(' ')) {
           setShowCommandPalette(true);
         } else {
@@ -2308,7 +2677,7 @@ function getInlineReactApp(port: number): string {
       const handlePermissionResponse = (approved, remember) => {
         if (!permissionRequest) return;
 
-        // 发送权限响应到服务器
+        // 发送权限响应到服务�?
         send({
           type: 'permission_response',
           payload: {
@@ -2319,14 +2688,14 @@ function getInlineReactApp(port: number): string {
           }
         });
 
-        // 关闭权限对话框
+        // 关闭权限对话�?
         setPermissionRequest(null);
       };
 
       const handleKeyDown = (e) => {
         // 如果命令面板显示，让面板处理键盘事件
         if (showCommandPalette && ['ArrowDown', 'ArrowUp', 'Enter', 'Tab', 'Escape'].includes(e.key)) {
-          return; // 由 SlashCommandPalette 处理
+          return; // �?SlashCommandPalette 处理
         }
 
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -2336,20 +2705,20 @@ function getInlineReactApp(port: number): string {
       };
 
       return React.createElement(React.Fragment, null,
-        // 用户问答对话框
+        // 用户问答对话�?
         userQuestion && React.createElement(UserQuestionDialog, {
           question: userQuestion,
           onAnswer: handleAnswerQuestion
         }),
 
-        // 侧边栏
+        // 侧边�?
         React.createElement('div', { className: 'sidebar' },
           React.createElement('div', { className: 'sidebar-header' },
             React.createElement('h1', null, '🤖 Claude Code'),
             React.createElement('button', {
               className: 'new-chat-btn',
               onClick: handleNewSession
-            }, '+ 新对话')
+            }, '+ 新对�?)
           ),
           React.createElement(SessionList, {
             sessions: sessions,
@@ -2367,7 +2736,7 @@ function getInlineReactApp(port: number): string {
               React.createElement('span', {
                 className: \`status-dot \${status === 'idle' ? '' : 'thinking'}\`
               }),
-              connected ? '已连接' : '连接中...'
+              connected ? '已连�? : '连接�?..'
             ),
             sessionId && React.createElement('div', null, \`会话: \${sessionId.slice(0, 8)}...\`)
           )
@@ -2402,7 +2771,7 @@ function getInlineReactApp(port: number): string {
                 className: 'attachment-item'
               },
                 React.createElement('span', { className: 'file-icon' },
-                  att.type === 'image' ? '🖼️' : '📄'
+                  att.type === 'image' ? '🖼�? : '📄'
                 ),
                 React.createElement('span', { className: 'file-name' }, att.name),
                 React.createElement('button', {
@@ -2442,7 +2811,7 @@ function getInlineReactApp(port: number): string {
                   onChange: handleInputChange,
                   onKeyDown: handleKeyDown,
                   onPaste: handlePaste,
-                  placeholder: status === 'idle' ? '输入消息，可粘贴图片或点击 📎 上传文件 (输入 / 查看命令)...' : '处理中...',
+                  placeholder: status === 'idle' ? '输入消息，可粘贴图片或点�?📎 上传文件 (输入 / 查看命令)...' : '处理�?..',
                   disabled: status !== 'idle',
                   rows: 1
                 })
@@ -2458,16 +2827,264 @@ function getInlineReactApp(port: number): string {
                       React.createElement('span'),
                       React.createElement('span')
                     )
-                  : '发送'
+                  : '发�?
               )
             )
           )
         ),
-        // 权限对话框
+        // 权限对话�?
         permissionRequest && React.createElement(PermissionDialog, {
           request: permissionRequest,
           onRespond: handlePermissionResponse
+        }),
+        // 设置面板
+        showSettings && React.createElement(SettingsPanel, {
+          onClose: () => setShowSettings(false),
+          send: send,
+          addMessageHandler: addMessageHandler
         })
+      );
+    }
+
+    // 设置面板组件
+    function SettingsPanel({ onClose, send, addMessageHandler }) {
+      const [activeTab, setActiveTab] = useState('mcp');
+      const [mcpServers, setMcpServers] = useState([]);
+      const [mcpLoading, setMcpLoading] = useState(true);
+      const [showAddForm, setShowAddForm] = useState(false);
+      const [newServer, setNewServer] = useState({ name: '', command: '', args: '' });
+
+      // 系统提示词状�?
+      const [promptConfig, setPromptConfig] = useState({ useDefault: true, customPrompt: '', appendPrompt: '' });
+      const [promptMode, setPromptMode] = useState('default');
+      const [promptText, setPromptText] = useState('');
+      const [promptLoading, setPromptLoading] = useState(true);
+      const [promptSaved, setPromptSaved] = useState(false);
+
+      // 加载数据
+      useEffect(() => {
+        const unsubscribe = addMessageHandler((msg) => {
+          if (msg.type === 'mcp_list_response') {
+            setMcpServers(msg.payload.servers || []);
+            setMcpLoading(false);
+          } else if (msg.type === 'system_prompt_response') {
+            const config = msg.payload.config || { useDefault: true };
+            setPromptConfig(config);
+            setPromptLoading(false);
+
+            if (!config.useDefault && config.customPrompt) {
+              setPromptMode('custom');
+              setPromptText(config.customPrompt);
+            } else if (config.useDefault && config.appendPrompt) {
+              setPromptMode('append');
+              setPromptText(config.appendPrompt);
+            } else {
+              setPromptMode('default');
+              setPromptText('');
+            }
+          }
+        });
+
+        send({ type: 'mcp_list' });
+        send({ type: 'system_prompt_get' });
+
+        return unsubscribe;
+      }, [send, addMessageHandler]);
+
+      // 添加 MCP 服务�?
+      const handleAddServer = () => {
+        if (!newServer.name.trim() || !newServer.command.trim()) return;
+        const args = newServer.args.trim() ? newServer.args.split(' ') : [];
+        send({
+          type: 'mcp_add',
+          payload: {
+            server: {
+              name: newServer.name.trim(),
+              type: 'stdio',
+              command: newServer.command.trim(),
+              args,
+              enabled: true
+            }
+          }
+        });
+        setNewServer({ name: '', command: '', args: '' });
+        setShowAddForm(false);
+      };
+
+      const handleToggleServer = (name) => {
+        send({ type: 'mcp_toggle', payload: { name } });
+      };
+
+      const handleRemoveServer = (name) => {
+        if (confirm('确定要删除此 MCP 服务器吗�?)) {
+          send({ type: 'mcp_remove', payload: { name } });
+        }
+      };
+
+      const handleSavePrompt = () => {
+        let config = { useDefault: true, customPrompt: '', appendPrompt: '' };
+        if (promptMode === 'custom') {
+          config = { useDefault: false, customPrompt: promptText, appendPrompt: '' };
+        } else if (promptMode === 'append') {
+          config = { useDefault: true, customPrompt: '', appendPrompt: promptText };
+        }
+        send({ type: 'system_prompt_update', payload: { config } });
+        setPromptSaved(true);
+        setTimeout(() => setPromptSaved(false), 2000);
+      };
+
+      const handleResetPrompt = () => {
+        const config = { useDefault: true, customPrompt: '', appendPrompt: '' };
+        send({ type: 'system_prompt_update', payload: { config } });
+        setPromptMode('default');
+        setPromptText('');
+      };
+
+      return React.createElement('div', { className: 'settings-panel-overlay', onClick: onClose },
+        React.createElement('div', { className: 'settings-panel', onClick: (e) => e.stopPropagation() },
+          // 头部
+          React.createElement('div', { className: 'settings-header' },
+            React.createElement('h2', null, '⚙️ 设置'),
+            React.createElement('button', { className: 'settings-close-btn', onClick: onClose }, '×')
+          ),
+          // 主体
+          React.createElement('div', { className: 'settings-body' },
+            // 导航
+            React.createElement('div', { className: 'settings-nav' },
+              React.createElement('div', {
+                className: 'settings-nav-item ' + (activeTab === 'mcp' ? 'active' : ''),
+                onClick: () => setActiveTab('mcp')
+              }, React.createElement('span', { className: 'nav-icon' }, '🔌'), ' MCP 服务�?),
+              React.createElement('div', {
+                className: 'settings-nav-item ' + (activeTab === 'prompt' ? 'active' : ''),
+                onClick: () => setActiveTab('prompt')
+              }, React.createElement('span', { className: 'nav-icon' }, '📝'), ' 系统提示�?)
+            ),
+            // 内容�?
+            React.createElement('div', { className: 'settings-content' },
+              // MCP 管理
+              activeTab === 'mcp' && React.createElement('div', { className: 'settings-section' },
+                React.createElement('h3', null, '🔌 MCP 服务�?),
+                React.createElement('p', null, '管理 Model Context Protocol 服务器连�?),
+                mcpLoading
+                  ? React.createElement('div', { className: 'empty-state' }, '加载�?..')
+                  : mcpServers.length === 0
+                    ? React.createElement('div', { className: 'empty-state' },
+                        React.createElement('div', { className: 'empty-icon' }, '🔌'),
+                        React.createElement('p', null, '暂无 MCP 服务器配�?)
+                      )
+                    : React.createElement('div', { className: 'mcp-server-list' },
+                        mcpServers.map(server =>
+                          React.createElement('div', { key: server.name, className: 'mcp-server-item' },
+                            React.createElement('div', { className: 'mcp-server-info' },
+                              React.createElement('div', { className: 'mcp-server-name' }, server.name),
+                              React.createElement('div', { className: 'mcp-server-command' },
+                                server.command + (server.args?.length ? ' ' + server.args.join(' ') : '')
+                              )
+                            ),
+                            React.createElement('span', {
+                              className: 'mcp-server-status ' + (server.enabled ? 'enabled' : 'disabled')
+                            }, server.enabled ? '已启�? : '已禁�?),
+                            React.createElement('div', { className: 'mcp-server-actions' },
+                              React.createElement('button', {
+                                onClick: () => handleToggleServer(server.name)
+                              }, server.enabled ? '禁用' : '启用'),
+                              React.createElement('button', {
+                                className: 'danger',
+                                onClick: () => handleRemoveServer(server.name)
+                              }, '删除')
+                            )
+                          )
+                        )
+                      ),
+                showAddForm
+                  ? React.createElement('div', { className: 'mcp-add-form' },
+                      React.createElement('div', { className: 'form-row' },
+                        React.createElement('div', { className: 'form-group' },
+                          React.createElement('label', null, '服务器名�?),
+                          React.createElement('input', {
+                            type: 'text',
+                            placeholder: '例如: my-server',
+                            value: newServer.name,
+                            onChange: (e) => setNewServer({ ...newServer, name: e.target.value })
+                          })
+                        )
+                      ),
+                      React.createElement('div', { className: 'form-row' },
+                        React.createElement('div', { className: 'form-group' },
+                          React.createElement('label', null, '命令'),
+                          React.createElement('input', {
+                            type: 'text',
+                            placeholder: '例如: node',
+                            value: newServer.command,
+                            onChange: (e) => setNewServer({ ...newServer, command: e.target.value })
+                          })
+                        ),
+                        React.createElement('div', { className: 'form-group' },
+                          React.createElement('label', null, '参数 (空格分隔)'),
+                          React.createElement('input', {
+                            type: 'text',
+                            placeholder: '例如: /path/to/server.js',
+                            value: newServer.args,
+                            onChange: (e) => setNewServer({ ...newServer, args: e.target.value })
+                          })
+                        )
+                      ),
+                      React.createElement('div', { className: 'form-actions' },
+                        React.createElement('button', { className: 'cancel', onClick: () => setShowAddForm(false) }, '取消'),
+                        React.createElement('button', {
+                          className: 'submit',
+                          onClick: handleAddServer,
+                          disabled: !newServer.name.trim() || !newServer.command.trim()
+                        }, '添加')
+                      )
+                    )
+                  : React.createElement('button', {
+                      className: 'add-mcp-btn',
+                      onClick: () => setShowAddForm(true)
+                    }, '+ 添加 MCP 服务�?)
+              ),
+              // 系统提示词管�?
+              activeTab === 'prompt' && React.createElement('div', { className: 'settings-section' },
+                React.createElement('h3', null, '📝 系统提示�?),
+                React.createElement('p', null, '自定�?Claude 的行为和响应风格'),
+                promptLoading
+                  ? React.createElement('div', { className: 'empty-state' }, '加载�?..')
+                  : React.createElement('div', { className: 'prompt-editor' },
+                      React.createElement('div', { className: 'prompt-mode-selector' },
+                        React.createElement('button', {
+                          className: 'prompt-mode-btn ' + (promptMode === 'default' ? 'active' : ''),
+                          onClick: () => { setPromptMode('default'); setPromptText(''); }
+                        }, '使用默认'),
+                        React.createElement('button', {
+                          className: 'prompt-mode-btn ' + (promptMode === 'append' ? 'active' : ''),
+                          onClick: () => setPromptMode('append')
+                        }, '追加内容'),
+                        React.createElement('button', {
+                          className: 'prompt-mode-btn ' + (promptMode === 'custom' ? 'active' : ''),
+                          onClick: () => setPromptMode('custom')
+                        }, '完全自定�?)
+                      ),
+                      promptMode !== 'default' && React.createElement('textarea', {
+                        className: 'prompt-textarea',
+                        placeholder: promptMode === 'append' ? '输入要追加到默认提示词后的内�?..' : '输入完全自定义的系统提示�?..',
+                        value: promptText,
+                        onChange: (e) => setPromptText(e.target.value)
+                      }),
+                      promptMode === 'default' && React.createElement('div', {
+                        style: { padding: '16px', background: 'var(--bg-primary)', borderRadius: '8px', color: 'var(--text-muted)' }
+                      }, '当前使用默认系统提示�?),
+                      React.createElement('div', { className: 'prompt-actions' },
+                        React.createElement('button', { className: 'reset', onClick: handleResetPrompt }, '重置'),
+                        React.createElement('button', { className: 'save', onClick: handleSavePrompt },
+                          promptSaved ? '�?已保�? : '保存'
+                        )
+                      )
+                    )
+              )
+            )
+          )
+        )
       );
     }
 
@@ -2477,7 +3094,7 @@ function getInlineReactApp(port: number): string {
   `;
 }
 
-// 如果直接运行此文件，启动服务器
+// 如果直接运行此文件，启动服务�?
 const isMainModule = process.argv[1]?.includes('server') ||
                      process.argv[1]?.endsWith('web.js') ||
                      process.argv[1]?.endsWith('web.ts');

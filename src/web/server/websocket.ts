@@ -467,6 +467,7 @@ async function handleChatMessage(
             output,
             error,
             data: data as any, // 工具特定的结构化数据
+            defaultCollapsed: true, // 结果默认折叠
           },
         });
       },

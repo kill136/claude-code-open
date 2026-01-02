@@ -187,6 +187,8 @@ export interface ToolResultPayload {
   error?: string;
   /** 工具特定的结构化数据 */
   data?: ToolResultData;
+  /** 结果是否应该默认折叠 */
+  defaultCollapsed?: boolean;
 }
 
 export interface MessageCompletePayload {
