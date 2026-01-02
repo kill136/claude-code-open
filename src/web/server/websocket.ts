@@ -7,6 +7,9 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { randomUUID } from 'crypto';
 import { ConversationManager } from './conversation.js';
 import { isSlashCommand, executeSlashCommand } from './slash-commands.js';
+import { apiManager } from './api-manager.js';
+import { authManager } from './auth-manager.js';
+import { CheckpointManager } from './checkpoint-manager.js';
 import type { ClientMessage, ServerMessage, Attachment } from '../shared/types.js';
 
 interface ClientConnection {
@@ -16,6 +19,9 @@ interface ClientConnection {
   model: string;
   isAlive: boolean;
 }
+
+// 全局检查点管理器实例
+const checkpointManager = new CheckpointManager();
 
 export function setupWebSocket(
   wss: WebSocketServer,
@@ -239,6 +245,106 @@ async function handleClientMessage(
 
     case 'system_prompt_get':
       await handleSystemPromptGet(client, conversationManager);
+      break;
+
+    case 'mcp_list':
+      await handleMcpList(client, conversationManager);
+      break;
+
+    case 'mcp_add':
+      await handleMcpAdd(client, message.payload, conversationManager);
+      break;
+
+    case 'mcp_remove':
+      await handleMcpRemove(client, message.payload, conversationManager);
+      break;
+
+    case 'mcp_toggle':
+      await handleMcpToggle(client, message.payload, conversationManager);
+      break;
+
+    case 'api_status':
+      await handleApiStatus(client);
+      break;
+
+    case 'api_test':
+      await handleApiTest(client);
+      break;
+
+    case 'api_models':
+      await handleApiModels(client);
+      break;
+
+    case 'api_provider':
+      await handleApiProvider(client);
+      break;
+
+    case 'api_token_status':
+      await handleApiTokenStatus(client);
+      break;
+
+    case 'checkpoint_create':
+      await handleCheckpointCreate(client, message.payload, conversationManager);
+      break;
+
+    case 'checkpoint_list':
+      await handleCheckpointList(client, message.payload, conversationManager);
+      break;
+
+    case 'checkpoint_restore':
+      await handleCheckpointRestore(client, message.payload.checkpointId, message.payload.dryRun, conversationManager);
+      break;
+
+    case 'checkpoint_delete':
+      await handleCheckpointDelete(client, message.payload.checkpointId, conversationManager);
+      break;
+
+    case 'checkpoint_diff':
+      await handleCheckpointDiff(client, message.payload.checkpointId, conversationManager);
+      break;
+
+    case 'checkpoint_clear':
+      await handleCheckpointClear(client, conversationManager);
+      break;
+
+    case 'doctor_run':
+      await handleDoctorRun(client, message.payload);
+      break;
+
+    case 'plugin_list':
+      await handlePluginList(client, conversationManager);
+      break;
+
+    case 'plugin_info':
+      await handlePluginInfo(client, message.payload.name, conversationManager);
+      break;
+
+    case 'plugin_enable':
+      await handlePluginEnable(client, message.payload.name, conversationManager);
+      break;
+
+    case 'plugin_disable':
+      await handlePluginDisable(client, message.payload.name, conversationManager);
+      break;
+
+    case 'plugin_uninstall':
+      await handlePluginUninstall(client, message.payload.name, conversationManager);
+      break;
+
+    case 'auth_status':
+      await handleAuthStatus(client);
+      break;
+
+    case 'auth_set_key':
+      await handleAuthSetKey(client, message.payload);
+      break;
+
+    case 'auth_clear':
+      await handleAuthClear(client);
+      break;
+
+    case 'auth_validate':
+      await handleAuthValidate(client, message.payload);
       break;
 
     default:
@@ -1077,6 +1183,1078 @@ async function handleTaskOutput(
       type: 'error',
       payload: {
         message: error instanceof Error ? error.message : '获取任务输出失败',
+      },
+    });
+  }
+}
+
+/**
+ * 处理获取API状态请求
+ */
+async function handleApiStatus(
+  client: ClientConnection
+): Promise<void> {
+  const { ws } = client;
+
+  try {
+    const status = await apiManager.getStatus();
+
+    sendMessage(ws, {
+      type: 'api_status_response',
+      payload: status,
+    });
+  } catch (error) {
+    console.error('[WebSocket] 获取API状态失败:', error);
+    sendMessage(ws, {
+      type: 'error',
+      payload: {
+        message: error instanceof Error ? error.message : '获取API状态失败',
+      },
+    });
+  }
+}
+
+/**
+ * 处理API连接测试请求
+ */
+async function handleApiTest(
+  client: ClientConnection
+): Promise<void> {
+  const { ws } = client;
+
+  try {
+    const result = await apiManager.testConnection();
+
+    sendMessage(ws, {
+      type: 'api_test_response',
+      payload: result,
+    });
+  } catch (error) {
+    console.error('[WebSocket] API测试失败:', error);
+    sendMessage(ws, {
+      type: 'error',
+      payload: {
+        message: error instanceof Error ? error.message : 'API测试失败',
+      },
+    });
+  }
+}
+
+/**
+ * 处理获取模型列表请求
+ */
+async function handleApiModels(
+  client: ClientConnection
+): Promise<void> {
+  const { ws } = client;
+
+  try {
+    const models = await apiManager.getAvailableModels();
+
+    sendMessage(ws, {
+      type: 'api_models_response',
+      payload: { models },
+    });
+  } catch (error) {
+    console.error('[WebSocket] 获取模型列表失败:', error);
+    sendMessage(ws, {
+      type: 'error',
+      payload: {
+        message: error instanceof Error ? error.message : '获取模型列表失败',
+      },
+    });
+  }
+}
+
+/**
+ * 处理获取Provider信息请求
+ */
+async function handleApiProvider(
+  client: ClientConnection
+): Promise<void> {
+  const { ws } = client;
+
+  try {
+    const info = apiManager.getProviderInfo();
+
+    sendMessage(ws, {
+      type: 'api_provider_response',
+      payload: info,
+    });
+  } catch (error) {
+    console.error('[WebSocket] 获取Provider信息失败:', error);
+    sendMessage(ws, {
+      type: 'error',
+      payload: {
+        message: error instanceof Error ? error.message : '获取Provider信息失败',
+      },
+    });
+  }
+}
+
+/**
+ * 处理获取Token状态请求
+ */
+async function handleApiTokenStatus(
+  client: ClientConnection
+): Promise<void> {
+  const { ws } = client;
+
+  try {
+    const status = apiManager.getTokenStatus();
+
+    sendMessage(ws, {
+      type: 'api_token_status_response',
+      payload: status,
+    });
+  } catch (error) {
+    console.error('[WebSocket] 获取Token状态失败:', error);
+    sendMessage(ws, {
+      type: 'error',
+      payload: {
+        message: error instanceof Error ? error.message : '获取Token状态失败',
+      },
+    });
+  }
+}
+
+/**
+ * 处理 MCP 服务器列表请求
+ */
+async function handleMcpList(
+  client: ClientConnection,
+  conversationManager: ConversationManager
+): Promise<void> {
+  const { ws } = client;
+
+  try {
+    const servers = conversationManager.listMcpServers();
+
+    sendMessage(ws, {
+      type: 'mcp_list_response',
+      payload: {
+        servers,
+        total: servers.length,
+      },
+    });
+  } catch (error) {
+    console.error('[WebSocket] 获取 MCP 服务器列表失败:', error);
+    sendMessage(ws, {
+      type: 'error',
+      payload: {
+        message: error instanceof Error ? error.message : '获取 MCP 服务器列表失败',
+      },
+    });
+  }
+}
+
+/**
+ * 处理 MCP 服务器添加请求
+ */
+async function handleMcpAdd(
+  client: ClientConnection,
+  payload: any,
+  conversationManager: ConversationManager
+): Promise<void> {
+  const { ws } = client;
+
+  try {
+    const { server } = payload;
+
+    if (!server || !server.name) {
+      sendMessage(ws, {
+        type: 'error',
+        payload: {
+          message: '无效的 MCP 服务器配置：缺少名称',
+        },
+      });
+      return;
+    }
+
+    const success = await conversationManager.addMcpServer(server.name, server);
+
+    if (success) {
+      sendMessage(ws, {
+        type: 'mcp_server_added',
+        payload: {
+          success: true,
+          name: server.name,
+          server,
+        },
+      });
+
+      // 同时发送更新后的列表
+      const servers = conversationManager.listMcpServers();
+      sendMessage(ws, {
+        type: 'mcp_list_response',
+        payload: {
+          servers,
+          total: servers.length,
+        },
+      });
+    } else {
+      sendMessage(ws, {
+        type: 'mcp_server_added',
+        payload: {
+          success: false,
+          name: server.name,
+        },
+      });
+    }
+  } catch (error) {
+    console.error('[WebSocket] 添加 MCP 服务器失败:', error);
+    sendMessage(ws, {
+      type: 'error',
+      payload: {
+        message: error instanceof Error ? error.message : '添加 MCP 服务器失败',
+      },
+    });
+  }
+}
+
+/**
+ * 处理 MCP 服务器删除请求
+ */
+async function handleMcpRemove(
+  client: ClientConnection,
+  payload: any,
+  conversationManager: ConversationManager
+): Promise<void> {
+  const { ws } = client;
+
+  try {
+    const { name } = payload;
+
+    if (!name) {
+      sendMessage(ws, {
+        type: 'error',
+        payload: {
+          message: '缺少服务器名称',
+        },
+      });
+      return;
+    }
+
+    const success = await conversationManager.removeMcpServer(name);
+
+    sendMessage(ws, {
+      type: 'mcp_server_removed',
+      payload: {
+        success,
+        name,
+      },
+    });
+
+    if (success) {
+      // 同时发送更新后的列表
+      const servers = conversationManager.listMcpServers();
+      sendMessage(ws, {
+        type: 'mcp_list_response',
+        payload: {
+          servers,
+          total: servers.length,
+        },
+      });
+    }
+  } catch (error) {
+    console.error('[WebSocket] 删除 MCP 服务器失败:', error);
+    sendMessage(ws, {
+      type: 'error',
+      payload: {
+        message: error instanceof Error ? error.message : '删除 MCP 服务器失败',
+      },
+    });
+  }
+}
+
+/**
+ * 处理 MCP 服务器切换请求
+ */
+async function handleMcpToggle(
+  client: ClientConnection,
+  payload: any,
+  conversationManager: ConversationManager
+): Promise<void> {
+  const { ws } = client;
+
+  try {
+    const { name, enabled } = payload;
+
+    if (!name) {
+      sendMessage(ws, {
+        type: 'error',
+        payload: {
+          message: '缺少服务器名称',
+        },
+      });
+      return;
+    }
+
+    const result = await conversationManager.toggleMcpServer(name, enabled);
+
+    sendMessage(ws, {
+      type: 'mcp_server_toggled',
+      payload: {
+        success: result.success,
+        name,
+        enabled: result.enabled,
+      },
+    });
+
+    if (result.success) {
+      // 同时发送更新后的列表
+      const servers = conversationManager.listMcpServers();
+      sendMessage(ws, {
+        type: 'mcp_list_response',
+        payload: {
+          servers,
+          total: servers.length,
+        },
+      });
+    }
+  } catch (error) {
+    console.error('[WebSocket] 切换 MCP 服务器失败:', error);
+    sendMessage(ws, {
+      type: 'error',
+      payload: {
+        message: error instanceof Error ? error.message : '切换 MCP 服务器失败',
+      },
+    });
+  }
+}
+
+/**
+ * 处理系统诊断请求
+ */
+async function handleDoctorRun(
+  client: ClientConnection,
+  payload?: { verbose?: boolean; includeSystemInfo?: boolean }
+): Promise<void> {
+  const { ws } = client;
+
+  try {
+    const { runDiagnostics, formatDoctorReport } = await import('./doctor.js');
+
+    const options = {
+      verbose: payload?.verbose || false,
+      includeSystemInfo: payload?.includeSystemInfo ?? true,
+    };
+
+    const report = await runDiagnostics(options);
+    const formattedText = formatDoctorReport(report, options.verbose);
+
+    sendMessage(ws, {
+      type: 'doctor_result',
+      payload: {
+        report: {
+          ...report,
+          timestamp: report.timestamp.getTime(),
+        },
+        formattedText,
+      },
+    });
+  } catch (error) {
+    console.error('[WebSocket] 运行诊断失败:', error);
+    sendMessage(ws, {
+      type: 'error',
+      payload: {
+        message: error instanceof Error ? error.message : '运行诊断失败',
+      },
+    });
+  }
+}
+
+// ============ 检查点相关处理函数 ============
+
+/**
+ * 处理创建检查点请求
+ */
+async function handleCheckpointCreate(
+  client: ClientConnection,
+  payload: any,
+  conversationManager: ConversationManager
+): Promise<void> {
+  const { ws } = client;
+
+  try {
+    const { description, filePaths, workingDirectory, tags } = payload;
+
+    if (!description || !filePaths || filePaths.length === 0) {
+      sendMessage(ws, {
+        type: 'error',
+        payload: {
+          message: '创建检查点需要提供描述和文件列表',
+        },
+      });
+      return;
+    }
+
+    const checkpoint = await checkpointManager.createCheckpoint(
+      description,
+      filePaths,
+      workingDirectory,
+      { tags }
+    );
+
+    console.log(`[WebSocket] 创建检查点: ${checkpoint.id} (${checkpoint.files.length} 个文件)`);
+
+    sendMessage(ws, {
+      type: 'checkpoint_created',
+      payload: {
+        checkpointId: checkpoint.id,
+        timestamp: checkpoint.timestamp.getTime(),
+        description: checkpoint.description,
+        fileCount: checkpoint.files.length,
+        totalSize: checkpoint.files.reduce((sum, f) => sum + f.size, 0),
+      },
+    });
+  } catch (error) {
+    console.error('[WebSocket] 创建检查点失败:', error);
+    sendMessage(ws, {
+      type: 'error',
+      payload: {
+        message: error instanceof Error ? error.message : '创建检查点失败',
+      },
+    });
+  }
+}
+
+/**
+ * 处理检查点列表请求
+ */
+async function handleCheckpointList(
+  client: ClientConnection,
+  payload: any,
+  conversationManager: ConversationManager
+): Promise<void> {
+  const { ws } = client;
+
+  try {
+    const limit = payload?.limit;
+    const sortBy = payload?.sortBy || 'timestamp';
+    const sortOrder = payload?.sortOrder || 'desc';
+
+    const checkpoints = checkpointManager.listCheckpoints({
+      limit,
+      sortBy,
+      sortOrder,
+    });
+
+    const stats = checkpointManager.getStats();
+
+    const checkpointSummaries = checkpoints.map(cp => ({
+      id: cp.id,
+      timestamp: cp.timestamp.getTime(),
+      description: cp.description,
+      fileCount: cp.files.length,
+      totalSize: cp.files.reduce((sum, f) => sum + f.size, 0),
+      workingDirectory: cp.workingDirectory,
+      tags: cp.metadata?.tags,
+    }));
+
+    sendMessage(ws, {
+      type: 'checkpoint_list_response',
+      payload: {
+        checkpoints: checkpointSummaries,
+        total: checkpointSummaries.length,
+        stats: {
+          totalFiles: stats.totalFiles,
+          totalSize: stats.totalSize,
+          oldest: stats.oldest?.getTime(),
+          newest: stats.newest?.getTime(),
+        },
+      },
+    });
+  } catch (error) {
+    console.error('[WebSocket] 获取检查点列表失败:', error);
+    sendMessage(ws, {
+      type: 'error',
+      payload: {
+        message: error instanceof Error ? error.message : '获取检查点列表失败',
+      },
+    });
+  }
+}
+
+/**
+ * 处理恢复检查点请求
+ */
+async function handleCheckpointRestore(
+  client: ClientConnection,
+  checkpointId: string,
+  dryRun: boolean | undefined,
+  conversationManager: ConversationManager
+): Promise<void> {
+  const { ws } = client;
+
+  try {
+    if (!checkpointId) {
+      sendMessage(ws, {
+        type: 'error',
+        payload: {
+          message: '缺少检查点 ID',
+        },
+      });
+      return;
+    }
+
+    const result = await checkpointManager.restoreCheckpoint(checkpointId, {
+      dryRun: dryRun || false,
+      skipBackup: false,
+    });
+
+    console.log(
+      `[WebSocket] ${dryRun ? '模拟' : ''}恢复检查点: ${checkpointId} ` +
+      `(成功: ${result.restored.length}, 失败: ${result.failed.length})`
+    );
+
+    sendMessage(ws, {
+      type: 'checkpoint_restored',
+      payload: {
+        checkpointId,
+        success: result.success,
+        restored: result.restored,
+        failed: result.failed,
+        errors: result.errors,
+      },
+    });
+  } catch (error) {
+    console.error('[WebSocket] 恢复检查点失败:', error);
+    sendMessage(ws, {
+      type: 'error',
+      payload: {
+        message: error instanceof Error ? error.message : '恢复检查点失败',
+      },
+    });
+  }
+}
+
+/**
+ * 处理删除检查点请求
+ */
+async function handleCheckpointDelete(
+  client: ClientConnection,
+  checkpointId: string,
+  conversationManager: ConversationManager
+): Promise<void> {
+  const { ws } = client;
+
+  try {
+    if (!checkpointId) {
+      sendMessage(ws, {
+        type: 'error',
+        payload: {
+          message: '缺少检查点 ID',
+        },
+      });
+      return;
+    }
+
+    const success = checkpointManager.deleteCheckpoint(checkpointId);
+
+    console.log(`[WebSocket] 删除检查点: ${checkpointId} (${success ? '成功' : '失败'})`);
+
+    sendMessage(ws, {
+      type: 'checkpoint_deleted',
+      payload: {
+        checkpointId,
+        success,
+      },
+    });
+  } catch (error) {
+    console.error('[WebSocket] 删除检查点失败:', error);
+    sendMessage(ws, {
+      type: 'error',
+      payload: {
+        message: error instanceof Error ? error.message : '删除检查点失败',
+      },
+    });
+  }
+}
+
+/**
+ * 处理检查点差异请求
+ */
+async function handleCheckpointDiff(
+  client: ClientConnection,
+  checkpointId: string,
+  conversationManager: ConversationManager
+): Promise<void> {
+  const { ws } = client;
+
+  try {
+    if (!checkpointId) {
+      sendMessage(ws, {
+        type: 'error',
+        payload: {
+          message: '缺少检查点 ID',
+        },
+      });
+      return;
+    }
+
+    const diffs = await checkpointManager.diffCheckpoint(checkpointId);
+
+    const stats = {
+      added: diffs.filter(d => d.type === 'added').length,
+      removed: diffs.filter(d => d.type === 'removed').length,
+      modified: diffs.filter(d => d.type === 'modified').length,
+      unchanged: diffs.filter(d => d.type === 'unchanged').length,
+    };
+
+    console.log(
+      `[WebSocket] 比较检查点: ${checkpointId} ` +
+      `(添加: ${stats.added}, 删除: ${stats.removed}, 修改: ${stats.modified}, 未变: ${stats.unchanged})`
+    );
+
+    sendMessage(ws, {
+      type: 'checkpoint_diff_response',
+      payload: {
+        checkpointId,
+        diffs,
+        stats,
+      },
+    });
+  } catch (error) {
+    console.error('[WebSocket] 比较检查点失败:', error);
+    sendMessage(ws, {
+      type: 'error',
+      payload: {
+        message: error instanceof Error ? error.message : '比较检查点失败',
+      },
+    });
+  }
+}
+
+/**
+ * 处理清除所有检查点请求
+ */
+async function handleCheckpointClear(
+  client: ClientConnection,
+  conversationManager: ConversationManager
+): Promise<void> {
+  const { ws } = client;
+
+  try {
+    const count = checkpointManager.clearCheckpoints();
+
+    console.log(`[WebSocket] 清除所有检查点: ${count} 个`);
+
+    sendMessage(ws, {
+      type: 'checkpoint_cleared',
+      payload: {
+        count,
+      },
+    });
+  } catch (error) {
+    console.error('[WebSocket] 清除检查点失败:', error);
+    sendMessage(ws, {
+      type: 'error',
+      payload: {
+        message: error instanceof Error ? error.message : '清除检查点失败',
+      },
+    });
+  }
+}
+
+// ============ 插件相关处理函数 ============
+
+/**
+ * 处理插件列表请求
+ */
+async function handlePluginList(
+  client: ClientConnection,
+  conversationManager: ConversationManager
+): Promise<void> {
+  const { ws } = client;
+
+  try {
+    const plugins = await conversationManager.listPlugins();
+
+    sendMessage(ws, {
+      type: 'plugin_list_response',
+      payload: {
+        plugins,
+        total: plugins.length,
+      },
+    });
+  } catch (error) {
+    console.error('[WebSocket] 获取插件列表失败:', error);
+    sendMessage(ws, {
+      type: 'error',
+      payload: {
+        message: error instanceof Error ? error.message : '获取插件列表失败',
+      },
+    });
+  }
+}
+
+/**
+ * 处理插件详情请求
+ */
+async function handlePluginInfo(
+  client: ClientConnection,
+  name: string,
+  conversationManager: ConversationManager
+): Promise<void> {
+  const { ws } = client;
+
+  try {
+    if (!name) {
+      sendMessage(ws, {
+        type: 'error',
+        payload: {
+          message: '缺少插件名称',
+        },
+      });
+      return;
+    }
+
+    const plugin = await conversationManager.getPluginInfo(name);
+
+    sendMessage(ws, {
+      type: 'plugin_info_response',
+      payload: {
+        plugin,
+      },
+    });
+  } catch (error) {
+    console.error('[WebSocket] 获取插件详情失败:', error);
+    sendMessage(ws, {
+      type: 'error',
+      payload: {
+        message: error instanceof Error ? error.message : '获取插件详情失败',
+      },
+    });
+  }
+}
+
+/**
+ * 处理启用插件请求
+ */
+async function handlePluginEnable(
+  client: ClientConnection,
+  name: string,
+  conversationManager: ConversationManager
+): Promise<void> {
+  const { ws } = client;
+
+  try {
+    if (!name) {
+      sendMessage(ws, {
+        type: 'error',
+        payload: {
+          message: '缺少插件名称',
+        },
+      });
+      return;
+    }
+
+    const success = await conversationManager.enablePlugin(name);
+
+    sendMessage(ws, {
+      type: 'plugin_enabled',
+      payload: {
+        name,
+        success,
+      },
+    });
+
+    // 发送更新后的插件列表
+    if (success) {
+      const plugins = await conversationManager.listPlugins();
+      sendMessage(ws, {
+        type: 'plugin_list_response',
+        payload: {
+          plugins,
+          total: plugins.length,
+        },
+      });
+    }
+  } catch (error) {
+    console.error('[WebSocket] 启用插件失败:', error);
+    sendMessage(ws, {
+      type: 'error',
+      payload: {
+        message: error instanceof Error ? error.message : '启用插件失败',
+      },
+    });
+  }
+}
+
+/**
+ * 处理禁用插件请求
+ */
+async function handlePluginDisable(
+  client: ClientConnection,
+  name: string,
+  conversationManager: ConversationManager
+): Promise<void> {
+  const { ws } = client;
+
+  try {
+    if (!name) {
+      sendMessage(ws, {
+        type: 'error',
+        payload: {
+          message: '缺少插件名称',
+        },
+      });
+      return;
+    }
+
+    const success = await conversationManager.disablePlugin(name);
+
+    sendMessage(ws, {
+      type: 'plugin_disabled',
+      payload: {
+        name,
+        success,
+      },
+    });
+
+    // 发送更新后的插件列表
+    if (success) {
+      const plugins = await conversationManager.listPlugins();
+      sendMessage(ws, {
+        type: 'plugin_list_response',
+        payload: {
+          plugins,
+          total: plugins.length,
+        },
+      });
+    }
+  } catch (error) {
+    console.error('[WebSocket] 禁用插件失败:', error);
+    sendMessage(ws, {
+      type: 'error',
+      payload: {
+        message: error instanceof Error ? error.message : '禁用插件失败',
+      },
+    });
+  }
+}
+
+/**
+ * 处理卸载插件请求
+ */
+async function handlePluginUninstall(
+  client: ClientConnection,
+  name: string,
+  conversationManager: ConversationManager
+): Promise<void> {
+  const { ws } = client;
+
+  try {
+    if (!name) {
+      sendMessage(ws, {
+        type: 'error',
+        payload: {
+          message: '缺少插件名称',
+        },
+      });
+      return;
+    }
+
+    const success = await conversationManager.uninstallPlugin(name);
+
+    sendMessage(ws, {
+      type: 'plugin_uninstalled',
+      payload: {
+        name,
+        success,
+      },
+    });
+
+    // 发送更新后的插件列表
+    if (success) {
+      const plugins = await conversationManager.listPlugins();
+      sendMessage(ws, {
+        type: 'plugin_list_response',
+        payload: {
+          plugins,
+          total: plugins.length,
+        },
+      });
+    }
+  } catch (error) {
+    console.error('[WebSocket] 卸载插件失败:', error);
+    sendMessage(ws, {
+      type: 'error',
+      payload: {
+        message: error instanceof Error ? error.message : '卸载插件失败',
+      },
+    });
+  }
+}
+
+// ============ 认证相关处理函数 ============
+
+/**
+ * 处理获取认证状态请求
+ */
+async function handleAuthStatus(
+  client: ClientConnection
+): Promise<void> {
+  const { ws } = client;
+
+  try {
+    const status = authManager.getAuthStatus();
+
+    sendMessage(ws, {
+      type: 'auth_status_response',
+      payload: {
+        status,
+      },
+    });
+  } catch (error) {
+    console.error('[WebSocket] 获取认证状态失败:', error);
+    sendMessage(ws, {
+      type: 'error',
+      payload: {
+        message: error instanceof Error ? error.message : '获取认证状态失败',
+      },
+    });
+  }
+}
+
+/**
+ * 处理设置API密钥请求
+ */
+async function handleAuthSetKey(
+  client: ClientConnection,
+  payload: any
+): Promise<void> {
+  const { ws } = client;
+
+  try {
+    const { apiKey } = payload;
+
+    if (!apiKey || typeof apiKey !== 'string') {
+      sendMessage(ws, {
+        type: 'auth_key_set',
+        payload: {
+          success: false,
+          message: '无效的 API 密钥',
+        },
+      });
+      return;
+    }
+
+    const success = authManager.setApiKey(apiKey);
+
+    if (success) {
+      sendMessage(ws, {
+        type: 'auth_key_set',
+        payload: {
+          success: true,
+          message: 'API 密钥已设置',
+        },
+      });
+
+      // 同时发送更新后的状态
+      const status = authManager.getAuthStatus();
+      sendMessage(ws, {
+        type: 'auth_status_response',
+        payload: {
+          status,
+        },
+      });
+    } else {
+      sendMessage(ws, {
+        type: 'auth_key_set',
+        payload: {
+          success: false,
+          message: '设置 API 密钥失败',
+        },
+      });
+    }
+  } catch (error) {
+    console.error('[WebSocket] 设置 API 密钥失败:', error);
+    sendMessage(ws, {
+      type: 'error',
+      payload: {
+        message: error instanceof Error ? error.message : '设置 API 密钥失败',
+      },
+    });
+  }
+}
+
+/**
+ * 处理清除认证请求
+ */
+async function handleAuthClear(
+  client: ClientConnection
+): Promise<void> {
+  const { ws } = client;
+
+  try {
+    authManager.clearAuth();
+
+    sendMessage(ws, {
+      type: 'auth_cleared',
+      payload: {
+        success: true,
+      },
+    });
+
+    // 同时发送更新后的状态
+    const status = authManager.getAuthStatus();
+    sendMessage(ws, {
+      type: 'auth_status_response',
+      payload: {
+        status,
+      },
+    });
+  } catch (error) {
+    console.error('[WebSocket] 清除认证失败:', error);
+    sendMessage(ws, {
+      type: 'error',
+      payload: {
+        message: error instanceof Error ? error.message : '清除认证失败',
+      },
+    });
+  }
+}
+
+/**
+ * 处理验证API密钥请求
+ */
+async function handleAuthValidate(
+  client: ClientConnection,
+  payload: any
+): Promise<void> {
+  const { ws } = client;
+
+  try {
+    const { apiKey } = payload;
+
+    if (!apiKey || typeof apiKey !== 'string') {
+      sendMessage(ws, {
+        type: 'auth_validated',
+        payload: {
+          valid: false,
+          message: '无效的 API 密钥格式',
+        },
+      });
+      return;
+    }
+
+    const valid = await authManager.validateApiKey(apiKey);
+
+    sendMessage(ws, {
+      type: 'auth_validated',
+      payload: {
+        valid,
+        message: valid ? 'API 密钥有效' : 'API 密钥无效',
+      },
+    });
+  } catch (error) {
+    console.error('[WebSocket] 验证 API 密钥失败:', error);
+    sendMessage(ws, {
+      type: 'error',
+      payload: {
+        message: error instanceof Error ? error.message : '验证 API 密钥失败',
       },
     });
   }

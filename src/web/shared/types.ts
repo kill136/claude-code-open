@@ -23,6 +23,40 @@ export interface Attachment {
   data: string; // base64 for images, text content for text files
 }
 
+// ============ 认证相关类型 ============
+
+/**
+ * 认证状态
+ */
+export interface AuthStatus {
+  /** 是否已认证 */
+  authenticated: boolean;
+  /** 认证类型 */
+  type: 'api_key' | 'oauth' | 'none';
+  /** Provider 类型 */
+  provider: string;
+  /** 用户名（OAuth时） */
+  username?: string;
+  /** 过期时间（OAuth时） */
+  expiresAt?: string;
+}
+
+/**
+ * 设置API密钥请求负载
+ */
+export interface AuthSetKeyPayload {
+  /** API密钥 */
+  apiKey: string;
+}
+
+/**
+ * 认证状态响应负载
+ */
+export interface AuthStatusPayload {
+  /** 认证状态 */
+  status: AuthStatus;
+}
+
 /**
  * 客户端发送的消息类型
  */
@@ -50,7 +84,32 @@ export type ClientMessage =
   | { type: 'system_prompt_get' }
   | { type: 'task_list'; payload?: TaskListRequestPayload }
   | { type: 'task_cancel'; payload: { taskId: string } }
-  | { type: 'task_output'; payload: { taskId: string } };
+  | { type: 'task_output'; payload: { taskId: string } }
+  | { type: 'mcp_list' }
+  | { type: 'mcp_add'; payload: McpAddPayload }
+  | { type: 'mcp_remove'; payload: McpRemovePayload }
+  | { type: 'mcp_toggle'; payload: McpTogglePayload }
+  | { type: 'api_status' }
+  | { type: 'api_test' }
+  | { type: 'api_models' }
+  | { type: 'api_provider' }
+  | { type: 'api_token_status' }
+  | { type: 'checkpoint_create'; payload: CheckpointCreatePayload }
+  | { type: 'checkpoint_list'; payload?: CheckpointListRequestPayload }
+  | { type: 'checkpoint_restore'; payload: { checkpointId: string; dryRun?: boolean } }
+  | { type: 'checkpoint_delete'; payload: { checkpointId: string } }
+  | { type: 'checkpoint_diff'; payload: { checkpointId: string } }
+  | { type: 'checkpoint_clear' }
+  | { type: 'doctor_run'; payload?: DoctorRunPayload }
+  | { type: 'plugin_list' }
+  | { type: 'plugin_info'; payload: { name: string } }
+  | { type: 'plugin_enable'; payload: { name: string } }
+  | { type: 'plugin_disable'; payload: { name: string } }
+  | { type: 'plugin_uninstall'; payload: { name: string } }
+  | { type: 'auth_status' }
+  | { type: 'auth_set_key'; payload: AuthSetKeyPayload }
+  | { type: 'auth_clear' }
+  | { type: 'auth_validate'; payload: AuthSetKeyPayload };
 
 /**
  * 服务端发送的消息类型
@@ -85,7 +144,32 @@ export type ServerMessage =
   | { type: 'task_list_response'; payload: TaskListPayload }
   | { type: 'task_status'; payload: TaskStatusPayload }
   | { type: 'task_cancelled'; payload: { taskId: string; success: boolean } }
-  | { type: 'task_output_response'; payload: TaskOutputPayload };
+  | { type: 'task_output_response'; payload: TaskOutputPayload }
+  | { type: 'mcp_list_response'; payload: McpListPayload }
+  | { type: 'mcp_server_added'; payload: { success: boolean; name: string; server?: McpServerConfig } }
+  | { type: 'mcp_server_removed'; payload: { success: boolean; name: string } }
+  | { type: 'mcp_server_toggled'; payload: { success: boolean; name: string; enabled: boolean } }
+  | { type: 'api_status_response'; payload: ApiStatusPayload }
+  | { type: 'api_test_response'; payload: ApiTestResult }
+  | { type: 'api_models_response'; payload: { models: string[] } }
+  | { type: 'api_provider_response'; payload: ProviderInfo }
+  | { type: 'api_token_status_response'; payload: ApiStatusPayload['tokenStatus'] }
+  | { type: 'checkpoint_created'; payload: CheckpointCreatedPayload }
+  | { type: 'checkpoint_list_response'; payload: CheckpointListResponsePayload }
+  | { type: 'checkpoint_restored'; payload: CheckpointRestoredPayload }
+  | { type: 'checkpoint_deleted'; payload: { checkpointId: string; success: boolean } }
+  | { type: 'checkpoint_diff_response'; payload: CheckpointDiffPayload }
+  | { type: 'checkpoint_cleared'; payload: { count: number } }
+  | { type: 'doctor_result'; payload: DoctorResultPayload }
+  | { type: 'plugin_list_response'; payload: PluginListPayload }
+  | { type: 'plugin_info_response'; payload: { plugin: PluginInfo | null } }
+  | { type: 'plugin_enabled'; payload: { name: string; success: boolean } }
+  | { type: 'plugin_disabled'; payload: { name: string; success: boolean } }
+  | { type: 'plugin_uninstalled'; payload: { name: string; success: boolean } }
+  | { type: 'auth_status_response'; payload: AuthStatusPayload }
+  | { type: 'auth_key_set'; payload: { success: boolean; message?: string } }
+  | { type: 'auth_cleared'; payload: { success: boolean } }
+  | { type: 'auth_validated'; payload: { valid: boolean; message?: string } };
 
 // ============ 消息负载类型 ============
 
@@ -651,4 +735,375 @@ export interface SystemPromptGetPayload {
   current: string;
   /** 当前配置 */
   config: SystemPromptConfig;
+}
+
+// ============ API 管理相关 ============
+
+/**
+ * API 连接状态
+ */
+export interface ApiStatusPayload {
+  /** 是否已连接 */
+  connected: boolean;
+  /** Provider 类型 */
+  provider: 'anthropic' | 'bedrock' | 'vertex';
+  /** API Base URL */
+  baseUrl: string;
+  /** 可用模型列表 */
+  models: string[];
+  /** Token 状态 */
+  tokenStatus: {
+    type: 'api_key' | 'oauth' | 'none';
+    valid: boolean;
+    expiresAt?: number;
+    scope?: string[];
+  };
+}
+
+/**
+ * API 测试结果
+ */
+export interface ApiTestResult {
+  /** 测试是否成功 */
+  success: boolean;
+  /** 响应延迟（毫秒） */
+  latency: number;
+  /** 测试使用的模型 */
+  model: string;
+  /** 错误信息（如果失败） */
+  error?: string;
+  /** 测试时间戳 */
+  timestamp: number;
+}
+
+/**
+ * Provider 信息
+ */
+export interface ProviderInfo {
+  /** Provider 类型 */
+  type: 'anthropic' | 'bedrock' | 'vertex';
+  /** Provider 名称 */
+  name: string;
+  /** 区域（Bedrock/Vertex） */
+  region?: string;
+  /** 项目 ID（Vertex） */
+  projectId?: string;
+  /** 端点 URL */
+  endpoint: string;
+  /** 是否可用 */
+  available: boolean;
+  /** 元数据 */
+  metadata?: Record<string, any>;
+}
+
+// ============ MCP 服务器管理 ============
+
+/**
+ * MCP 服务器配置
+ */
+export interface McpServerConfig {
+  /** 服务器名称 */
+  name: string;
+  /** 服务器类型 */
+  type: 'stdio' | 'sse' | 'http';
+  /** 命令路径 (stdio) */
+  command?: string;
+  /** 命令参数 */
+  args?: string[];
+  /** 环境变量 */
+  env?: Record<string, string>;
+  /** 服务器 URL (sse/http) */
+  url?: string;
+  /** HTTP 请求头 */
+  headers?: Record<string, string>;
+  /** 是否启用 */
+  enabled: boolean;
+  /** 超时时间(ms) */
+  timeout?: number;
+  /** 重试次数 */
+  retries?: number;
+}
+
+/**
+ * MCP 列表响应负载
+ */
+export interface McpListPayload {
+  /** MCP 服务器列表 */
+  servers: McpServerConfig[];
+  /** 总数 */
+  total: number;
+}
+
+/**
+ * MCP 添加请求负载
+ */
+export interface McpAddPayload {
+  /** 服务器配置 */
+  server: Omit<McpServerConfig, 'name'> & { name: string };
+}
+
+/**
+ * MCP 删除请求负载
+ */
+export interface McpRemovePayload {
+  /** 服务器名称 */
+  name: string;
+}
+
+/**
+ * MCP 切换请求负载
+ */
+export interface McpTogglePayload {
+  /** 服务器名称 */
+  name: string;
+  /** 是否启用 */
+  enabled?: boolean;
+}
+
+// ============ 检查点相关 Payload ============
+
+/**
+ * 检查点文件信息
+ */
+export interface CheckpointFileInfo {
+  /** 文件路径 */
+  path: string;
+  /** 文件哈希值 */
+  hash: string;
+  /** 文件大小（字节） */
+  size: number;
+}
+
+/**
+ * 检查点摘要信息
+ */
+export interface CheckpointSummary {
+  /** 检查点 ID */
+  id: string;
+  /** 创建时间戳 */
+  timestamp: number;
+  /** 检查点描述 */
+  description: string;
+  /** 文件数量 */
+  fileCount: number;
+  /** 总大小（字节） */
+  totalSize: number;
+  /** 工作目录 */
+  workingDirectory: string;
+  /** 标签 */
+  tags?: string[];
+}
+
+/**
+ * 创建检查点请求负载
+ */
+export interface CheckpointCreatePayload {
+  /** 检查点描述 */
+  description: string;
+  /** 要包含的文件路径列表 */
+  filePaths: string[];
+  /** 工作目录（可选） */
+  workingDirectory?: string;
+  /** 标签（可选） */
+  tags?: string[];
+}
+
+/**
+ * 检查点创建响应负载
+ */
+export interface CheckpointCreatedPayload {
+  /** 检查点 ID */
+  checkpointId: string;
+  /** 创建时间戳 */
+  timestamp: number;
+  /** 检查点描述 */
+  description: string;
+  /** 文件数量 */
+  fileCount: number;
+  /** 总大小 */
+  totalSize: number;
+}
+
+/**
+ * 检查点列表请求负载
+ */
+export interface CheckpointListRequestPayload {
+  /** 限制数量 */
+  limit?: number;
+  /** 排序字段 */
+  sortBy?: 'timestamp' | 'description';
+  /** 排序方式 */
+  sortOrder?: 'asc' | 'desc';
+}
+
+/**
+ * 检查点列表响应负载
+ */
+export interface CheckpointListResponsePayload {
+  /** 检查点列表 */
+  checkpoints: CheckpointSummary[];
+  /** 总数 */
+  total: number;
+  /** 统计信息 */
+  stats: {
+    totalFiles: number;
+    totalSize: number;
+    oldest?: number;
+    newest?: number;
+  };
+}
+
+/**
+ * 检查点恢复响应负载
+ */
+export interface CheckpointRestoredPayload {
+  /** 检查点 ID */
+  checkpointId: string;
+  /** 是否成功 */
+  success: boolean;
+  /** 恢复的文件列表 */
+  restored: string[];
+  /** 失败的文件列表 */
+  failed: string[];
+  /** 错误信息 */
+  errors?: Array<{ path: string; error: string }>;
+}
+
+/**
+ * 文件差异类型
+ */
+export type FileDiffType = 'added' | 'removed' | 'modified' | 'unchanged';
+
+/**
+ * 文件差异信息
+ */
+export interface FileDiff {
+  /** 文件路径 */
+  path: string;
+  /** 差异类型 */
+  type: FileDiffType;
+  /** 检查点中的内容 */
+  checkpointContent?: string;
+  /** 当前内容 */
+  currentContent?: string;
+  /** 差异文本 */
+  diff?: string;
+}
+
+/**
+ * 检查点差异响应负载
+ */
+export interface CheckpointDiffPayload {
+  /** 检查点 ID */
+  checkpointId: string;
+  /** 文件差异列表 */
+  diffs: FileDiff[];
+  /** 统计信息 */
+  stats: {
+    added: number;
+    removed: number;
+    modified: number;
+    unchanged: number;
+  };
+}
+
+// ============ Doctor 诊断相关 ============
+
+/**
+ * 单个诊断检查结果
+ */
+export interface DiagnosticResult {
+  category: string;
+  name: string;
+  status: 'pass' | 'warn' | 'fail';
+  message: string;
+  details?: string;
+  fix?: string;
+}
+
+/**
+ * 完整诊断报告
+ */
+export interface DoctorReport {
+  timestamp: number;
+  results: DiagnosticResult[];
+  summary: {
+    passed: number;
+    warnings: number;
+    failed: number;
+  };
+  systemInfo?: {
+    version: string;
+    platform: string;
+    nodeVersion: string;
+    memory: {
+      total: string;
+      free: string;
+      used: string;
+      percentUsed: number;
+    };
+    cpu: {
+      model: string;
+      cores: number;
+      loadAverage: number[];
+    };
+  };
+}
+
+/**
+ * Doctor 运行请求负载
+ */
+export interface DoctorRunPayload {
+  verbose?: boolean;
+  includeSystemInfo?: boolean;
+}
+
+/**
+ * Doctor 结果响应负载
+ */
+export interface DoctorResultPayload {
+  report: DoctorReport;
+  formattedText: string;
+}
+
+// ============ 插件相关 Payload ============
+
+/**
+ * 插件信息
+ */
+export interface PluginInfo {
+  /** 插件名称 */
+  name: string;
+  /** 插件版本 */
+  version: string;
+  /** 插件描述 */
+  description?: string;
+  /** 插件作者 */
+  author?: string;
+  /** 是否启用 */
+  enabled: boolean;
+  /** 是否已加载 */
+  loaded: boolean;
+  /** 插件路径 */
+  path: string;
+  /** 提供的命令列表 */
+  commands?: string[];
+  /** 提供的技能列表 */
+  skills?: string[];
+  /** 提供的钩子列表 */
+  hooks?: string[];
+  /** 提供的工具列表 */
+  tools?: string[];
+  /** 错误信息（如果有） */
+  error?: string;
+}
+
+/**
+ * 插件列表响应负载
+ */
+export interface PluginListPayload {
+  /** 插件列表 */
+  plugins: PluginInfo[];
+  /** 总数 */
+  total: number;
 }

@@ -1065,10 +1065,1086 @@ const tasksCommand: SlashCommand = {
   },
 };
 
+// /api - API管理命令
+const apiCommand: SlashCommand = {
+  name: 'api',
+  description: '管理API连接',
+  usage: '/api [status|test|models|provider]',
+  category: 'config',
+  execute: async (ctx: ExtendedCommandContext): Promise<CommandResult> => {
+    const { args } = ctx;
+    const subcommand = args[0] || 'status';
+
+    // 动态导入 apiManager
+    const { apiManager } = await import('./api-manager.js');
+
+    try {
+      switch (subcommand) {
+        case 'status': {
+          const status = await apiManager.getStatus();
+          let message = 'API 状态\n\n';
+          message += `连接状态: ${status.connected ? '✓ 已连接' : '✗ 未连接'}\n`;
+          message += `Provider: ${status.provider}\n`;
+          message += `Base URL: ${status.baseUrl}\n`;
+          message += `认证类型: ${status.tokenStatus.type}\n`;
+          message += `认证状态: ${status.tokenStatus.valid ? '✓ 有效' : '✗ 无效'}\n\n`;
+
+          if (status.tokenStatus.expiresAt) {
+            const expiresDate = new Date(status.tokenStatus.expiresAt);
+            message += `过期时间: ${expiresDate.toLocaleString('zh-CN')}\n`;
+          }
+
+          if (status.tokenStatus.scope && status.tokenStatus.scope.length > 0) {
+            message += `权限范围: ${status.tokenStatus.scope.join(', ')}\n`;
+          }
+
+          message += `\n可用模型: ${status.models.length} 个\n`;
+
+          return { success: true, message };
+        }
+
+        case 'test': {
+          let message = 'API 连接测试\n\n';
+          message += '正在测试连接...\n';
+
+          const result = await apiManager.testConnection();
+
+          if (result.success) {
+            message += `\n✓ 测试成功\n`;
+            message += `  延迟: ${result.latency}ms\n`;
+            message += `  模型: ${result.model}\n`;
+          } else {
+            message += `\n✗ 测试失败\n`;
+            message += `  错误: ${result.error}\n`;
+          }
+
+          return { success: result.success, message };
+        }
+
+        case 'models': {
+          const models = await apiManager.getAvailableModels();
+          let message = '可用模型列表\n\n';
+
+          if (models.length === 0) {
+            message += '未找到可用模型\n';
+          } else {
+            message += `共 ${models.length} 个模型:\n\n`;
+            for (const model of models) {
+              message += `  • ${model}\n`;
+            }
+          }
+
+          return { success: true, message };
+        }
+
+        case 'provider': {
+          const info = apiManager.getProviderInfo();
+          let message = 'Provider 信息\n\n';
+          message += `类型: ${info.type}\n`;
+          message += `名称: ${info.name}\n`;
+          message += `端点: ${info.endpoint}\n`;
+          message += `状态: ${info.available ? '✓ 可用' : '✗ 不可用'}\n`;
+
+          if (info.region) {
+            message += `区域: ${info.region}\n`;
+          }
+
+          if (info.projectId) {
+            message += `项目ID: ${info.projectId}\n`;
+          }
+
+          if (info.metadata && Object.keys(info.metadata).length > 0) {
+            message += '\n元数据:\n';
+            for (const [key, value] of Object.entries(info.metadata)) {
+              message += `  ${key}: ${value}\n`;
+            }
+          }
+
+          return { success: true, message };
+        }
+
+        default:
+          return {
+            success: false,
+            message: `未知子命令: ${subcommand}\n\n用法:\n  /api status    - 显示API状态\n  /api test      - 测试API连接\n  /api models    - 列出可用模型\n  /api provider  - 显示Provider信息`,
+          };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        message: `执行失败: ${error instanceof Error ? error.message : '未知错误'}`,
+      };
+    }
+  },
+};
+
+// /doctor - 系统诊断命令
+const doctorCommand: SlashCommand = {
+  name: 'doctor',
+  description: '运行系统诊断检查',
+  usage: '/doctor [verbose]',
+  category: 'utility',
+  execute: async (ctx: ExtendedCommandContext): Promise<CommandResult> => {
+    const { args } = ctx;
+    const verbose = args.includes('verbose') || args.includes('v') || args.includes('-v');
+
+    try {
+      // 动态导入 doctor 模块
+      const { runDiagnostics, formatDoctorReport } = await import('./doctor.js');
+
+      const options = {
+        verbose,
+        includeSystemInfo: true,
+      };
+
+      let message = '正在运行系统诊断...\n\n';
+
+      const report = await runDiagnostics(options);
+      const formattedText = formatDoctorReport(report, verbose);
+
+      message = formattedText;
+
+      return {
+        success: true,
+        message,
+        data: {
+          report: {
+            ...report,
+            timestamp: report.timestamp.getTime(),
+          },
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `运行诊断失败: ${error instanceof Error ? error.message : '未知错误'}`,
+      };
+    }
+  },
+};
+
+// /mcp - 管理 MCP 服务器
+const mcpCommand: SlashCommand = {
+  name: 'mcp',
+  description: '管理 MCP (Model Context Protocol) 服务器',
+  usage: '/mcp [list|add|remove|toggle] [参数]',
+  category: 'config',
+  execute: async (ctx: ExtendedCommandContext): Promise<CommandResult> => {
+    const { args, conversationManager } = ctx;
+
+    // 默认行为：列出所有 MCP 服务器
+    if (!args || args.length === 0 || args[0] === 'list') {
+      try {
+        const servers = conversationManager.listMcpServers();
+
+        if (servers.length === 0) {
+          return {
+            success: true,
+            message: '没有配置 MCP 服务器。\n\n使用 /mcp add <name> <command> 添加服务器。',
+          };
+        }
+
+        let message = 'MCP 服务器列表\n\n';
+
+        servers.forEach((server, idx) => {
+          const statusIcon = server.enabled ? '✓' : '✗';
+          const typeLabel = {
+            stdio: '标准输入输出',
+            sse: 'SSE',
+            http: 'HTTP',
+          }[server.type] || server.type;
+
+          message += `${idx + 1}. ${statusIcon} ${server.name}\n`;
+          message += `   类型: ${typeLabel}\n`;
+
+          if (server.type === 'stdio' && server.command) {
+            message += `   命令: ${server.command}`;
+            if (server.args && server.args.length > 0) {
+              message += ` ${server.args.join(' ')}`;
+            }
+            message += '\n';
+          } else if (server.url) {
+            message += `   URL: ${server.url}\n`;
+          }
+
+          if (server.env && Object.keys(server.env).length > 0) {
+            message += `   环境变量: ${Object.keys(server.env).length} 个\n`;
+          }
+
+          message += '\n';
+        });
+
+        message += '使用命令:\n';
+        message += '  /mcp add <name> <command>    - 添加服务器\n';
+        message += '  /mcp remove <name>           - 删除服务器\n';
+        message += '  /mcp toggle <name>           - 启用/禁用服务器';
+
+        return { success: true, message };
+      } catch (error) {
+        return {
+          success: false,
+          message: `列出 MCP 服务器失败: ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+    }
+
+    const subcommand = args[0].toLowerCase();
+
+    // /mcp add <name> <command> [args...]
+    if (subcommand === 'add') {
+      if (args.length < 3) {
+        return {
+          success: false,
+          message: '用法: /mcp add <name> <command> [args...]\n\n示例: /mcp add my-server node /path/to/server.js',
+        };
+      }
+
+      const name = args[1];
+      const command = args[2];
+      const cmdArgs = args.slice(3);
+
+      try {
+        const success = await conversationManager.addMcpServer(name, {
+          type: 'stdio',
+          command,
+          args: cmdArgs.length > 0 ? cmdArgs : undefined,
+          enabled: true,
+        });
+
+        if (success) {
+          return {
+            success: true,
+            message: `已添加 MCP 服务器: ${name}\n\n命令: ${command} ${cmdArgs.join(' ')}\n类型: stdio\n状态: 已启用`,
+          };
+        } else {
+          return {
+            success: false,
+            message: `添加 MCP 服务器 ${name} 失败。\n\n可能原因:\n  • 服务器名称已存在\n  • 配置无效`,
+          };
+        }
+      } catch (error) {
+        return {
+          success: false,
+          message: `添加 MCP 服务器失败: ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+    }
+
+    // /mcp remove <name>
+    if (subcommand === 'remove') {
+      if (args.length < 2) {
+        return {
+          success: false,
+          message: '用法: /mcp remove <name>\n\n示例: /mcp remove my-server',
+        };
+      }
+
+      const name = args[1];
+
+      try {
+        const success = await conversationManager.removeMcpServer(name);
+
+        if (success) {
+          return {
+            success: true,
+            message: `已删除 MCP 服务器: ${name}`,
+          };
+        } else {
+          return {
+            success: false,
+            message: `MCP 服务器 ${name} 不存在。\n\n使用 /mcp list 查看所有服务器。`,
+          };
+        }
+      } catch (error) {
+        return {
+          success: false,
+          message: `删除 MCP 服务器失败: ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+    }
+
+    // /mcp toggle <name>
+    if (subcommand === 'toggle' || subcommand === 'enable' || subcommand === 'disable') {
+      if (args.length < 2) {
+        return {
+          success: false,
+          message: `用法: /mcp ${subcommand} <name>\n\n示例: /mcp ${subcommand} my-server`,
+        };
+      }
+
+      const name = args[1];
+      let enabled: boolean | undefined = undefined;
+
+      if (subcommand === 'enable') {
+        enabled = true;
+      } else if (subcommand === 'disable') {
+        enabled = false;
+      }
+
+      try {
+        const result = await conversationManager.toggleMcpServer(name, enabled);
+
+        if (result.success) {
+          return {
+            success: true,
+            message: `MCP 服务器 ${name} 已${result.enabled ? '启用' : '禁用'}`,
+          };
+        } else {
+          return {
+            success: false,
+            message: `MCP 服务器 ${name} 不存在。\n\n使用 /mcp list 查看所有服务器。`,
+          };
+        }
+      } catch (error) {
+        return {
+          success: false,
+          message: `切换 MCP 服务器失败: ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+    }
+
+    return {
+      success: false,
+      message: `未知子命令: ${subcommand}\n\n可用命令:\n  list   - 列出所有服务器\n  add    - 添加服务器\n  remove - 删除服务器\n  toggle - 启用/禁用服务器`,
+    };
+  },
+};
+
+// /checkpoint - 管理文件检查点
+const checkpointCommand: SlashCommand = {
+  name: 'checkpoint',
+  aliases: ['cp'],
+  description: '管理文件检查点（保存和恢复文件状态）',
+  usage: '/checkpoint [list|create|restore|delete|diff|clear] [参数]',
+  category: 'utility',
+  execute: async (ctx: ExtendedCommandContext): Promise<CommandResult> => {
+    const { args } = ctx;
+
+    // 动态导入 CheckpointManager
+    const { CheckpointManager } = await import('./checkpoint-manager.js');
+    const checkpointManager = new CheckpointManager();
+
+    // 默认行为：列出所有检查点
+    if (!args || args.length === 0 || args[0] === 'list') {
+      try {
+        const checkpoints = checkpointManager.listCheckpoints({
+          limit: 20,
+          sortBy: 'timestamp',
+          sortOrder: 'desc',
+        });
+
+        if (checkpoints.length === 0) {
+          return {
+            success: true,
+            message: '没有检查点。\n\n使用 /checkpoint create <描述> <文件1> [文件2...] 创建检查点。',
+          };
+        }
+
+        const stats = checkpointManager.getStats();
+
+        let message = '检查点列表\n\n';
+
+        checkpoints.forEach((cp, idx) => {
+          const date = new Date(cp.timestamp).toLocaleString('zh-CN');
+          const fileCount = cp.files.length;
+          const totalSize = cp.files.reduce((sum, f) => sum + f.size, 0);
+          const sizeKB = (totalSize / 1024).toFixed(2);
+
+          message += `${idx + 1}. ${cp.description}\n`;
+          message += `   ID: ${cp.id.slice(0, 8)}\n`;
+          message += `   时间: ${date}\n`;
+          message += `   文件: ${fileCount} 个 (${sizeKB} KB)\n`;
+          if (cp.metadata?.tags && cp.metadata.tags.length > 0) {
+            message += `   标签: ${cp.metadata.tags.join(', ')}\n`;
+          }
+          message += '\n';
+        });
+
+        message += `总计: ${stats.total} 个检查点, ${stats.totalFiles} 个文件, ${(stats.totalSize / 1024 / 1024).toFixed(2)} MB\n\n`;
+        message += '使用命令:\n';
+        message += '  /checkpoint create <描述> <文件...>  - 创建检查点\n';
+        message += '  /checkpoint restore <id>             - 恢复检查点\n';
+        message += '  /checkpoint diff <id>                - 查看差异\n';
+        message += '  /checkpoint delete <id>              - 删除检查点\n';
+        message += '  /checkpoint clear                    - 清除所有检查点';
+
+        return { success: true, message };
+      } catch (error) {
+        return {
+          success: false,
+          message: `列出检查点失败: ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+    }
+
+    const subcommand = args[0].toLowerCase();
+
+    // /checkpoint create <description> <file1> [file2...]
+    if (subcommand === 'create') {
+      if (args.length < 3) {
+        return {
+          success: false,
+          message: '用法: /checkpoint create <描述> <文件1> [文件2...]\n\n示例: /checkpoint create "功能完成前的状态" src/index.ts src/utils.ts',
+        };
+      }
+
+      const description = args[1];
+      const filePaths = args.slice(2);
+
+      try {
+        const checkpoint = await checkpointManager.createCheckpoint(
+          description,
+          filePaths,
+          ctx.cwd
+        );
+
+        const totalSize = checkpoint.files.reduce((sum, f) => sum + f.size, 0);
+        const sizeKB = (totalSize / 1024).toFixed(2);
+
+        return {
+          success: true,
+          message: `已创建检查点\n\n` +
+            `ID: ${checkpoint.id.slice(0, 8)}\n` +
+            `描述: ${checkpoint.description}\n` +
+            `文件: ${checkpoint.files.length} 个 (${sizeKB} KB)\n` +
+            `时间: ${checkpoint.timestamp.toLocaleString('zh-CN')}\n\n` +
+            `使用 /checkpoint restore ${checkpoint.id.slice(0, 8)} 恢复此检查点`,
+        };
+      } catch (error) {
+        return {
+          success: false,
+          message: `创建检查点失败: ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+    }
+
+    // /checkpoint restore <id>
+    if (subcommand === 'restore') {
+      if (args.length < 2) {
+        return {
+          success: false,
+          message: '用法: /checkpoint restore <checkpoint-id>\n\n使用 /checkpoint list 查看所有检查点。',
+        };
+      }
+
+      // 支持短ID（前8位）
+      const inputId = args[1];
+      const checkpoints = checkpointManager.listCheckpoints({});
+      const checkpoint = checkpoints.find(cp => cp.id.startsWith(inputId) || cp.id === inputId);
+
+      if (!checkpoint) {
+        return {
+          success: false,
+          message: `检查点 ${inputId} 不存在。\n\n使用 /checkpoint list 查看所有检查点。`,
+        };
+      }
+
+      try {
+        const result = await checkpointManager.restoreCheckpoint(checkpoint.id, {
+          dryRun: false,
+          skipBackup: false,
+        });
+
+        if (result.success) {
+          return {
+            success: true,
+            message: `已恢复检查点: ${checkpoint.description}\n\n` +
+              `恢复的文件: ${result.restored.length} 个\n` +
+              `${result.restored.map(f => `  • ${f}`).join('\n')}\n\n` +
+              `备份文件已创建（.backup-* 后缀）`,
+          };
+        } else {
+          let message = `恢复检查点失败\n\n`;
+          message += `成功: ${result.restored.length} 个\n`;
+          if (result.restored.length > 0) {
+            message += result.restored.map(f => `  ✓ ${f}`).join('\n') + '\n\n';
+          }
+          message += `失败: ${result.failed.length} 个\n`;
+          if (result.errors.length > 0) {
+            message += result.errors.map(e => `  ✗ ${e.path}: ${e.error}`).join('\n');
+          }
+          return { success: false, message };
+        }
+      } catch (error) {
+        return {
+          success: false,
+          message: `恢复检查点失败: ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+    }
+
+    // /checkpoint delete <id>
+    if (subcommand === 'delete' || subcommand === 'del' || subcommand === 'rm') {
+      if (args.length < 2) {
+        return {
+          success: false,
+          message: '用法: /checkpoint delete <checkpoint-id>\n\n使用 /checkpoint list 查看所有检查点。',
+        };
+      }
+
+      const inputId = args[1];
+      const checkpoints = checkpointManager.listCheckpoints({});
+      const checkpoint = checkpoints.find(cp => cp.id.startsWith(inputId) || cp.id === inputId);
+
+      if (!checkpoint) {
+        return {
+          success: false,
+          message: `检查点 ${inputId} 不存在。\n\n使用 /checkpoint list 查看所有检查点。`,
+        };
+      }
+
+      try {
+        const success = checkpointManager.deleteCheckpoint(checkpoint.id);
+
+        if (success) {
+          return {
+            success: true,
+            message: `已删除检查点: ${checkpoint.description}`,
+          };
+        } else {
+          return {
+            success: false,
+            message: `删除检查点失败。`,
+          };
+        }
+      } catch (error) {
+        return {
+          success: false,
+          message: `删除检查点失败: ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+    }
+
+    // /checkpoint diff <id>
+    if (subcommand === 'diff') {
+      if (args.length < 2) {
+        return {
+          success: false,
+          message: '用法: /checkpoint diff <checkpoint-id>\n\n使用 /checkpoint list 查看所有检查点。',
+        };
+      }
+
+      const inputId = args[1];
+      const checkpoints = checkpointManager.listCheckpoints({});
+      const checkpoint = checkpoints.find(cp => cp.id.startsWith(inputId) || cp.id === inputId);
+
+      if (!checkpoint) {
+        return {
+          success: false,
+          message: `检查点 ${inputId} 不存在。\n\n使用 /checkpoint list 查看所有检查点。`,
+        };
+      }
+
+      try {
+        const diffs = await checkpointManager.diffCheckpoint(checkpoint.id);
+
+        const stats = {
+          added: diffs.filter(d => d.type === 'added').length,
+          removed: diffs.filter(d => d.type === 'removed').length,
+          modified: diffs.filter(d => d.type === 'modified').length,
+          unchanged: diffs.filter(d => d.type === 'unchanged').length,
+        };
+
+        let message = `检查点差异: ${checkpoint.description}\n\n`;
+        message += `统计:\n`;
+        message += `  添加: ${stats.added} 个文件\n`;
+        message += `  删除: ${stats.removed} 个文件\n`;
+        message += `  修改: ${stats.modified} 个文件\n`;
+        message += `  未变: ${stats.unchanged} 个文件\n\n`;
+
+        if (stats.modified > 0) {
+          message += `修改的文件:\n`;
+          diffs.filter(d => d.type === 'modified').forEach(d => {
+            message += `  • ${d.path}\n`;
+          });
+        }
+
+        if (stats.removed > 0) {
+          message += `\n删除的文件:\n`;
+          diffs.filter(d => d.type === 'removed').forEach(d => {
+            message += `  • ${d.path}\n`;
+          });
+        }
+
+        if (stats.added > 0) {
+          message += `\n新增的文件:\n`;
+          diffs.filter(d => d.type === 'added').forEach(d => {
+            message += `  • ${d.path}\n`;
+          });
+        }
+
+        return { success: true, message };
+      } catch (error) {
+        return {
+          success: false,
+          message: `比较检查点失败: ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+    }
+
+    // /checkpoint clear
+    if (subcommand === 'clear') {
+      try {
+        const count = checkpointManager.clearCheckpoints();
+
+        return {
+          success: true,
+          message: `已清除 ${count} 个检查点。`,
+        };
+      } catch (error) {
+        return {
+          success: false,
+          message: `清除检查点失败: ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+    }
+
+    return {
+      success: false,
+      message: `未知子命令: ${subcommand}\n\n可用命令:\n  list    - 列出所有检查点\n  create  - 创建检查点\n  restore - 恢复检查点\n  delete  - 删除检查点\n  diff    - 查看差异\n  clear   - 清除所有检查点`,
+    };
+  },
+};
+
+// /plugins - 管理插件
+const pluginsCommand: SlashCommand = {
+  name: 'plugins',
+  aliases: ['plugin'],
+  description: '管理 Claude Code 插件',
+  usage: '/plugins [list|info|enable|disable|uninstall] [参数]',
+  category: 'config',
+  execute: async (ctx: ExtendedCommandContext): Promise<CommandResult> => {
+    const { args, conversationManager } = ctx;
+
+    // 默认行为：列出所有插件
+    if (!args || args.length === 0 || args[0] === 'list') {
+      try {
+        const plugins = await conversationManager.listPlugins();
+
+        if (plugins.length === 0) {
+          return {
+            success: true,
+            message: '没有安装插件。\n\n插件安装在: ~/.claude/plugins/ 和 ./.claude/plugins/\n\n更多信息: https://docs.anthropic.com/claude-code/plugins',
+          };
+        }
+
+        let message = '插件列表\n\n';
+
+        plugins.forEach((plugin, idx) => {
+          const statusIcon = plugin.loaded ? '✓' : plugin.enabled ? '○' : '✗';
+          const statusText = plugin.loaded ? '已加载' : plugin.enabled ? '已启用' : '已禁用';
+
+          message += `${idx + 1}. ${statusIcon} ${plugin.name} v${plugin.version}\n`;
+          if (plugin.description) {
+            message += `   描述: ${plugin.description}\n`;
+          }
+          if (plugin.author) {
+            message += `   作者: ${plugin.author}\n`;
+          }
+          message += `   状态: ${statusText}\n`;
+
+          // 统计提供的功能
+          const features: string[] = [];
+          if (plugin.tools && plugin.tools.length > 0) {
+            features.push(`${plugin.tools.length} 个工具`);
+          }
+          if (plugin.commands && plugin.commands.length > 0) {
+            features.push(`${plugin.commands.length} 个命令`);
+          }
+          if (plugin.skills && plugin.skills.length > 0) {
+            features.push(`${plugin.skills.length} 个技能`);
+          }
+          if (plugin.hooks && plugin.hooks.length > 0) {
+            features.push(`${plugin.hooks.length} 个钩子`);
+          }
+
+          if (features.length > 0) {
+            message += `   功能: ${features.join(', ')}\n`;
+          }
+
+          if (plugin.error) {
+            message += `   ⚠️  错误: ${plugin.error}\n`;
+          }
+
+          message += '\n';
+        });
+
+        message += `总计: ${plugins.length} 个插件\n`;
+        message += `已加载: ${plugins.filter(p => p.loaded).length} | `;
+        message += `已启用: ${plugins.filter(p => p.enabled).length} | `;
+        message += `已禁用: ${plugins.filter(p => !p.enabled).length}\n\n`;
+
+        message += '使用命令:\n';
+        message += '  /plugins list              - 列出所有插件\n';
+        message += '  /plugins info <name>       - 查看插件详情\n';
+        message += '  /plugins enable <name>     - 启用插件\n';
+        message += '  /plugins disable <name>    - 禁用插件\n';
+        message += '  /plugins uninstall <name>  - 卸载插件';
+
+        return { success: true, message };
+      } catch (error) {
+        return {
+          success: false,
+          message: `列出插件失败: ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+    }
+
+    const subcommand = args[0].toLowerCase();
+
+    // /plugins info <name>
+    if (subcommand === 'info') {
+      if (args.length < 2) {
+        return {
+          success: false,
+          message: '用法: /plugins info <插件名>\n\n示例: /plugins info my-plugin',
+        };
+      }
+
+      const pluginName = args[1];
+
+      try {
+        const plugin = await conversationManager.getPluginInfo(pluginName);
+
+        if (!plugin) {
+          return {
+            success: false,
+            message: `插件 ${pluginName} 不存在。\n\n使用 /plugins list 查看所有插件。`,
+          };
+        }
+
+        let message = `插件详情: ${plugin.name}\n`;
+        message += '='.repeat(plugin.name.length + 6) + '\n\n';
+        message += `版本: ${plugin.version}\n`;
+        if (plugin.description) {
+          message += `描述: ${plugin.description}\n`;
+        }
+        if (plugin.author) {
+          message += `作者: ${plugin.author}\n`;
+        }
+        message += `状态: ${plugin.loaded ? '已加载' : plugin.enabled ? '已启用' : '已禁用'}\n`;
+        message += `路径: ${plugin.path}\n\n`;
+
+        // 显示功能详情
+        if (plugin.tools && plugin.tools.length > 0) {
+          message += `工具 (${plugin.tools.length}):\n`;
+          plugin.tools.forEach(tool => {
+            message += `  • ${tool}\n`;
+          });
+          message += '\n';
+        }
+
+        if (plugin.commands && plugin.commands.length > 0) {
+          message += `命令 (${plugin.commands.length}):\n`;
+          plugin.commands.forEach(cmd => {
+            message += `  • ${cmd}\n`;
+          });
+          message += '\n';
+        }
+
+        if (plugin.skills && plugin.skills.length > 0) {
+          message += `技能 (${plugin.skills.length}):\n`;
+          plugin.skills.forEach(skill => {
+            message += `  • ${skill}\n`;
+          });
+          message += '\n';
+        }
+
+        if (plugin.hooks && plugin.hooks.length > 0) {
+          message += `钩子 (${plugin.hooks.length}):\n`;
+          plugin.hooks.forEach(hook => {
+            message += `  • ${hook}\n`;
+          });
+          message += '\n';
+        }
+
+        if (plugin.error) {
+          message += `⚠️  错误:\n${plugin.error}\n`;
+        }
+
+        return { success: true, message };
+      } catch (error) {
+        return {
+          success: false,
+          message: `获取插件信息失败: ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+    }
+
+    // /plugins enable <name>
+    if (subcommand === 'enable') {
+      if (args.length < 2) {
+        return {
+          success: false,
+          message: '用法: /plugins enable <插件名>\n\n示例: /plugins enable my-plugin',
+        };
+      }
+
+      const pluginName = args[1];
+
+      try {
+        const success = await conversationManager.enablePlugin(pluginName);
+
+        if (success) {
+          return {
+            success: true,
+            message: `已启用插件: ${pluginName}\n\n插件将在下次对话时加载。`,
+          };
+        } else {
+          return {
+            success: false,
+            message: `启用插件 ${pluginName} 失败。\n\n可能原因:\n  • 插件不存在\n  • 插件配置无效`,
+          };
+        }
+      } catch (error) {
+        return {
+          success: false,
+          message: `启用插件失败: ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+    }
+
+    // /plugins disable <name>
+    if (subcommand === 'disable') {
+      if (args.length < 2) {
+        return {
+          success: false,
+          message: '用法: /plugins disable <插件名>\n\n示例: /plugins disable my-plugin',
+        };
+      }
+
+      const pluginName = args[1];
+
+      try {
+        const success = await conversationManager.disablePlugin(pluginName);
+
+        if (success) {
+          return {
+            success: true,
+            message: `已禁用插件: ${pluginName}\n\n插件将在下次对话时卸载。`,
+          };
+        } else {
+          return {
+            success: false,
+            message: `禁用插件 ${pluginName} 失败。\n\n可能原因:\n  • 插件不存在`,
+          };
+        }
+      } catch (error) {
+        return {
+          success: false,
+          message: `禁用插件失败: ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+    }
+
+    // /plugins uninstall <name>
+    if (subcommand === 'uninstall' || subcommand === 'remove') {
+      if (args.length < 2) {
+        return {
+          success: false,
+          message: '用法: /plugins uninstall <插件名>\n\n示例: /plugins uninstall my-plugin',
+        };
+      }
+
+      const pluginName = args[1];
+
+      try {
+        const success = await conversationManager.uninstallPlugin(pluginName);
+
+        if (success) {
+          return {
+            success: true,
+            message: `已卸载插件: ${pluginName}\n\n插件文件已从磁盘删除。`,
+          };
+        } else {
+          return {
+            success: false,
+            message: `卸载插件 ${pluginName} 失败。\n\n可能原因:\n  • 插件不存在\n  • 其他插件依赖此插件`,
+          };
+        }
+      } catch (error) {
+        return {
+          success: false,
+          message: `卸载插件失败: ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+    }
+
+    return {
+      success: false,
+      message: `未知子命令: ${subcommand}\n\n可用命令:\n  list      - 列出所有插件\n  info      - 查看插件详情\n  enable    - 启用插件\n  disable   - 禁用插件\n  uninstall - 卸载插件`,
+    };
+  },
+};
+
+// /auth - 认证管理命令
+const authCommand: SlashCommand = {
+  name: 'auth',
+  description: '管理认证和API密钥',
+  usage: '/auth [status|set <key>|clear]',
+  category: 'config',
+  execute: async (ctx: ExtendedCommandContext): Promise<CommandResult> => {
+    const { args } = ctx;
+
+    // 动态导入 authManager
+    const { authManager } = await import('./auth-manager.js');
+
+    // 默认行为：显示认证状态
+    if (!args || args.length === 0 || args[0] === 'status') {
+      try {
+        const status = authManager.getAuthStatus();
+        const maskedKey = authManager.getMaskedApiKey();
+
+        let message = '认证状态\n\n';
+        message += `认证: ${status.authenticated ? '✓ 已认证' : '✗ 未认证'}\n`;
+        message += `类型: ${status.type === 'api_key' ? 'API密钥' : status.type === 'oauth' ? 'OAuth' : '无'}\n`;
+        message += `Provider: ${status.provider}\n`;
+
+        if (maskedKey) {
+          message += `API密钥: ${maskedKey}\n`;
+        }
+
+        if (status.username) {
+          message += `用户: ${status.username}\n`;
+        }
+
+        if (status.expiresAt) {
+          const expiresDate = new Date(status.expiresAt);
+          message += `过期时间: ${expiresDate.toLocaleString('zh-CN')}\n`;
+        }
+
+        message += '\n可用命令:\n';
+        message += '  /auth status       - 显示认证状态\n';
+        message += '  /auth set <key>    - 设置API密钥\n';
+        message += '  /auth clear        - 清除认证（登出）\n';
+        message += '  /logout            - 等同于 /auth clear';
+
+        return { success: true, message };
+      } catch (error) {
+        return {
+          success: false,
+          message: `获取认证状态失败: ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+    }
+
+    const subcommand = args[0].toLowerCase();
+
+    // /auth set <api_key>
+    if (subcommand === 'set') {
+      if (args.length < 2) {
+        return {
+          success: false,
+          message: '用法: /auth set <api_key>\n\n示例: /auth set sk-ant-api03-...',
+        };
+      }
+
+      const apiKey = args.slice(1).join(' '); // 支持包含空格的密钥（虽然通常不会有）
+
+      try {
+        const success = authManager.setApiKey(apiKey);
+
+        if (success) {
+          const maskedKey = authManager.getMaskedApiKey();
+          return {
+            success: true,
+            message: `API密钥已设置\n\n密钥: ${maskedKey}\n\n注意: 密钥已保存到配置文件。`,
+          };
+        } else {
+          return {
+            success: false,
+            message: '设置API密钥失败。请检查密钥格式。',
+          };
+        }
+      } catch (error) {
+        return {
+          success: false,
+          message: `设置API密钥失败: ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+    }
+
+    // /auth clear
+    if (subcommand === 'clear') {
+      try {
+        authManager.clearAuth();
+
+        return {
+          success: true,
+          message: '认证已清除。\n\nAPI密钥已从配置中移除。',
+        };
+      } catch (error) {
+        return {
+          success: false,
+          message: `清除认证失败: ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+    }
+
+    // /auth validate <api_key>
+    if (subcommand === 'validate') {
+      if (args.length < 2) {
+        return {
+          success: false,
+          message: '用法: /auth validate <api_key>\n\n验证API密钥是否有效。',
+        };
+      }
+
+      const apiKey = args.slice(1).join(' ');
+
+      try {
+        let message = '正在验证API密钥...\n\n';
+        const valid = await authManager.validateApiKey(apiKey);
+
+        if (valid) {
+          message += '✓ API密钥有效\n\n';
+          message += '密钥已通过验证，可以正常使用。';
+        } else {
+          message += '✗ API密钥无效\n\n';
+          message += '密钥验证失败，请检查密钥是否正确。';
+        }
+
+        return { success: valid, message };
+      } catch (error) {
+        return {
+          success: false,
+          message: `验证API密钥失败: ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+    }
+
+    return {
+      success: false,
+      message: `未知子命令: ${subcommand}\n\n可用命令:\n  status   - 显示认证状态\n  set      - 设置API密钥\n  clear    - 清除认证\n  validate - 验证API密钥`,
+    };
+  },
+};
+
+// /logout - 登出（清除认证）
+const logoutCommand: SlashCommand = {
+  name: 'logout',
+  description: '登出（清除API密钥）',
+  category: 'config',
+  execute: async (ctx: ExtendedCommandContext): Promise<CommandResult> => {
+    // 直接调用 /auth clear
+    return authCommand.execute({
+      ...ctx,
+      args: ['clear'],
+    });
+  },
+};
+
 // 注册工具和提示命令
 registry.register(tasksCommand);
 registry.register(toolsCommand);
 registry.register(promptCommand);
+registry.register(apiCommand);
+registry.register(doctorCommand);
+registry.register(mcpCommand);
+registry.register(checkpointCommand);
+registry.register(pluginsCommand);
+registry.register(authCommand);
+registry.register(logoutCommand);
 
 /**
  * 检查输入是否为斜杠命令

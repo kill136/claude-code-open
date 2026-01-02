@@ -5,6 +5,12 @@
 import type { Express, Request, Response } from 'express';
 import type { ConversationManager } from '../conversation.js';
 import { toolRegistry } from '../../../tools/index.js';
+import { apiManager } from '../api-manager.js';
+import { authManager } from '../auth-manager.js';
+import { CheckpointManager } from '../checkpoint-manager.js';
+
+// 全局检查点管理器实例
+const checkpointManager = new CheckpointManager();
 
 export function setupApiRoutes(app: Express, conversationManager: ConversationManager): void {
   // 健康检查
@@ -388,6 +394,64 @@ export function setupApiRoutes(app: Express, conversationManager: ConversationMa
     }
   });
 
+  // ============ API 管理API ============
+
+  // 获取API状态
+  app.get('/api/api/status', async (req: Request, res: Response) => {
+    try {
+      const status = await apiManager.getStatus();
+      res.json(status);
+    } catch (error) {
+      console.error('[API] 获取API状态失败:', error);
+      res.status(500).json({
+        error: '获取API状态失败',
+        message: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  });
+
+  // 测试API连接
+  app.post('/api/api/test', async (req: Request, res: Response) => {
+    try {
+      const result = await apiManager.testConnection();
+      res.json(result);
+    } catch (error) {
+      console.error('[API] API测试失败:', error);
+      res.status(500).json({
+        error: 'API测试失败',
+        message: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  });
+
+  // 获取Provider信息
+  app.get('/api/api/provider', (req: Request, res: Response) => {
+    try {
+      const info = apiManager.getProviderInfo();
+      res.json(info);
+    } catch (error) {
+      console.error('[API] 获取Provider信息失败:', error);
+      res.status(500).json({
+        error: '获取Provider信息失败',
+        message: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  });
+
+  // 获取Token状态
+  app.get('/api/api/token/status', (req: Request, res: Response) => {
+    try {
+      const status = apiManager.getTokenStatus();
+      res.json(status);
+    } catch (error) {
+      console.error('[API] 获取Token状态失败:', error);
+      res.status(500).json({
+        error: '获取Token状态失败',
+        message: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  });
+
   // ============ 系统提示API ============
 
   // 获取当前系统提示
@@ -446,6 +510,618 @@ export function setupApiRoutes(app: Express, conversationManager: ConversationMa
       res.status(500).json({
         success: false,
         error: '更新系统提示失败',
+        message: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  });
+
+  // ============ Doctor 诊断API ============
+
+  // ============ MCP 服务器管理 API ============
+
+  // 获取 MCP 服务器列表
+  app.get('/api/mcp/servers', (req: Request, res: Response) => {
+    try {
+      const servers = conversationManager.listMcpServers();
+
+      res.json({
+        servers,
+        total: servers.length,
+      });
+    } catch (error) {
+      console.error('[API] 获取 MCP 服务器列表失败:', error);
+      res.status(500).json({
+        error: '获取 MCP 服务器列表失败',
+        message: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  });
+
+  // 添加 MCP 服务器
+  app.post('/api/mcp/servers', async (req: Request, res: Response) => {
+    try {
+      const { name, config } = req.body;
+
+      if (!name || !config) {
+        res.status(400).json({
+          error: '缺少必要参数',
+          message: '请提供 name 和 config 参数',
+        });
+        return;
+      }
+
+      const success = await conversationManager.addMcpServer(name, config);
+
+      if (success) {
+        res.json({
+          success: true,
+          name,
+          message: `MCP 服务器 ${name} 已添加`,
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          error: '添加 MCP 服务器失败',
+        });
+      }
+    } catch (error) {
+      console.error('[API] 添加 MCP 服务器失败:', error);
+      res.status(500).json({
+        success: false,
+        error: '添加 MCP 服务器失败',
+        message: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  });
+
+  // 删除 MCP 服务器
+  app.delete('/api/mcp/servers/:name', async (req: Request, res: Response) => {
+    try {
+      const { name } = req.params;
+
+      const success = await conversationManager.removeMcpServer(name);
+
+      if (success) {
+        res.json({
+          success: true,
+          name,
+          message: `MCP 服务器 ${name} 已删除`,
+        });
+      } else {
+        res.status(404).json({
+          success: false,
+          error: '服务器不存在',
+          name,
+        });
+      }
+    } catch (error) {
+      console.error('[API] 删除 MCP 服务器失败:', error);
+      res.status(500).json({
+        success: false,
+        error: '删除 MCP 服务器失败',
+        message: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  });
+
+  // 启用/禁用 MCP 服务器
+  app.patch('/api/mcp/servers/:name/toggle', async (req: Request, res: Response) => {
+    try {
+      const { name } = req.params;
+      const { enabled } = req.body;
+
+      const result = await conversationManager.toggleMcpServer(name, enabled);
+
+      if (result.success) {
+        res.json({
+          success: true,
+          name,
+          enabled: result.enabled,
+          message: `MCP 服务器 ${name} 已${result.enabled ? '启用' : '禁用'}`,
+        });
+      } else {
+        res.status(404).json({
+          success: false,
+          error: '服务器不存在',
+          name,
+        });
+      }
+    } catch (error) {
+      console.error('[API] 切换 MCP 服务器失败:', error);
+      res.status(500).json({
+        success: false,
+        error: '切换 MCP 服务器失败',
+        message: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  });
+
+  // 运行系统诊断
+  app.post('/api/doctor', async (req: Request, res: Response) => {
+    try {
+      const { verbose, includeSystemInfo } = req.body || {};
+
+      // 动态导入 doctor 模块
+      const { runDiagnostics, formatDoctorReport } = await import('../doctor.js');
+
+      const options = {
+        verbose: verbose || false,
+        includeSystemInfo: includeSystemInfo ?? true,
+      };
+
+      const report = await runDiagnostics(options);
+      const formattedText = formatDoctorReport(report, options.verbose);
+
+      res.json({
+        success: true,
+        report: {
+          ...report,
+          timestamp: report.timestamp.getTime(),
+        },
+        formattedText,
+      });
+    } catch (error) {
+      console.error('[API] 运行诊断失败:', error);
+      res.status(500).json({
+        success: false,
+        error: '运行诊断失败',
+        message: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  });
+
+  // 获取系统诊断报告（可选：缓存上次的结果）
+  app.get('/api/doctor', async (req: Request, res: Response) => {
+    try {
+      const verbose = req.query.verbose === 'true';
+      const includeSystemInfo = req.query.includeSystemInfo !== 'false';
+
+      const { runDiagnostics, formatDoctorReport } = await import('../doctor.js');
+
+      const options = {
+        verbose,
+        includeSystemInfo,
+      };
+
+      const report = await runDiagnostics(options);
+      const formattedText = formatDoctorReport(report, options.verbose);
+
+      res.json({
+        success: true,
+        report: {
+          ...report,
+          timestamp: report.timestamp.getTime(),
+        },
+        formattedText,
+      });
+    } catch (error) {
+      console.error('[API] 获取诊断报告失败:', error);
+      res.status(500).json({
+        success: false,
+        error: '获取诊断报告失败',
+        message: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  });
+
+  // ============ 检查点管理API ============
+
+  // 获取检查点列表
+  app.get('/api/checkpoints', (req: Request, res: Response) => {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+      const sortBy = (req.query.sortBy as 'timestamp' | 'description') || 'timestamp';
+      const sortOrder = (req.query.sortOrder as 'asc' | 'desc') || 'desc';
+
+      const checkpoints = checkpointManager.listCheckpoints({
+        limit,
+        sortBy,
+        sortOrder,
+      });
+
+      const stats = checkpointManager.getStats();
+
+      const checkpointSummaries = checkpoints.map(cp => ({
+        id: cp.id,
+        timestamp: cp.timestamp.getTime(),
+        description: cp.description,
+        fileCount: cp.files.length,
+        totalSize: cp.files.reduce((sum, f) => sum + f.size, 0),
+        workingDirectory: cp.workingDirectory,
+        tags: cp.metadata?.tags,
+      }));
+
+      res.json({
+        checkpoints: checkpointSummaries,
+        total: checkpointSummaries.length,
+        stats: {
+          totalFiles: stats.totalFiles,
+          totalSize: stats.totalSize,
+          oldest: stats.oldest?.getTime(),
+          newest: stats.newest?.getTime(),
+        },
+      });
+    } catch (error) {
+      console.error('[API] 获取检查点列表失败:', error);
+      res.status(500).json({
+        error: '获取检查点列表失败',
+        message: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  });
+
+  // 创建检查点
+  app.post('/api/checkpoints', async (req: Request, res: Response) => {
+    try {
+      const { description, filePaths, workingDirectory, tags } = req.body;
+
+      if (!description || !filePaths || filePaths.length === 0) {
+        res.status(400).json({
+          error: '创建检查点需要提供描述和文件列表',
+        });
+        return;
+      }
+
+      const checkpoint = await checkpointManager.createCheckpoint(
+        description,
+        filePaths,
+        workingDirectory,
+        { tags }
+      );
+
+      res.json({
+        checkpointId: checkpoint.id,
+        timestamp: checkpoint.timestamp.getTime(),
+        description: checkpoint.description,
+        fileCount: checkpoint.files.length,
+        totalSize: checkpoint.files.reduce((sum, f) => sum + f.size, 0),
+      });
+    } catch (error) {
+      console.error('[API] 创建检查点失败:', error);
+      res.status(500).json({
+        error: '创建检查点失败',
+        message: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  });
+
+  // 恢复检查点
+  app.post('/api/checkpoints/:id/restore', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { dryRun } = req.body;
+
+      const result = await checkpointManager.restoreCheckpoint(id, {
+        dryRun: dryRun || false,
+        skipBackup: false,
+      });
+
+      res.json({
+        checkpointId: id,
+        success: result.success,
+        restored: result.restored,
+        failed: result.failed,
+        errors: result.errors,
+      });
+    } catch (error) {
+      console.error('[API] 恢复检查点失败:', error);
+      res.status(500).json({
+        error: '恢复检查点失败',
+        message: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  });
+
+  // 删除检查点
+  app.delete('/api/checkpoints/:id', (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const success = checkpointManager.deleteCheckpoint(id);
+
+      if (success) {
+        res.json({
+          checkpointId: id,
+          success: true,
+          message: '检查点已删除',
+        });
+      } else {
+        res.status(404).json({
+          checkpointId: id,
+          success: false,
+          error: '检查点不存在',
+        });
+      }
+    } catch (error) {
+      console.error('[API] 删除检查点失败:', error);
+      res.status(500).json({
+        error: '删除检查点失败',
+        message: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  });
+
+  // 比较检查点差异
+  app.get('/api/checkpoints/:id/diff', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const diffs = await checkpointManager.diffCheckpoint(id);
+
+      const stats = {
+        added: diffs.filter(d => d.type === 'added').length,
+        removed: diffs.filter(d => d.type === 'removed').length,
+        modified: diffs.filter(d => d.type === 'modified').length,
+        unchanged: diffs.filter(d => d.type === 'unchanged').length,
+      };
+
+      res.json({
+        checkpointId: id,
+        diffs,
+        stats,
+      });
+    } catch (error) {
+      console.error('[API] 比较检查点失败:', error);
+      res.status(500).json({
+        error: '比较检查点失败',
+        message: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  });
+
+  // 清除所有检查点
+  app.delete('/api/checkpoints', (req: Request, res: Response) => {
+    try {
+      const count = checkpointManager.clearCheckpoints();
+
+      res.json({
+        success: true,
+        count,
+        message: `已清除 ${count} 个检查点`,
+      });
+    } catch (error) {
+      console.error('[API] 清除检查点失败:', error);
+      res.status(500).json({
+        error: '清除检查点失败',
+        message: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  });
+
+  // ============ 插件管理API ============
+
+  // 获取插件列表
+  app.get('/api/plugins', async (req: Request, res: Response) => {
+    try {
+      const plugins = await conversationManager.listPlugins();
+
+      res.json({
+        plugins,
+        total: plugins.length,
+      });
+    } catch (error) {
+      console.error('[API] 获取插件列表失败:', error);
+      res.status(500).json({
+        error: '获取插件列表失败',
+        message: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  });
+
+  // 获取插件详情
+  app.get('/api/plugins/:name', async (req: Request, res: Response) => {
+    try {
+      const { name } = req.params;
+
+      const plugin = await conversationManager.getPluginInfo(name);
+
+      if (!plugin) {
+        res.status(404).json({
+          error: '插件不存在',
+          name,
+        });
+        return;
+      }
+
+      res.json({
+        plugin,
+      });
+    } catch (error) {
+      console.error('[API] 获取插件详情失败:', error);
+      res.status(500).json({
+        error: '获取插件详情失败',
+        message: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  });
+
+  // 启用插件
+  app.patch('/api/plugins/:name/enable', async (req: Request, res: Response) => {
+    try {
+      const { name } = req.params;
+
+      const success = await conversationManager.enablePlugin(name);
+
+      if (success) {
+        res.json({
+          success: true,
+          name,
+          message: `插件 ${name} 已启用`,
+        });
+      } else {
+        res.status(404).json({
+          success: false,
+          error: '插件不存在',
+          name,
+        });
+      }
+    } catch (error) {
+      console.error('[API] 启用插件失败:', error);
+      res.status(500).json({
+        success: false,
+        error: '启用插件失败',
+        message: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  });
+
+  // 禁用插件
+  app.patch('/api/plugins/:name/disable', async (req: Request, res: Response) => {
+    try {
+      const { name } = req.params;
+
+      const success = await conversationManager.disablePlugin(name);
+
+      if (success) {
+        res.json({
+          success: true,
+          name,
+          message: `插件 ${name} 已禁用`,
+        });
+      } else {
+        res.status(404).json({
+          success: false,
+          error: '插件不存在',
+          name,
+        });
+      }
+    } catch (error) {
+      console.error('[API] 禁用插件失败:', error);
+      res.status(500).json({
+        success: false,
+        error: '禁用插件失败',
+        message: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  });
+
+  // 卸载插件
+  app.delete('/api/plugins/:name', async (req: Request, res: Response) => {
+    try {
+      const { name } = req.params;
+
+      const success = await conversationManager.uninstallPlugin(name);
+
+      if (success) {
+        res.json({
+          success: true,
+          name,
+          message: `插件 ${name} 已卸载`,
+        });
+      } else {
+        res.status(404).json({
+          success: false,
+          error: '插件不存在',
+          name,
+        });
+      }
+    } catch (error) {
+      console.error('[API] 卸载插件失败:', error);
+      res.status(500).json({
+        success: false,
+        error: '卸载插件失败',
+        message: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  });
+
+  // ============ 认证管理API ============
+
+  // 获取认证状态
+  app.get('/api/auth/status', (req: Request, res: Response) => {
+    try {
+      const status = authManager.getAuthStatus();
+      res.json({ status });
+    } catch (error) {
+      console.error('[API] 获取认证状态失败:', error);
+      res.status(500).json({
+        error: '获取认证状态失败',
+        message: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  });
+
+  // 设置API密钥
+  app.post('/api/auth/key', (req: Request, res: Response) => {
+    try {
+      const { apiKey } = req.body;
+
+      if (!apiKey || typeof apiKey !== 'string') {
+        res.status(400).json({
+          success: false,
+          error: '无效的API密钥',
+        });
+        return;
+      }
+
+      const success = authManager.setApiKey(apiKey);
+
+      if (success) {
+        const status = authManager.getAuthStatus();
+        res.json({
+          success: true,
+          message: 'API密钥已设置',
+          status,
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          error: '设置API密钥失败',
+        });
+      }
+    } catch (error) {
+      console.error('[API] 设置API密钥失败:', error);
+      res.status(500).json({
+        success: false,
+        error: '设置API密钥失败',
+        message: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  });
+
+  // 清除认证（登出）
+  app.delete('/api/auth', (req: Request, res: Response) => {
+    try {
+      authManager.clearAuth();
+      const status = authManager.getAuthStatus();
+
+      res.json({
+        success: true,
+        message: '认证已清除',
+        status,
+      });
+    } catch (error) {
+      console.error('[API] 清除认证失败:', error);
+      res.status(500).json({
+        success: false,
+        error: '清除认证失败',
+        message: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  });
+
+  // 验证API密钥
+  app.post('/api/auth/validate', async (req: Request, res: Response) => {
+    try {
+      const { apiKey } = req.body;
+
+      if (!apiKey || typeof apiKey !== 'string') {
+        res.status(400).json({
+          valid: false,
+          message: '无效的API密钥格式',
+        });
+        return;
+      }
+
+      const valid = await authManager.validateApiKey(apiKey);
+
+      res.json({
+        valid,
+        message: valid ? 'API密钥有效' : 'API密钥无效',
+      });
+    } catch (error) {
+      console.error('[API] 验证API密钥失败:', error);
+      res.status(500).json({
+        valid: false,
+        error: '验证API密钥失败',
         message: error instanceof Error ? error.message : '未知错误',
       });
     }

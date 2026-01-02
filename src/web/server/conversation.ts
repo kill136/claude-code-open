@@ -16,6 +16,8 @@ import type { WebSocket } from 'ws';
 import { WebSessionManager, type WebSessionData } from './session-manager.js';
 import type { SessionMetadata, SessionListOptions } from '../../session/index.js';
 import { TaskManager } from './task-manager.js';
+import { McpConfigManager } from '../../mcp/config.js';
+import type { ExtendedMcpServerConfig } from '../../mcp/config.js';
 
 /**
  * 流式回调接口
@@ -58,11 +60,16 @@ export class ConversationManager {
   private sessionManager: WebSessionManager;
   private cwd: string;
   private defaultModel: string;
+  private mcpConfigManager: McpConfigManager;
 
   constructor(cwd: string, defaultModel: string = 'sonnet') {
     this.cwd = cwd;
     this.defaultModel = defaultModel;
     this.sessionManager = new WebSessionManager(cwd);
+    this.mcpConfigManager = new McpConfigManager({
+      validateCommands: true,
+      autoSave: true,
+    });
   }
 
   /**
@@ -1287,5 +1294,227 @@ Respond in Chinese when the user writes in Chinese.`;
   getToolFilterConfig(sessionId: string): import('../shared/types.js').ToolFilterConfig {
     const state = this.sessions.get(sessionId);
     return state?.toolFilterConfig || { mode: 'all' };
+  }
+
+  // ============ MCP 服务器管理方法 ============
+
+  /**
+   * 列出所有 MCP 服务器
+   */
+  listMcpServers(): import('../shared/types.js').McpServerConfig[] {
+    const servers = this.mcpConfigManager.getServers();
+
+    return Object.entries(servers).map(([name, config]) => ({
+      name,
+      type: config.type,
+      command: config.command,
+      args: config.args,
+      env: config.env,
+      url: config.url,
+      headers: config.headers,
+      enabled: config.enabled !== false,
+      timeout: config.timeout,
+      retries: config.retries,
+    }));
+  }
+
+  /**
+   * 添加 MCP 服务器
+   */
+  async addMcpServer(name: string, config: Omit<import('../shared/types.js').McpServerConfig, 'name'>): Promise<boolean> {
+    try {
+      const serverConfig: ExtendedMcpServerConfig = {
+        type: config.type,
+        command: config.command,
+        args: config.args,
+        env: config.env,
+        url: config.url,
+        headers: config.headers,
+        enabled: config.enabled !== false,
+        timeout: config.timeout || 30000,
+        retries: config.retries || 3,
+      };
+
+      await this.mcpConfigManager.addServer(name, serverConfig);
+      console.log(`[ConversationManager] 已添加 MCP 服务器: ${name}`);
+      return true;
+    } catch (error) {
+      console.error(`[ConversationManager] 添加 MCP 服务器失败:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * 删除 MCP 服务器
+   */
+  async removeMcpServer(name: string): Promise<boolean> {
+    try {
+      const success = await this.mcpConfigManager.removeServer(name);
+      if (success) {
+        console.log(`[ConversationManager] 已删除 MCP 服务器: ${name}`);
+      }
+      return success;
+    } catch (error) {
+      console.error(`[ConversationManager] 删除 MCP 服务器失败:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * 切换 MCP 服务器启用状态
+   */
+  async toggleMcpServer(name: string, enabled?: boolean): Promise<{ success: boolean; enabled: boolean }> {
+    try {
+      const server = this.mcpConfigManager.getServer(name);
+
+      if (!server) {
+        console.warn(`[ConversationManager] MCP 服务器不存在: ${name}`);
+        return { success: false, enabled: false };
+      }
+
+      // 如果未指定 enabled，则切换当前状态
+      const newEnabled = enabled !== undefined ? enabled : !(server.enabled !== false);
+
+      if (newEnabled) {
+        await this.mcpConfigManager.enableServer(name);
+      } else {
+        await this.mcpConfigManager.disableServer(name);
+      }
+
+      console.log(`[ConversationManager] MCP 服务器 ${name} ${newEnabled ? '已启用' : '已禁用'}`);
+      return { success: true, enabled: newEnabled };
+    } catch (error) {
+      console.error(`[ConversationManager] 切换 MCP 服务器失败:`, error);
+      return { success: false, enabled: false };
+    }
+  }
+
+  /**
+   * 获取 MCP 配置管理器（供其他模块使用）
+   */
+  getMcpConfigManager(): McpConfigManager {
+    return this.mcpConfigManager;
+  }
+
+  // ============ 插件管理方法 ============
+
+  /**
+   * 列出所有插件
+   */
+  async listPlugins(): Promise<import('../shared/types.js').PluginInfo[]> {
+    const { pluginManager } = await import('../../plugins/index.js');
+
+    // 发现所有插件
+    await pluginManager.discover();
+
+    const pluginStates = pluginManager.getPluginStates();
+
+    return pluginStates.map(state => {
+      const tools = pluginManager.getPluginTools(state.metadata.name);
+      const commands = pluginManager.getPluginCommands(state.metadata.name);
+      const skills = pluginManager.getPluginSkills(state.metadata.name);
+      const hooks = pluginManager.getPluginHooks(state.metadata.name);
+
+      return {
+        name: state.metadata.name,
+        version: state.metadata.version,
+        description: state.metadata.description,
+        author: state.metadata.author,
+        enabled: state.enabled,
+        loaded: state.loaded,
+        path: state.path,
+        commands: commands.map(c => c.name),
+        skills: skills.map(s => s.name),
+        hooks: hooks.map(h => h.type),
+        tools: tools.map(t => t.name),
+        error: state.error,
+      };
+    });
+  }
+
+  /**
+   * 获取插件详情
+   */
+  async getPluginInfo(name: string): Promise<import('../shared/types.js').PluginInfo | null> {
+    const { pluginManager } = await import('../../plugins/index.js');
+
+    const state = pluginManager.getPluginState(name);
+    if (!state) {
+      return null;
+    }
+
+    const tools = pluginManager.getPluginTools(name);
+    const commands = pluginManager.getPluginCommands(name);
+    const skills = pluginManager.getPluginSkills(name);
+    const hooks = pluginManager.getPluginHooks(name);
+
+    return {
+      name: state.metadata.name,
+      version: state.metadata.version,
+      description: state.metadata.description,
+      author: state.metadata.author,
+      enabled: state.enabled,
+      loaded: state.loaded,
+      path: state.path,
+      commands: commands.map(c => c.name),
+      skills: skills.map(s => s.name),
+      hooks: hooks.map(h => h.type),
+      tools: tools.map(t => t.name),
+      error: state.error,
+    };
+  }
+
+  /**
+   * 启用插件
+   */
+  async enablePlugin(name: string): Promise<boolean> {
+    try {
+      const { pluginManager } = await import('../../plugins/index.js');
+
+      const success = await pluginManager.setEnabled(name, true);
+      if (success) {
+        console.log(`[ConversationManager] 插件已启用: ${name}`);
+      }
+      return success;
+    } catch (error) {
+      console.error(`[ConversationManager] 启用插件失败:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * 禁用插件
+   */
+  async disablePlugin(name: string): Promise<boolean> {
+    try {
+      const { pluginManager } = await import('../../plugins/index.js');
+
+      const success = await pluginManager.setEnabled(name, false);
+      if (success) {
+        console.log(`[ConversationManager] 插件已禁用: ${name}`);
+      }
+      return success;
+    } catch (error) {
+      console.error(`[ConversationManager] 禁用插件失败:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * 卸载插件
+   */
+  async uninstallPlugin(name: string): Promise<boolean> {
+    try {
+      const { pluginManager } = await import('../../plugins/index.js');
+
+      const success = await pluginManager.uninstall(name);
+      if (success) {
+        console.log(`[ConversationManager] 插件已卸载: ${name}`);
+      }
+      return success;
+    } catch (error) {
+      console.error(`[ConversationManager] 卸载插件失败:`, error);
+      return false;
+    }
   }
 }
