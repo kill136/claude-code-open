@@ -1044,6 +1044,240 @@ You can try:
   },
 };
 
+// /tag - 会话标签管理
+export const tagCommand: SlashCommand = {
+  name: 'tag',
+  aliases: ['tags'],
+  description: 'Add, remove, or list session tags',
+  usage: '/tag [add|remove|list|clear] [tag-name]',
+  category: 'session',
+  execute: (ctx: CommandContext): CommandResult => {
+    const { args, session } = ctx;
+    const action = args[0]?.toLowerCase();
+
+    // 获取当前标签 - 优先使用 getTags() 方法，否则从会话文件读取
+    let currentTags: string[] = [];
+
+    if (session.getTags) {
+      currentTags = session.getTags();
+    } else {
+      // 从会话文件读取标签
+      try {
+        const sessionsDir = getSessionsDir();
+        const sessionFile = path.join(sessionsDir, `${session.id}.json`);
+        if (fs.existsSync(sessionFile)) {
+          const sessionData = JSON.parse(fs.readFileSync(sessionFile, 'utf-8'));
+          currentTags = sessionData?.metadata?.tags || [];
+        }
+      } catch {
+        currentTags = [];
+      }
+    }
+
+    // 默认或 list：显示所有标签
+    if (!action || action === 'list') {
+      if (currentTags.length === 0) {
+        ctx.ui.addMessage('assistant', `Session Tags\n\nNo tags on this session.\n\nUsage:\n  /tag add <name>    - Add a tag\n  /tag remove <name> - Remove a tag\n  /tag list          - List all tags\n  /tag clear         - Remove all tags\n\nExamples:\n  /tag add feature-x\n  /tag add bug-fix\n  /tag add important`);
+        return { success: true };
+      }
+
+      let tagInfo = `Session Tags (${currentTags.length})\n\n`;
+      currentTags.forEach((tag, i) => {
+        tagInfo += `  ${i + 1}. ${tag}\n`;
+      });
+      tagInfo += `\nCommands:\n  /tag add <name>    - Add a tag\n  /tag remove <name> - Remove a tag\n  /tag clear         - Remove all tags`;
+
+      ctx.ui.addMessage('assistant', tagInfo);
+      return { success: true };
+    }
+
+    // add：添加标签
+    if (action === 'add') {
+      if (args.length < 2) {
+        ctx.ui.addMessage('assistant', 'Usage: /tag add <tag-name>\n\nExample: /tag add feature-x');
+        return { success: false };
+      }
+
+      const tagName = args.slice(1).join('-').toLowerCase().replace(/[^a-z0-9-]/g, '');
+      if (!tagName) {
+        ctx.ui.addMessage('assistant', 'Invalid tag name. Tags can only contain letters, numbers, and hyphens.');
+        return { success: false };
+      }
+
+      if (currentTags.includes(tagName)) {
+        ctx.ui.addMessage('assistant', `Tag "${tagName}" already exists on this session.`);
+        return { success: true };
+      }
+
+      const newTags = [...currentTags, tagName];
+
+      // 保存标签
+      if (session.setTags) {
+        session.setTags(newTags);
+      } else {
+        // 直接修改会话文件
+        try {
+          const sessionsDir = getSessionsDir();
+          const sessionFile = path.join(sessionsDir, `${session.id}.json`);
+
+          if (fs.existsSync(sessionFile)) {
+            const sessionData = JSON.parse(fs.readFileSync(sessionFile, 'utf-8'));
+            if (!sessionData.metadata) {
+              sessionData.metadata = {};
+            }
+            sessionData.metadata.tags = newTags;
+            sessionData.metadata.modified = Date.now();
+            fs.writeFileSync(sessionFile, JSON.stringify(sessionData, null, 2));
+          }
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          ctx.ui.addMessage('assistant', `Error saving tag: ${errorMsg}`);
+          return { success: false };
+        }
+      }
+
+      ctx.ui.addMessage('assistant', `Added tag: ${tagName}\n\nCurrent tags: ${newTags.join(', ')}`);
+      ctx.ui.addActivity(`Added tag: ${tagName}`);
+      return { success: true };
+    }
+
+    // remove：移除标签
+    if (action === 'remove' || action === 'rm') {
+      if (args.length < 2) {
+        ctx.ui.addMessage('assistant', 'Usage: /tag remove <tag-name>\n\nExample: /tag remove feature-x');
+        return { success: false };
+      }
+
+      const tagName = args.slice(1).join('-').toLowerCase();
+      if (!currentTags.includes(tagName)) {
+        ctx.ui.addMessage('assistant', `Tag "${tagName}" not found on this session.\n\nCurrent tags: ${currentTags.join(', ') || '(none)'}`);
+        return { success: false };
+      }
+
+      const newTags = currentTags.filter(t => t !== tagName);
+
+      // 保存标签
+      if (session.setTags) {
+        session.setTags(newTags);
+      } else {
+        // 直接修改会话文件
+        try {
+          const sessionsDir = getSessionsDir();
+          const sessionFile = path.join(sessionsDir, `${session.id}.json`);
+
+          if (fs.existsSync(sessionFile)) {
+            const sessionData = JSON.parse(fs.readFileSync(sessionFile, 'utf-8'));
+            if (!sessionData.metadata) {
+              sessionData.metadata = {};
+            }
+            sessionData.metadata.tags = newTags;
+            sessionData.metadata.modified = Date.now();
+            fs.writeFileSync(sessionFile, JSON.stringify(sessionData, null, 2));
+          }
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          ctx.ui.addMessage('assistant', `Error saving tag: ${errorMsg}`);
+          return { success: false };
+        }
+      }
+
+      ctx.ui.addMessage('assistant', `Removed tag: ${tagName}\n\nRemaining tags: ${newTags.join(', ') || '(none)'}`);
+      ctx.ui.addActivity(`Removed tag: ${tagName}`);
+      return { success: true };
+    }
+
+    // clear：清除所有标签
+    if (action === 'clear') {
+      if (currentTags.length === 0) {
+        ctx.ui.addMessage('assistant', 'No tags to clear.');
+        return { success: true };
+      }
+
+      const tagCount = currentTags.length;
+
+      // 保存标签
+      if (session.setTags) {
+        session.setTags([]);
+      } else {
+        // 直接修改会话文件
+        try {
+          const sessionsDir = getSessionsDir();
+          const sessionFile = path.join(sessionsDir, `${session.id}.json`);
+
+          if (fs.existsSync(sessionFile)) {
+            const sessionData = JSON.parse(fs.readFileSync(sessionFile, 'utf-8'));
+            if (!sessionData.metadata) {
+              sessionData.metadata = {};
+            }
+            sessionData.metadata.tags = [];
+            sessionData.metadata.modified = Date.now();
+            fs.writeFileSync(sessionFile, JSON.stringify(sessionData, null, 2));
+          }
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          ctx.ui.addMessage('assistant', `Error clearing tags: ${errorMsg}`);
+          return { success: false };
+        }
+      }
+
+      ctx.ui.addMessage('assistant', `Cleared ${tagCount} tag(s) from this session.`);
+      ctx.ui.addActivity('Cleared session tags');
+      return { success: true };
+    }
+
+    // toggle：快速切换标签
+    if (action === 'toggle') {
+      if (args.length < 2) {
+        ctx.ui.addMessage('assistant', 'Usage: /tag toggle <tag-name>');
+        return { success: false };
+      }
+
+      const tagName = args.slice(1).join('-').toLowerCase().replace(/[^a-z0-9-]/g, '');
+      let newTags: string[];
+      let message: string;
+
+      if (currentTags.includes(tagName)) {
+        newTags = currentTags.filter(t => t !== tagName);
+        message = `Removed tag: ${tagName}`;
+      } else {
+        newTags = [...currentTags, tagName];
+        message = `Added tag: ${tagName}`;
+      }
+
+      // 保存标签
+      if (session.setTags) {
+        session.setTags(newTags);
+      } else {
+        // 直接修改会话文件
+        try {
+          const sessionsDir = getSessionsDir();
+          const sessionFile = path.join(sessionsDir, `${session.id}.json`);
+
+          if (fs.existsSync(sessionFile)) {
+            const sessionData = JSON.parse(fs.readFileSync(sessionFile, 'utf-8'));
+            if (!sessionData.metadata) {
+              sessionData.metadata = {};
+            }
+            sessionData.metadata.tags = newTags;
+            sessionData.metadata.modified = Date.now();
+            fs.writeFileSync(sessionFile, JSON.stringify(sessionData, null, 2));
+          }
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          ctx.ui.addMessage('assistant', `Error toggling tag: ${errorMsg}`);
+          return { success: false };
+        }
+      }
+
+      ctx.ui.addMessage('assistant', message);
+      return { success: true };
+    }
+
+    ctx.ui.addMessage('assistant', `Unknown action: ${action}\n\nUsage:\n  /tag add <name>\n  /tag remove <name>\n  /tag list\n  /tag clear\n  /tag toggle <name>`);
+    return { success: false };
+  },
+};
+
 // 辅助函数：格式化持续时间
 function formatDuration(ms: number): string {
   const seconds = Math.floor(ms / 1000);
@@ -1068,4 +1302,5 @@ export function registerSessionCommands(): void {
   commandRegistry.register(renameCommand);
   commandRegistry.register(exportCommand);
   commandRegistry.register(transcriptCommand);
+  commandRegistry.register(tagCommand);
 }

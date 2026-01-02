@@ -33,6 +33,9 @@ export interface CommandContext {
       status: 'pending' | 'in_progress' | 'completed';
       activeForm: string;
     }>) => void;
+    // 标签管理 (用于 /tag 命令)
+    getTags?: () => string[];
+    setTags?: (tags: string[]) => void;
     // 文件状态跟踪 (官方实现 - 用于 /files 命令)
     readFileState?: Map<string, any> | Record<string, any> | string[];
   };

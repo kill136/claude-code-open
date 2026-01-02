@@ -2461,6 +2461,67 @@ Check your terminal's documentation for custom key binding configuration.`;
     return { success: true };
   },
 };
+
+// /sandbox - 沙箱设置
+export const sandboxCommand: SlashCommand = {
+  name: 'sandbox',
+  description: 'Configure sandbox settings for tool execution',
+  usage: '/sandbox [status|enable|disable]',
+  category: 'config',
+  execute: (ctx: CommandContext): CommandResult => {
+    const { args } = ctx;
+    const action = args[0]?.toLowerCase();
+
+    // 检查当前沙箱状态
+    const sandboxEnabled = process.env.CLAUDE_CODE_ENABLE_SANDBOX === 'true';
+    const platform = process.platform;
+    const supportsSandbox = platform === 'linux'; // Bubblewrap 仅支持 Linux
+
+    if (!action || action === 'status') {
+      let sandboxInfo = `Sandbox Settings\n\n`;
+      sandboxInfo += `Status: ${sandboxEnabled ? '✓ Enabled' : '✗ Disabled'}\n`;
+      sandboxInfo += `Platform: ${platform}\n`;
+      sandboxInfo += `Sandbox Support: ${supportsSandbox ? '✓ Available (Linux with Bubblewrap)' : '✗ Not available (requires Linux)'}\n\n`;
+
+      if (!supportsSandbox) {
+        sandboxInfo += `Note: Sandbox isolation requires Linux with Bubblewrap installed.\n`;
+        sandboxInfo += `On Windows, consider using WSL for sandbox support.\n`;
+        sandboxInfo += `On macOS, sandbox features are limited.\n\n`;
+      }
+
+      sandboxInfo += `Commands:\n`;
+      sandboxInfo += `  /sandbox status   - Show current status\n`;
+      sandboxInfo += `  /sandbox enable   - Enable sandbox (Linux only)\n`;
+      sandboxInfo += `  /sandbox disable  - Disable sandbox\n\n`;
+
+      sandboxInfo += `Environment Variable:\n`;
+      sandboxInfo += `  CLAUDE_CODE_ENABLE_SANDBOX=true|false\n`;
+
+      ctx.ui.addMessage('assistant', sandboxInfo);
+      return { success: true };
+    }
+
+    if (action === 'enable') {
+      if (!supportsSandbox) {
+        ctx.ui.addMessage('assistant', `Cannot enable sandbox on ${platform}.\n\nSandbox requires Linux with Bubblewrap installed.`);
+        return { success: false };
+      }
+      process.env.CLAUDE_CODE_ENABLE_SANDBOX = 'true';
+      ctx.ui.addMessage('assistant', 'Sandbox enabled for this session.\n\nTo make permanent, set CLAUDE_CODE_ENABLE_SANDBOX=true in your environment.');
+      return { success: true };
+    }
+
+    if (action === 'disable') {
+      process.env.CLAUDE_CODE_ENABLE_SANDBOX = 'false';
+      ctx.ui.addMessage('assistant', 'Sandbox disabled for this session.');
+      return { success: true };
+    }
+
+    ctx.ui.addMessage('assistant', `Unknown action: ${action}\n\nUsage: /sandbox [status|enable|disable]`);
+    return { success: false };
+  },
+};
+
 // 注册所有配置命令
 export function registerConfigCommands(): void {
   commandRegistry.register(configCommand);
@@ -2477,4 +2538,5 @@ export function registerConfigCommands(): void {
   commandRegistry.register(statuslineCommand);
   commandRegistry.register(remoteEnvCommand);
   commandRegistry.register(terminalSetupCommand);
+  commandRegistry.register(sandboxCommand);
 }

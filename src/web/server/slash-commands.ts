@@ -49,7 +49,7 @@ export interface SlashCommand {
   aliases?: string[];
   description: string;
   usage?: string;
-  category: 'general' | 'session' | 'config' | 'utility';
+  category: 'general' | 'session' | 'config' | 'utility' | 'integration' | 'auth' | 'development';
   execute: (ctx: ExtendedCommandContext) => Promise<CommandResult> | CommandResult;
 }
 
@@ -159,9 +159,12 @@ export class SlashCommandRegistry {
       session: '会话管理',
       config: '配置',
       utility: '工具',
+      integration: '集成',
+      auth: '认证',
+      development: '开发',
     };
 
-    const categoryOrder: Array<keyof typeof categories> = ['general', 'session', 'config', 'utility'];
+    const categoryOrder: Array<keyof typeof categories> = ['general', 'session', 'config', 'utility', 'integration', 'auth', 'development'];
 
     let help = '\n可用命令\n';
     help += '='.repeat(50) + '\n\n';
@@ -1440,11 +1443,12 @@ const pluginsCommand: SlashCommand = {
   },
 };
 
-// /auth - 认证管理命令
-const authCommand: SlashCommand = {
-  name: 'auth',
+// /login - 认证管理命令（与 CLI 模式一致，auth 作为别名）
+const loginCommand: SlashCommand = {
+  name: 'login',
+  aliases: ['auth'],
   description: '管理认证和API密钥',
-  usage: '/auth [status|set <key>|clear]',
+  usage: '/login [status|set <key>|clear]',
   category: 'config',
   execute: async (ctx: ExtendedCommandContext): Promise<CommandResult> => {
     const { args } = ctx;
@@ -1477,10 +1481,10 @@ const authCommand: SlashCommand = {
         }
 
         message += '\n可用命令:\n';
-        message += '  /auth status       - 显示认证状态\n';
-        message += '  /auth set <key>    - 设置API密钥\n';
-        message += '  /auth clear        - 清除认证（登出）\n';
-        message += '  /logout            - 等同于 /auth clear';
+        message += '  /login status      - 显示认证状态\n';
+        message += '  /login set <key>   - 设置API密钥\n';
+        message += '  /login clear       - 清除认证（登出）\n';
+        message += '  /logout            - 等同于 /login clear';
 
         return { success: true, message };
       } catch (error) {
@@ -1493,12 +1497,12 @@ const authCommand: SlashCommand = {
 
     const subcommand = args[0].toLowerCase();
 
-    // /auth set <api_key>
+    // /login set <api_key>
     if (subcommand === 'set') {
       if (args.length < 2) {
         return {
           success: false,
-          message: '用法: /auth set <api_key>\n\n示例: /auth set sk-ant-api03-...',
+          message: '用法: /login set <api_key>\n\n示例: /login set sk-ant-api03-...',
         };
       }
 
@@ -1527,7 +1531,7 @@ const authCommand: SlashCommand = {
       }
     }
 
-    // /auth clear
+    // /login clear
     if (subcommand === 'clear') {
       try {
         authManager.clearAuth();
@@ -1544,12 +1548,12 @@ const authCommand: SlashCommand = {
       }
     }
 
-    // /auth validate <api_key>
+    // /login validate <api_key>
     if (subcommand === 'validate') {
       if (args.length < 2) {
         return {
           success: false,
-          message: '用法: /auth validate <api_key>\n\n验证API密钥是否有效。',
+          message: '用法: /login validate <api_key>\n\n验证API密钥是否有效。',
         };
       }
 
@@ -1589,25 +1593,1173 @@ const logoutCommand: SlashCommand = {
   description: '登出（清除API密钥）',
   category: 'config',
   execute: async (ctx: ExtendedCommandContext): Promise<CommandResult> => {
-    // 直接调用 /auth clear
-    return authCommand.execute({
+    // 直接调用 /login clear
+    return loginCommand.execute({
       ...ctx,
       args: ['clear'],
     });
   },
 };
 
+// ============ 通用命令 ============
+
+// /exit - 退出 Claude Code
+const exitCommand: SlashCommand = {
+  name: 'exit',
+  aliases: ['quit', 'q'],
+  description: '退出 Claude Code',
+  category: 'general',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    return {
+      success: true,
+      message: '正在退出 Claude Code...\n\n请关闭浏览器标签页。',
+    };
+  },
+};
+
+// /version - 显示版本信息
+const versionCommand: SlashCommand = {
+  name: 'version',
+  aliases: ['ver', 'v'],
+  description: '显示版本信息',
+  category: 'general',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    const packageJson = require('../../../package.json');
+
+    let message = 'Claude Code 版本信息\n\n';
+    message += `版本: ${packageJson.version || 'Unknown'}\n`;
+    message += `Node.js: ${process.version}\n`;
+    message += `平台: ${process.platform} ${process.arch}\n`;
+    message += `运行模式: WebUI\n\n`;
+    message += '项目地址: https://github.com/yourusername/claude-code-open\n';
+    message += '官方文档: https://docs.anthropic.com/claude-code';
+
+    return { success: true, message };
+  },
+};
+
+// /bug - 报告问题
+const bugCommand: SlashCommand = {
+  name: 'bug',
+  aliases: ['report', 'issue'],
+  description: '报告问题或提交反馈',
+  category: 'general',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    let message = '报告问题\n\n';
+    message += '感谢您帮助改进 Claude Code！\n\n';
+    message += '报告问题:\n';
+    message += '  • GitHub Issues: https://github.com/yourusername/claude-code-open/issues\n';
+    message += '  • 邮箱: support@example.com\n\n';
+    message += '提交反馈时请包含:\n';
+    message += '  1. 问题描述\n';
+    message += '  2. 复现步骤\n';
+    message += '  3. 预期行为\n';
+    message += '  4. 实际行为\n';
+    message += '  5. 系统信息 (使用 /doctor 获取)\n\n';
+    message += '使用 /doctor 运行系统诊断并附上结果。';
+
+    return { success: true, message };
+  },
+};
+
+// ============ 会话命令 ============
+
+// /context - 显示上下文使用情况
+const contextCommand: SlashCommand = {
+  name: 'context',
+  aliases: ['ctx'],
+  description: '显示当前上下文使用情况',
+  category: 'session',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    const history = ctx.conversationManager.getHistory(ctx.sessionId);
+
+    let totalTokens = 0;
+    let inputTokens = 0;
+    let outputTokens = 0;
+
+    for (const msg of history) {
+      if (msg.usage) {
+        inputTokens += msg.usage.inputTokens || 0;
+        outputTokens += msg.usage.outputTokens || 0;
+        totalTokens += (msg.usage.inputTokens || 0) + (msg.usage.outputTokens || 0);
+      }
+    }
+
+    // 假设上下文窗口为 200k tokens
+    const contextWindow = 200000;
+    const usagePercent = ((totalTokens / contextWindow) * 100).toFixed(1);
+
+    let message = '上下文使用情况\n\n';
+    message += `当前会话:\n`;
+    message += `  消息数: ${history.length}\n`;
+    message += `  输入 tokens: ${inputTokens.toLocaleString()}\n`;
+    message += `  输出 tokens: ${outputTokens.toLocaleString()}\n`;
+    message += `  总计 tokens: ${totalTokens.toLocaleString()}\n\n`;
+    message += `上下文窗口:\n`;
+    message += `  容量: ${contextWindow.toLocaleString()} tokens\n`;
+    message += `  已使用: ${usagePercent}%\n`;
+    message += `  剩余: ${(contextWindow - totalTokens).toLocaleString()} tokens\n\n`;
+
+    if (totalTokens > contextWindow * 0.8) {
+      message += '⚠️  警告: 上下文使用超过 80%，建议使用 /clear 或 /compact 释放空间。';
+    } else {
+      message += '提示: 使用 /compact 压缩历史，或 /clear 清除对话。';
+    }
+
+    return { success: true, message };
+  },
+};
+
+// /rewind - 回退会话
+const rewindCommand: SlashCommand = {
+  name: 'rewind',
+  aliases: ['undo'],
+  description: '回退会话到之前的状态',
+  usage: '/rewind [步数]',
+  category: 'session',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    return {
+      success: false,
+      message: '会话回退\n\n' +
+        'WebUI 模式暂不支持会话回退功能。\n\n' +
+        '替代方案:\n' +
+        '  • 使用 /checkpoint 创建检查点\n' +
+        '  • 使用 /clear 清除当前会话\n' +
+        '  • 在 CLI 模式中使用 /rewind 命令',
+    };
+  },
+};
+
+// /rename - 重命名会话
+const renameCommand: SlashCommand = {
+  name: 'rename',
+  description: '重命名当前会话',
+  usage: '/rename <新名称>',
+  category: 'session',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    const { args } = ctx;
+
+    if (!args || args.length === 0) {
+      return {
+        success: false,
+        message: '用法: /rename <新名称>\n\n示例: /rename "我的项目开发"',
+      };
+    }
+
+    const newName = args.join(' ');
+
+    return {
+      success: false,
+      message: '会话重命名\n\n' +
+        'WebUI 模式暂不支持会话重命名功能。\n\n' +
+        '替代方案:\n' +
+        '  • 通过 WebUI 界面管理会话\n' +
+        '  • 在 CLI 模式中使用 /rename 命令',
+    };
+  },
+};
+
+// /export - 导出会话
+const exportCommand: SlashCommand = {
+  name: 'export',
+  description: '导出会话数据',
+  usage: '/export [格式]',
+  category: 'session',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    return {
+      success: false,
+      message: '会话导出\n\n' +
+        'WebUI 模式暂不支持会话导出功能。\n\n' +
+        '替代方案:\n' +
+        '  • 使用 /transcript 导出对话记录\n' +
+        '  • 在 CLI 模式中使用 /export 命令',
+    };
+  },
+};
+
+// /transcript - 导出对话记录
+const transcriptCommand: SlashCommand = {
+  name: 'transcript',
+  description: '导出对话记录',
+  usage: '/transcript [markdown|json|text]',
+  category: 'session',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    const { args } = ctx;
+    const format = args && args.length > 0 ? args[0].toLowerCase() : 'markdown';
+
+    const history = ctx.conversationManager.getHistory(ctx.sessionId);
+
+    if (history.length === 0) {
+      return {
+        success: false,
+        message: '没有对话记录可导出。',
+      };
+    }
+
+    let message = '对话记录导出\n\n';
+    message += `格式: ${format}\n`;
+    message += `消息数: ${history.length}\n\n`;
+    message += 'WebUI 模式暂不支持直接导出到文件。\n\n';
+    message += '对话记录保存在: ~/.claude/sessions/\n';
+    message += `会话 ID: ${ctx.sessionId}\n\n`;
+    message += '提示: 在 CLI 模式中使用 /transcript 导出到文件。';
+
+    return { success: true, message };
+  },
+};
+
+// /tag - 会话标签管理
+const tagCommand: SlashCommand = {
+  name: 'tag',
+  description: '管理会话标签',
+  usage: '/tag [add|remove|list] [标签]',
+  category: 'session',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    return {
+      success: false,
+      message: '会话标签\n\n' +
+        'WebUI 模式暂不支持会话标签功能。\n\n' +
+        '替代方案:\n' +
+        '  • 通过 WebUI 界面管理会话\n' +
+        '  • 在 CLI 模式中使用 /tag 命令',
+    };
+  },
+};
+
+// /stats - 会话统计
+const statsCommand: SlashCommand = {
+  name: 'stats',
+  description: '显示会话统计信息',
+  category: 'session',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    const history = ctx.conversationManager.getHistory(ctx.sessionId);
+
+    let totalInput = 0;
+    let totalOutput = 0;
+    let toolCalls = 0;
+
+    for (const msg of history) {
+      if (msg.usage) {
+        totalInput += msg.usage.inputTokens || 0;
+        totalOutput += msg.usage.outputTokens || 0;
+      }
+      if (msg.role === 'assistant' && msg.content) {
+        const content = Array.isArray(msg.content) ? msg.content : [msg.content];
+        toolCalls += content.filter(c => typeof c === 'object' && c.type === 'tool_use').length;
+      }
+    }
+
+    const modelPricing: Record<string, { input: number; output: number }> = {
+      opus: { input: 15, output: 75 },
+      sonnet: { input: 3, output: 15 },
+      haiku: { input: 0.8, output: 4 },
+    };
+
+    const pricing = modelPricing[ctx.model] || modelPricing.sonnet;
+    const totalCost = (totalInput / 1000000) * pricing.input + (totalOutput / 1000000) * pricing.output;
+
+    let message = '会话统计\n\n';
+    message += `基本信息:\n`;
+    message += `  会话 ID: ${ctx.sessionId.slice(0, 8)}\n`;
+    message += `  消息数: ${history.length}\n`;
+    message += `  模型: ${ctx.model}\n`;
+    message += `  工具调用: ${toolCalls} 次\n\n`;
+    message += `Token 使用:\n`;
+    message += `  输入: ${totalInput.toLocaleString()}\n`;
+    message += `  输出: ${totalOutput.toLocaleString()}\n`;
+    message += `  总计: ${(totalInput + totalOutput).toLocaleString()}\n\n`;
+    message += `费用:\n`;
+    message += `  估算: $${totalCost.toFixed(4)}`;
+
+    return { success: true, message };
+  },
+};
+
+// ============ 配置命令 ============
+
+// /permissions - 管理工具权限
+const permissionsCommand: SlashCommand = {
+  name: 'permissions',
+  description: '管理工具权限设置',
+  usage: '/permissions [list|grant|revoke] [工具名]',
+  category: 'config',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    return {
+      success: false,
+      message: '工具权限管理\n\n' +
+        'WebUI 模式暂不支持权限管理功能。\n\n' +
+        '说明:\n' +
+        '  • WebUI 模式下所有工具默认可用\n' +
+        '  • 在 CLI 模式中使用 /permissions 管理权限\n' +
+        '  • 可通过配置文件设置工具允许/拒绝列表',
+    };
+  },
+};
+
+// /hooks - 查看/管理钩子
+const hooksCommand: SlashCommand = {
+  name: 'hooks',
+  description: '查看和管理钩子脚本',
+  usage: '/hooks [list|enable|disable] [钩子名]',
+  category: 'config',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    return {
+      success: true,
+      message: '钩子管理\n\n' +
+        '钩子脚本位置:\n' +
+        '  • ~/.claude/hooks/\n' +
+        '  • ./.claude/hooks/\n\n' +
+        '可用钩子:\n' +
+        '  • pre-tool-call - 工具调用前执行\n' +
+        '  • post-tool-call - 工具调用后执行\n' +
+        '  • pre-message - 发送消息前执行\n' +
+        '  • post-message - 接收消息后执行\n' +
+        '  • session-start - 会话开始时执行\n' +
+        '  • session-end - 会话结束时执行\n\n' +
+        '详细管理请在 CLI 模式中使用 /hooks 命令。',
+    };
+  },
+};
+
+// /init - 初始化 CLAUDE.md
+const initCommand: SlashCommand = {
+  name: 'init',
+  description: '初始化项目的 CLAUDE.md 文件',
+  category: 'config',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    return {
+      success: false,
+      message: '初始化 CLAUDE.md\n\n' +
+        'WebUI 模式暂不支持直接初始化功能。\n\n' +
+        '手动创建:\n' +
+        '  1. 在项目根目录创建 CLAUDE.md 文件\n' +
+        '  2. 添加项目说明和 Claude 使用指南\n' +
+        '  3. 参考: https://docs.anthropic.com/claude-code/claude-md\n\n' +
+        '或在 CLI 模式中使用 /init 命令自动创建。',
+    };
+  },
+};
+
+// /privacy-settings - 隐私设置
+const privacySettingsCommand: SlashCommand = {
+  name: 'privacy-settings',
+  description: '管理隐私和数据收集设置',
+  category: 'config',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    return {
+      success: true,
+      message: '隐私设置\n\n' +
+        '当前设置:\n' +
+        '  • 数据收集: 已禁用\n' +
+        '  • 匿名统计: 已禁用\n' +
+        '  • 会话本地存储: 已启用\n\n' +
+        '数据存储位置:\n' +
+        '  • 会话: ~/.claude/sessions/\n' +
+        '  • 配置: ~/.claude/settings.json\n' +
+        '  • 日志: ~/.claude/logs/\n\n' +
+        '注意:\n' +
+        '  • 所有数据仅本地存储\n' +
+        '  • 不会上传到任何服务器\n' +
+        '  • API 调用直接发送到 Anthropic',
+    };
+  },
+};
+
+// /vim - 切换 Vim 模式
+const vimCommand: SlashCommand = {
+  name: 'vim',
+  description: '切换 Vim 键绑定模式',
+  category: 'config',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    return {
+      success: false,
+      message: 'Vim 模式\n\n' +
+        'WebUI 模式暂不支持 Vim 键绑定。\n\n' +
+        '替代方案:\n' +
+        '  • 使用浏览器扩展 (如 Vimium)\n' +
+        '  • 在 CLI 模式中使用 /vim 启用 Vim 模式',
+    };
+  },
+};
+
+// /theme - 更改主题
+const themeCommand: SlashCommand = {
+  name: 'theme',
+  description: '更改界面主题',
+  usage: '/theme [light|dark|auto]',
+  category: 'config',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    const { args } = ctx;
+
+    if (!args || args.length === 0) {
+      return {
+        success: true,
+        message: '主题设置\n\n' +
+          '当前主题: 跟随系统\n\n' +
+          '可用主题:\n' +
+          '  • light - 浅色主题\n' +
+          '  • dark - 深色主题\n' +
+          '  • auto - 跟随系统设置\n\n' +
+          '用法: /theme <主题名>',
+      };
+    }
+
+    const theme = args[0].toLowerCase();
+    const validThemes = ['light', 'dark', 'auto'];
+
+    if (!validThemes.includes(theme)) {
+      return {
+        success: false,
+        message: `无效的主题: ${theme}\n\n可用主题: light, dark, auto`,
+      };
+    }
+
+    return {
+      success: false,
+      message: '主题切换\n\n' +
+        'WebUI 模式请通过浏览器界面切换主题。\n\n' +
+        '主题设置将自动保存。',
+    };
+  },
+};
+
+// /discover - 发现功能
+const discoverCommand: SlashCommand = {
+  name: 'discover',
+  description: '发现 Claude Code 的功能和技巧',
+  category: 'general',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    let message = '发现功能\n\n';
+    message += '核心功能:\n';
+    message += '  • 文件操作: Read, Write, Edit, MultiEdit\n';
+    message += '  • 代码搜索: Grep, Glob\n';
+    message += '  • 命令执行: Bash, Tmux\n';
+    message += '  • Web 访问: WebFetch, WebSearch\n';
+    message += '  • 任务管理: Task, TodoWrite\n';
+    message += '  • MCP 服务器: 扩展 Claude 能力\n\n';
+    message += '高级功能:\n';
+    message += '  • 检查点: 保存和恢复文件状态\n';
+    message += '  • 插件系统: 自定义扩展\n';
+    message += '  • 钩子脚本: 自动化工作流\n';
+    message += '  • 技能系统: 复用常见任务\n\n';
+    message += '使用技巧:\n';
+    message += '  1. 使用 /help 查看所有命令\n';
+    message += '  2. 使用 CLAUDE.md 提供项目上下文\n';
+    message += '  3. 使用 /checkpoint 保护重要文件\n';
+    message += '  4. 使用 /context 监控 token 使用\n\n';
+    message += '文档: https://docs.anthropic.com/claude-code';
+
+    return { success: true, message };
+  },
+};
+
+// /sandbox - 沙箱设置
+const sandboxCommand: SlashCommand = {
+  name: 'sandbox',
+  description: '配置沙箱安全设置',
+  usage: '/sandbox [status|enable|disable]',
+  category: 'config',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    return {
+      success: true,
+      message: '沙箱设置\n\n' +
+        '注意: 沙箱功能仅在 CLI 模式的 Linux 系统上可用。\n\n' +
+        '沙箱功能:\n' +
+        '  • 使用 Bubblewrap 隔离命令执行\n' +
+        '  • 限制文件系统访问\n' +
+        '  • 限制网络访问\n' +
+        '  • 防止意外的系统更改\n\n' +
+        '当前环境:\n' +
+        `  • 平台: ${process.platform}\n` +
+        '  • 沙箱: 不可用 (WebUI 模式)\n\n' +
+        '在 CLI 模式中使用 /sandbox 管理沙箱设置。',
+    };
+  },
+};
+
+// ============ 工具集成命令 ============
+
+// /agents - 管理代理
+const agentsCommand: SlashCommand = {
+  name: 'agents',
+  description: '管理和查看后台代理',
+  usage: '/agents [list|create|stop] [参数]',
+  category: 'integration',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    return {
+      success: true,
+      message: '代理管理\n\n' +
+        '后台代理用于执行长时间运行的任务。\n\n' +
+        '相关命令:\n' +
+        '  • /tasks - 查看所有后台任务\n' +
+        '  • /tasks cancel <id> - 取消任务\n' +
+        '  • /tasks output <id> - 查看任务输出\n\n' +
+        '提示: 使用 Task 工具创建后台任务。',
+    };
+  },
+};
+
+// /ide - IDE 集成
+const ideCommand: SlashCommand = {
+  name: 'ide',
+  description: 'IDE 集成设置和状态',
+  category: 'integration',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    return {
+      success: true,
+      message: 'IDE 集成\n\n' +
+        'Claude Code 支持以下 IDE 集成:\n\n' +
+        'VS Code:\n' +
+        '  • 安装 Claude Code 扩展\n' +
+        '  • 在编辑器内直接使用 Claude\n' +
+        '  • 快捷键支持\n\n' +
+        'JetBrains IDEs:\n' +
+        '  • 通过 LSP 集成\n' +
+        '  • 代码分析和建议\n\n' +
+        'Vim/Neovim:\n' +
+        '  • 通过命令行集成\n' +
+        '  • 终端内使用\n\n' +
+        '详细文档: https://docs.anthropic.com/claude-code/ide-integration',
+    };
+  },
+};
+
+// /chrome - Chrome 集成
+const chromeCommand: SlashCommand = {
+  name: 'chrome',
+  description: 'Chrome 浏览器集成',
+  category: 'integration',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    return {
+      success: true,
+      message: 'Chrome 集成\n\n' +
+        'Claude Code 通过 MCP 支持浏览器控制。\n\n' +
+        '功能:\n' +
+        '  • 自动化网页操作\n' +
+        '  • 抓取网页内容\n' +
+        '  • 填写表单\n' +
+        '  • 截图和录屏\n\n' +
+        '设置:\n' +
+        '  1. 安装 Chrome/Chromium\n' +
+        '  2. 配置 MCP chrome 服务器\n' +
+        '  3. 使用 /mcp add chrome-server <command>\n\n' +
+        '示例:\n' +
+        '  /mcp add chrome npx @modelcontextprotocol/server-puppeteer\n\n' +
+        '相关命令: /mcp list',
+    };
+  },
+};
+
+// ============ 实用工具命令 ============
+
+// /usage - 使用统计
+const usageCommand: SlashCommand = {
+  name: 'usage',
+  description: '显示 API 使用统计',
+  category: 'utility',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    const history = ctx.conversationManager.getHistory(ctx.sessionId);
+
+    let totalInput = 0;
+    let totalOutput = 0;
+
+    for (const msg of history) {
+      if (msg.usage) {
+        totalInput += msg.usage.inputTokens || 0;
+        totalOutput += msg.usage.outputTokens || 0;
+      }
+    }
+
+    const modelPricing: Record<string, { input: number; output: number }> = {
+      opus: { input: 15, output: 75 },
+      sonnet: { input: 3, output: 15 },
+      haiku: { input: 0.8, output: 4 },
+    };
+
+    const pricing = modelPricing[ctx.model] || modelPricing.sonnet;
+    const totalCost = (totalInput / 1000000) * pricing.input + (totalOutput / 1000000) * pricing.output;
+
+    let message = 'API 使用统计\n\n';
+    message += `当前会话:\n`;
+    message += `  输入 tokens: ${totalInput.toLocaleString()}\n`;
+    message += `  输出 tokens: ${totalOutput.toLocaleString()}\n`;
+    message += `  总计 tokens: ${(totalInput + totalOutput).toLocaleString()}\n`;
+    message += `  估算费用: $${totalCost.toFixed(4)}\n\n`;
+    message += '使用 /stats 查看详细统计。';
+
+    return { success: true, message };
+  },
+};
+
+// /files - 列出文件
+const filesCommand: SlashCommand = {
+  name: 'files',
+  aliases: ['ls'],
+  description: '列出当前目录的文件',
+  usage: '/files [目录]',
+  category: 'utility',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    const { args, cwd } = ctx;
+    const targetDir = args && args.length > 0 ? path.join(cwd, args[0]) : cwd;
+
+    try {
+      if (!fs.existsSync(targetDir)) {
+        return {
+          success: false,
+          message: `目录不存在: ${targetDir}`,
+        };
+      }
+
+      const files = fs.readdirSync(targetDir);
+
+      let message = `文件列表: ${targetDir}\n\n`;
+
+      const dirs: string[] = [];
+      const regularFiles: string[] = [];
+
+      for (const file of files) {
+        const filePath = path.join(targetDir, file);
+        const stats = fs.statSync(filePath);
+
+        if (stats.isDirectory()) {
+          dirs.push(file);
+        } else {
+          regularFiles.push(file);
+        }
+      }
+
+      if (dirs.length > 0) {
+        message += '目录:\n';
+        dirs.sort().forEach(dir => {
+          message += `  📁 ${dir}/\n`;
+        });
+        message += '\n';
+      }
+
+      if (regularFiles.length > 0) {
+        message += '文件:\n';
+        regularFiles.sort().forEach(file => {
+          const filePath = path.join(targetDir, file);
+          const stats = fs.statSync(filePath);
+          const sizeKB = (stats.size / 1024).toFixed(2);
+          message += `  📄 ${file} (${sizeKB} KB)\n`;
+        });
+      }
+
+      if (dirs.length === 0 && regularFiles.length === 0) {
+        message += '(空目录)';
+      }
+
+      return { success: true, message };
+    } catch (error) {
+      return {
+        success: false,
+        message: `列出文件失败: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+  },
+};
+
+// /todos - 待办事项
+const todosCommand: SlashCommand = {
+  name: 'todos',
+  aliases: ['todo'],
+  description: '查看和管理待办事项',
+  usage: '/todos [list|add|done|clear]',
+  category: 'utility',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    return {
+      success: true,
+      message: '待办事项\n\n' +
+        '使用 TodoWrite 工具管理任务列表。\n\n' +
+        '功能:\n' +
+        '  • 创建任务列表\n' +
+        '  • 跟踪任务状态 (pending/in_progress/completed)\n' +
+        '  • 实时更新进度\n\n' +
+        '示例:\n' +
+        '  "创建一个待办事项列表，包含:\n' +
+        '   1. 实现用户登录\n' +
+        '   2. 添加数据验证\n' +
+        '   3. 编写单元测试"\n\n' +
+        '提示: 直接在对话中要求 Claude 创建待办清单。',
+    };
+  },
+};
+
+// /add-dir - 添加目录到上下文
+const addDirCommand: SlashCommand = {
+  name: 'add-dir',
+  aliases: ['add'],
+  description: '将目录添加到会话上下文',
+  usage: '/add-dir <目录路径>',
+  category: 'utility',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    const { args } = ctx;
+
+    if (!args || args.length === 0) {
+      return {
+        success: false,
+        message: '用法: /add-dir <目录路径>\n\n示例: /add-dir ./src',
+      };
+    }
+
+    const dirPath = args[0];
+    const fullPath = path.isAbsolute(dirPath) ? dirPath : path.join(ctx.cwd, dirPath);
+
+    if (!fs.existsSync(fullPath)) {
+      return {
+        success: false,
+        message: `目录不存在: ${fullPath}`,
+      };
+    }
+
+    if (!fs.statSync(fullPath).isDirectory()) {
+      return {
+        success: false,
+        message: `不是目录: ${fullPath}`,
+      };
+    }
+
+    return {
+      success: true,
+      message: `目录信息\n\n` +
+        `路径: ${fullPath}\n\n` +
+        `提示:\n` +
+        `  • 使用自然语言描述您想对此目录做什么\n` +
+        `  • Claude 会自动读取和分析相关文件\n` +
+        `  • 示例: "分析 ${dirPath} 目录的代码结构"`,
+    };
+  },
+};
+
+// /skills - 显示技能
+const skillsCommand: SlashCommand = {
+  name: 'skills',
+  description: '查看可用的技能和自定义命令',
+  category: 'utility',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    return {
+      success: true,
+      message: '技能系统\n\n' +
+        '技能位置:\n' +
+        '  • 全局: ~/.claude/skills/\n' +
+        '  • 项目: ./.claude/commands/\n\n' +
+        '技能类型:\n' +
+        '  • 斜杠命令: 自定义快捷命令\n' +
+        '  • 提示模板: 可复用的提示词\n' +
+        '  • 工作流: 自动化任务序列\n\n' +
+        '创建技能:\n' +
+        '  1. 在技能目录创建 .md 文件\n' +
+        '  2. 文件名即为命令名\n' +
+        '  3. 内容为提示词模板\n\n' +
+        '示例:\n' +
+        '  文件: .claude/commands/review.md\n' +
+        '  内容: "审查以下代码的质量和安全性..."\n' +
+        '  使用: /review\n\n' +
+        '详细文档: https://docs.anthropic.com/claude-code/skills',
+    };
+  },
+};
+
+// /mobile - 移动端配置
+const mobileCommand: SlashCommand = {
+  name: 'mobile',
+  description: '移动端访问配置',
+  category: 'config',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    return {
+      success: true,
+      message: '移动端访问\n\n' +
+        'WebUI 支持移动设备访问。\n\n' +
+        '访问方式:\n' +
+        '  1. 在移动浏览器中打开 WebUI 地址\n' +
+        '  2. 界面会自动适配移动设备\n' +
+        '  3. 支持触摸操作\n\n' +
+        '功能限制:\n' +
+        '  • 某些高级功能可能不可用\n' +
+        '  • 建议使用桌面端进行开发\n' +
+        '  • 移动端适合查看和轻度交互\n\n' +
+        '提示:\n' +
+        '  • 使用横屏模式获得更好体验\n' +
+        '  • 将网页添加到主屏幕快速访问',
+    };
+  },
+};
+
+// /api - API 查询
+const apiCommand: SlashCommand = {
+  name: 'api',
+  aliases: ['api-query'],
+  description: 'Anthropic API 查询和测试',
+  usage: '/api [status|models|limits]',
+  category: 'utility',
+  execute: async (ctx: ExtendedCommandContext): Promise<CommandResult> => {
+    const { args } = ctx;
+    const subcommand = args && args.length > 0 ? args[0].toLowerCase() : 'status';
+
+    const apiKeySet = !!(process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY);
+
+    if (subcommand === 'status') {
+      let message = 'API 状态\n\n';
+      message += `连接状态: ${apiKeySet ? '✓ 已连接' : '✗ 未连接'}\n`;
+      message += `API Key: ${apiKeySet ? '✓ 已配置' : '✗ 未配置'}\n`;
+      message += `端点: api.anthropic.com\n\n`;
+
+      if (!apiKeySet) {
+        message += '设置 API Key:\n';
+        message += '  • 使用 /login set <key> 命令\n';
+        message += '  • 或设置环境变量 ANTHROPIC_API_KEY\n';
+        message += '  • 或在 ~/.claude/settings.json 中配置';
+      } else {
+        message += '可用子命令:\n';
+        message += '  /api status - API 状态\n';
+        message += '  /api models - 可用模型\n';
+        message += '  /api limits - 使用限制';
+      }
+
+      return { success: true, message };
+    }
+
+    if (subcommand === 'models') {
+      let message = 'API 模型列表\n\n';
+      message += 'Claude 4.5 系列:\n';
+      message += '  • claude-opus-4-5 - 最强大的模型\n';
+      message += '  • claude-sonnet-4-5 - 平衡性能和速度\n';
+      message += '  • claude-haiku-3-5 - 快速响应\n\n';
+      message += '上下文窗口:\n';
+      message += '  • 所有模型: 200k tokens\n\n';
+      message += '输出限制:\n';
+      message += '  • 最大输出: 32k tokens\n\n';
+      message += '使用 /model <名称> 切换模型。';
+
+      return { success: true, message };
+    }
+
+    if (subcommand === 'limits') {
+      let message = 'API 使用限制\n\n';
+      message += '速率限制:\n';
+      message += '  • 免费层: 50 请求/分钟\n';
+      message += '  • Pro: 1000 请求/分钟\n';
+      message += '  • 企业: 自定义\n\n';
+      message += 'Token 限制:\n';
+      message += '  • 上下文: 200k tokens\n';
+      message += '  • 输出: 32k tokens\n\n';
+      message += '当前会话:\n';
+      message += '  使用 /context 查看 token 使用情况\n';
+      message += '  使用 /cost 查看费用统计';
+
+      return { success: true, message };
+    }
+
+    return {
+      success: false,
+      message: `未知子命令: ${subcommand}\n\n可用命令:\n  status - API 状态\n  models - 可用模型\n  limits - 使用限制`,
+    };
+  },
+};
+
+// /memory - 管理持久记忆
+const memoryCommand: SlashCommand = {
+  name: 'memory',
+  aliases: ['mem', 'remember'],
+  description: '管理 Claude 的持久记忆',
+  usage: '/memory [add|list|remove|clear] [内容]',
+  category: 'utility',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    return {
+      success: false,
+      message: '持久记忆\n\n' +
+        'WebUI 模式暂不支持持久记忆功能。\n\n' +
+        '替代方案:\n' +
+        '  • 使用 CLAUDE.md 提供项目上下文\n' +
+        '  • 在对话中重复重要信息\n' +
+        '  • 在 CLI 模式中使用 /memory 命令\n\n' +
+        'CLAUDE.md 文件:\n' +
+        '  • 在项目根目录创建 CLAUDE.md\n' +
+        '  • 添加项目说明、约定、偏好设置\n' +
+        '  • Claude 会自动读取并记住这些信息',
+    };
+  },
+};
+
+// ============ 认证命令 ============
+
+// /upgrade - 升级账户
+const upgradeCommand: SlashCommand = {
+  name: 'upgrade',
+  description: '升级 Claude Code 账户',
+  category: 'auth',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    return {
+      success: true,
+      message: '账户升级\n\n' +
+        'Claude Code 基于 Anthropic API 运行。\n\n' +
+        '升级选项:\n' +
+        '  • API 免费层: 基本使用\n' +
+        '  • API Pro: 更高速率限制\n' +
+        '  • API 企业: 自定义配额和支持\n\n' +
+        '升级步骤:\n' +
+        '  1. 访问: https://console.anthropic.com\n' +
+        '  2. 登录您的账户\n' +
+        '  3. 进入 Billing 页面\n' +
+        '  4. 选择合适的计划\n\n' +
+        '注意: 升级后需更新 API Key 才能生效。',
+    };
+  },
+};
+
+// /passes - 管理 API passes
+const passesCommand: SlashCommand = {
+  name: 'passes',
+  description: '管理 API 使用额度',
+  category: 'auth',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    return {
+      success: true,
+      message: 'API 使用额度\n\n' +
+        'Claude Code 使用 Anthropic API。\n\n' +
+        '查看额度:\n' +
+        '  1. 访问: https://console.anthropic.com\n' +
+        '  2. 进入 Usage 页面\n' +
+        '  3. 查看当前余额和使用情况\n\n' +
+        '充值额度:\n' +
+        '  1. 进入 Billing 页面\n' +
+        '  2. 添加支付方式\n' +
+        '  3. 设置自动充值或手动充值\n\n' +
+        '当前会话费用:\n' +
+        '  使用 /cost 查看详细费用统计',
+    };
+  },
+};
+
+// ============ 开发命令 ============
+
+// /review - 代码审查
+const reviewCommand: SlashCommand = {
+  name: 'review',
+  aliases: ['code-review', 'cr'],
+  description: '代码审查和质量检查',
+  usage: '/review [文件路径]',
+  category: 'development',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    const { args } = ctx;
+
+    let message = '代码审查\n\n';
+
+    if (args && args.length > 0) {
+      const filePath = args[0];
+      message += `目标文件: ${filePath}\n\n`;
+    }
+
+    message += '审查内容:\n';
+    message += '  • 代码质量和可读性\n';
+    message += '  • 潜在的 bug 和错误\n';
+    message += '  • 性能优化建议\n';
+    message += '  • 安全漏洞检查\n';
+    message += '  • 最佳实践建议\n\n';
+    message += '使用方法:\n';
+    message += '  直接告诉 Claude "审查这个文件的代码" 并提供文件路径。\n\n';
+    message += '示例:\n';
+    message += '  "请审查 src/index.ts 的代码质量"';
+
+    return { success: true, message };
+  },
+};
+
+// /feedback - 提交反馈
+const feedbackCommand: SlashCommand = {
+  name: 'feedback',
+  description: '提交功能反馈和建议',
+  category: 'development',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    return {
+      success: true,
+      message: '提交反馈\n\n' +
+        '感谢您帮助改进 Claude Code！\n\n' +
+        '反馈渠道:\n' +
+        '  • GitHub Discussions: https://github.com/yourusername/claude-code-open/discussions\n' +
+        '  • GitHub Issues: https://github.com/yourusername/claude-code-open/issues\n' +
+        '  • 邮箱: feedback@example.com\n\n' +
+        '反馈类型:\n' +
+        '  • 功能建议\n' +
+        '  • 使用体验\n' +
+        '  • 性能问题\n' +
+        '  • 文档改进\n\n' +
+        '也可使用 /bug 报告具体问题。',
+    };
+  },
+};
+
+// /pr - 管理 Pull Request
+const prCommand: SlashCommand = {
+  name: 'pr',
+  description: '管理 GitHub Pull Request',
+  usage: '/pr [create|list|view|merge] [参数]',
+  category: 'development',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    return {
+      success: true,
+      message: 'Pull Request 管理\n\n' +
+        'Claude Code 可以帮助管理 PR。\n\n' +
+        '可用操作:\n' +
+        '  • 创建 PR: "创建一个 PR，标题是..."\n' +
+        '  • 审查 PR: "审查 PR #123"\n' +
+        '  • 查看评论: 使用 /pr-comments 命令\n' +
+        '  • 合并 PR: "合并 PR #123"\n\n' +
+        '前置要求:\n' +
+        '  • 项目是 Git 仓库\n' +
+        '  • 配置 GitHub 凭证\n' +
+        '  • 安装 gh CLI 工具\n\n' +
+        '示例:\n' +
+        '  "基于当前分支创建一个 PR 到 main"',
+    };
+  },
+};
+
+// /pr-comments - 查看 PR 评论
+const prCommentsCommand: SlashCommand = {
+  name: 'pr-comments',
+  description: '查看 Pull Request 评论',
+  usage: '/pr-comments <PR编号>',
+  category: 'development',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    const { args } = ctx;
+
+    if (!args || args.length === 0) {
+      return {
+        success: false,
+        message: '用法: /pr-comments <PR编号>\n\n示例: /pr-comments 123',
+      };
+    }
+
+    return {
+      success: false,
+      message: 'PR 评论查看\n\n' +
+        'WebUI 模式暂不支持直接查看 PR 评论。\n\n' +
+        '替代方案:\n' +
+        '  • 使用 GitHub 网页界面\n' +
+        '  • 使用 gh CLI: gh pr view <编号>\n' +
+        '  • 在 CLI 模式中使用此命令\n\n' +
+        '示例:\n' +
+        '  "查看 PR #123 的评论并总结"',
+    };
+  },
+};
+
+// /security-review - 安全审查
+const securityReviewCommand: SlashCommand = {
+  name: 'security-review',
+  description: '执行安全审查和漏洞扫描',
+  usage: '/security-review [文件路径]',
+  category: 'development',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    return {
+      success: true,
+      message: '安全审查\n\n' +
+        'Claude 可以帮助识别常见的安全问题。\n\n' +
+        '检查项目:\n' +
+        '  • SQL 注入风险\n' +
+        '  • XSS 跨站脚本\n' +
+        '  • CSRF 攻击\n' +
+        '  • 敏感信息泄露\n' +
+        '  • 不安全的依赖\n' +
+        '  • 权限和认证问题\n\n' +
+        '使用方法:\n' +
+        '  直接告诉 Claude "进行安全审查" 并指定文件或目录。\n\n' +
+        '示例:\n' +
+        '  "审查 src/ 目录的安全性"\n' +
+        '  "检查这段代码是否有安全漏洞"\n\n' +
+        '注意: 这是基础检查，严肃项目建议使用专业安全工具。',
+    };
+  },
+};
+
+// /map - 代码地图
+const mapCommand: SlashCommand = {
+  name: 'map',
+  description: '生成代码库结构地图',
+  usage: '/map [目录]',
+  category: 'development',
+  execute: (ctx: ExtendedCommandContext): CommandResult => {
+    return {
+      success: true,
+      message: '代码地图\n\n' +
+        'Claude 可以分析和可视化代码结构。\n\n' +
+        '生成内容:\n' +
+        '  • 目录结构树\n' +
+        '  • 模块依赖关系\n' +
+        '  • 主要组件和功能\n' +
+        '  • 架构概览\n\n' +
+        '使用方法:\n' +
+        '  直接告诉 Claude "生成代码地图" 或 "分析项目结构"。\n\n' +
+        '示例:\n' +
+        '  "分析 src/ 目录的结构并生成概览"\n' +
+        '  "绘制这个项目的架构图"\n' +
+        '  "列出主要模块及其职责"\n\n' +
+        '提示: Claude 会自动使用 Glob 和 Read 工具分析代码。',
+    };
+  },
+};
+
 // 注册工具和提示命令
 registry.register(tasksCommand);
-registry.register(toolsCommand);
-registry.register(promptCommand);
-registry.register(apiCommand);
 registry.register(doctorCommand);
 registry.register(mcpCommand);
 registry.register(checkpointCommand);
 registry.register(pluginsCommand);
-registry.register(authCommand);
+registry.register(loginCommand);
 registry.register(logoutCommand);
+
+// 注册新增的通用命令
+registry.register(exitCommand);
+registry.register(versionCommand);
+registry.register(bugCommand);
+registry.register(discoverCommand);
+
+// 注册新增的会话命令
+registry.register(contextCommand);
+registry.register(rewindCommand);
+registry.register(renameCommand);
+registry.register(exportCommand);
+registry.register(transcriptCommand);
+registry.register(tagCommand);
+registry.register(statsCommand);
+
+// 注册新增的配置命令
+registry.register(permissionsCommand);
+registry.register(hooksCommand);
+registry.register(initCommand);
+registry.register(privacySettingsCommand);
+registry.register(vimCommand);
+registry.register(themeCommand);
+registry.register(sandboxCommand);
+
+// 注册工具集成命令
+registry.register(agentsCommand);
+registry.register(ideCommand);
+registry.register(chromeCommand);
+
+// 注册实用工具命令
+registry.register(usageCommand);
+registry.register(filesCommand);
+registry.register(todosCommand);
+registry.register(addDirCommand);
+registry.register(skillsCommand);
+registry.register(mobileCommand);
+registry.register(apiCommand);
+registry.register(memoryCommand);
+
+// 注册认证命令
+registry.register(upgradeCommand);
+registry.register(passesCommand);
+
+// 注册开发命令
+registry.register(reviewCommand);
+registry.register(feedbackCommand);
+registry.register(prCommand);
+registry.register(prCommentsCommand);
+registry.register(securityReviewCommand);
+registry.register(mapCommand);
 
 /**
  * 检查输入是否为斜杠命令

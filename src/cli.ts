@@ -655,6 +655,79 @@ async function runTextInterface(
 // MCP 子命令
 const mcpCommand = program.command('mcp').description('Configure and manage MCP servers');
 
+// serve 命令 - 启动 Claude Code MCP 服务器
+mcpCommand
+  .command('serve')
+  .description('Start the Claude Code MCP server')
+  .option('-p, --port <port>', 'Port to listen on', '3000')
+  .option('--stdio', 'Use stdio transport instead of HTTP')
+  .action(async (options) => {
+    console.log(chalk.bold('\n🚀 Starting Claude Code MCP Server\n'));
+
+    // MCP Server 功能 - 占位实现
+    console.log(chalk.cyan(`Transport: ${options.stdio ? 'stdio' : `HTTP on port ${options.port}`}`));
+    console.log();
+    console.log(chalk.yellow('⚠️  MCP Server functionality is not yet implemented.'));
+    console.log(chalk.gray('This feature allows Claude Code to act as an MCP server,'));
+    console.log(chalk.gray('exposing its tools to other MCP-compatible applications.'));
+    console.log();
+    console.log(chalk.gray('For now, you can:'));
+    console.log(chalk.gray('  • Use `claude mcp add` to add external MCP servers'));
+    console.log(chalk.gray('  • Use `claude mcp list` to see configured servers'));
+    console.log();
+  });
+
+// add 命令 - 添加 MCP 服务器（支持命令和 URL）
+mcpCommand
+  .command('add <name> <commandOrUrl> [args...]')
+  .description('Add an MCP server to Claude Code')
+  .option('-s, --scope <scope>', 'Configuration scope (local, user, project)', 'local')
+  .option('-e, --env <env...>', 'Environment variables (KEY=VALUE)')
+  .action((name, commandOrUrl, args, options) => {
+    const env: Record<string, string> = {};
+    if (options.env) {
+      options.env.forEach((e: string) => {
+        const [key, ...valueParts] = e.split('=');
+        env[key] = valueParts.join('=');
+      });
+    }
+
+    // 判断是 URL 还是命令
+    const isUrl = commandOrUrl.startsWith('http://') || commandOrUrl.startsWith('https://');
+
+    if (isUrl) {
+      // SSE 服务器
+      configManager.addMcpServer(name, {
+        type: 'sse',
+        url: commandOrUrl,
+      });
+      console.log(chalk.green(`✓ Added SSE MCP server: ${name}`));
+    } else {
+      // stdio 服务器
+      configManager.addMcpServer(name, {
+        type: 'stdio',
+        command: commandOrUrl,
+        args: args || [],
+        env,
+      });
+      console.log(chalk.green(`✓ Added stdio MCP server: ${name}`));
+    }
+  });
+
+// remove 命令 - 移除 MCP 服务器
+mcpCommand
+  .command('remove <name>')
+  .description('Remove an MCP server')
+  .option('-s, --scope <scope>', 'Configuration scope (local, user, project)', 'local')
+  .action((name, options) => {
+    if (configManager.removeMcpServer(name)) {
+      console.log(chalk.green(`✓ Removed MCP server: ${name}`));
+    } else {
+      console.log(chalk.red(`MCP server not found: ${name}`));
+    }
+  });
+
+// list 命令 - 列出所有 MCP 服务器
 mcpCommand
   .command('list')
   .description('List configured MCP servers')
@@ -682,39 +755,136 @@ mcpCommand
     console.log();
   });
 
+// get 命令 - 获取 MCP 服务器详情
 mcpCommand
-  .command('add <name> <command>')
-  .description('Add an MCP server')
-  .option('-s, --scope <scope>', 'Configuration scope (local, user, project)', 'local')
-  .option('-a, --args <args...>', 'Arguments for the command')
-  .option('-e, --env <env...>', 'Environment variables (KEY=VALUE)')
-  .action((name, command, options) => {
-    const env: Record<string, string> = {};
-    if (options.env) {
-      options.env.forEach((e: string) => {
-        const [key, ...valueParts] = e.split('=');
-        env[key] = valueParts.join('=');
+  .command('get <name>')
+  .description('Get details about an MCP server')
+  .action(async (name) => {
+    const servers = configManager.getMcpServers();
+    const config = servers[name];
+
+    if (!config) {
+      console.log(chalk.red(`\nMCP server not found: ${name}\n`));
+      return;
+    }
+
+    console.log(chalk.bold(`\nMCP Server: ${chalk.cyan(name)}\n`));
+    console.log(`  Type: ${config.type}`);
+
+    if (config.command) {
+      console.log(`  Command: ${config.command}`);
+      if (config.args && config.args.length > 0) {
+        console.log(`  Arguments: ${config.args.join(' ')}`);
+      }
+    }
+
+    if (config.url) {
+      console.log(`  URL: ${config.url}`);
+    }
+
+    if (config.env && Object.keys(config.env).length > 0) {
+      console.log('  Environment:');
+      Object.entries(config.env).forEach(([key, value]) => {
+        console.log(`    ${key}=${value}`);
       });
     }
 
-    configManager.addMcpServer(name, {
-      type: 'stdio',
-      command,
-      args: options.args || [],
-      env,
-    });
+    // 状态信息（运行时才能获取）
+    console.log(chalk.gray('\n  Status: Run Claude Code to see connection status'))
 
-    console.log(chalk.green(`✓ Added MCP server: ${name}`));
+    console.log();
   });
 
+// add-json 命令 - 用 JSON 字符串添加 MCP 服务器
 mcpCommand
-  .command('remove <name>')
-  .description('Remove an MCP server')
-  .action((name) => {
-    if (configManager.removeMcpServer(name)) {
-      console.log(chalk.green(`✓ Removed MCP server: ${name}`));
-    } else {
-      console.log(chalk.red(`MCP server not found: ${name}`));
+  .command('add-json <name> <json>')
+  .description('Add an MCP server (stdio or SSE) with a JSON string')
+  .option('-s, --scope <scope>', 'Configuration scope (local, user, project)', 'local')
+  .action((name, jsonString, options) => {
+    try {
+      const config = JSON.parse(jsonString);
+
+      // 验证配置格式
+      if (!config.type || !['stdio', 'sse', 'http'].includes(config.type)) {
+        console.log(chalk.red('\n❌ Invalid server type. Must be "stdio", "sse", or "http"\n'));
+        return;
+      }
+
+      if (config.type === 'stdio' && !config.command) {
+        console.log(chalk.red('\n❌ stdio server requires "command" field\n'));
+        return;
+      }
+
+      if ((config.type === 'sse' || config.type === 'http') && !config.url) {
+        console.log(chalk.red('\n❌ SSE/HTTP server requires "url" field\n'));
+        return;
+      }
+
+      configManager.addMcpServer(name, config);
+      console.log(chalk.green(`\n✓ Added MCP server: ${name}\n`));
+      console.log(chalk.gray(`Config: ${JSON.stringify(config, null, 2)}\n`));
+    } catch (error) {
+      console.log(chalk.red(`\n❌ Invalid JSON: ${error instanceof Error ? error.message : error}\n`));
+    }
+  });
+
+// add-from-claude-desktop 命令 - 从 Claude Desktop 导入 MCP 服务器
+mcpCommand
+  .command('add-from-claude-desktop')
+  .description('Import MCP servers from Claude Desktop (Mac and WSL only)')
+  .option('--select <names...>', 'Select specific servers to import')
+  .option('--all', 'Import all servers without prompting')
+  .action(async (options) => {
+    console.log(chalk.bold('\n📥 Importing MCP servers from Claude Desktop\n'));
+
+    // 从 Claude Desktop 导入 MCP 服务器（功能尚未完全实现）
+    console.log(chalk.yellow('⚠️  This feature is not yet fully implemented.\n'));
+    console.log('Claude Desktop config locations:');
+    console.log(chalk.gray('  macOS: ~/Library/Application Support/Claude/claude_desktop_config.json'));
+    console.log(chalk.gray('  Windows: %APPDATA%\\Claude\\claude_desktop_config.json'));
+    console.log(chalk.gray('  WSL: /mnt/c/Users/<username>/AppData/Roaming/Claude/claude_desktop_config.json\n'));
+    console.log(chalk.cyan('To import manually, use: claude mcp add-json <server-name> \'{"command": "..."}\''));
+  });
+
+// reset-project-choices 命令 - 重置项目级 MCP 服务器选择
+mcpCommand
+  .command('reset-project-choices')
+  .description('Reset all approved and rejected project-scoped (.mcp.json) servers')
+  .action(() => {
+    console.log(chalk.bold('\n🔄 Resetting project MCP server choices\n'));
+
+    try {
+      const projectMcpFile = path.join(process.cwd(), '.claude', '.mcp.json');
+
+      if (fs.existsSync(projectMcpFile)) {
+        fs.unlinkSync(projectMcpFile);
+        console.log(chalk.green('✓ Reset project MCP server choices'));
+        console.log(chalk.gray(`  Removed: ${projectMcpFile}\n`));
+      } else {
+        console.log(chalk.gray('No project MCP choices found.\n'));
+      }
+
+      // 同时清除项目配置中的禁用服务器列表
+      const projectSettingsFile = path.join(process.cwd(), '.claude', 'settings.json');
+      if (fs.existsSync(projectSettingsFile)) {
+        try {
+          const settings = JSON.parse(fs.readFileSync(projectSettingsFile, 'utf-8'));
+
+          if (settings.disabledMcpServers) {
+            delete settings.disabledMcpServers;
+            fs.writeFileSync(projectSettingsFile, JSON.stringify(settings, null, 2));
+            console.log(chalk.green('✓ Cleared disabled MCP servers list'));
+            console.log(chalk.gray(`  Updated: ${projectSettingsFile}\n`));
+          }
+        } catch (err) {
+          // 忽略解析错误
+        }
+      }
+
+      console.log('All project MCP server choices have been reset.');
+      console.log('You will be prompted again for approval when using project-scoped servers.\n');
+    } catch (error) {
+      console.log(chalk.red(`\n❌ Failed to reset: ${error instanceof Error ? error.message : error}\n`));
     }
   });
 

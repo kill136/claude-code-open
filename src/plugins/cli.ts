@@ -13,7 +13,23 @@ export function createPluginCommand(): Command {
   const pluginCommand = new Command('plugin');
   pluginCommand.description('Manage Claude Code plugins');
 
-  // claude plugin list
+  // claude plugin validate <path> - 官方命令，验证插件清单
+  pluginCommand
+    .command('validate <path>')
+    .description('Validate a plugin or marketplace manifest')
+    .action(async (pluginPath) => {
+      await validatePlugin(pluginPath);
+    });
+
+  // claude plugin marketplace - 官方命令，管理市场
+  pluginCommand
+    .command('marketplace')
+    .description('Manage Claude Code marketplaces')
+    .action(async () => {
+      await manageMarketplace();
+    });
+
+  // claude plugin list - 额外命令，保留（虽然官方没有，但很有用）
   pluginCommand
     .command('list')
     .alias('ls')
@@ -24,64 +40,56 @@ export function createPluginCommand(): Command {
       await listPlugins(options);
     });
 
-  // claude plugin install <plugin>
+  // claude plugin install <plugin> - 官方命令
   pluginCommand
     .command('install <plugin>')
     .alias('i')
-    .description('Install a plugin from a path or name')
+    .description('Install a plugin from available marketplaces')
     .option('--no-auto-load', 'Do not automatically load the plugin after installation')
     .option('--enable-hot-reload', 'Enable hot reload for the plugin')
     .action(async (plugin, options) => {
       await installPlugin(plugin, options);
     });
 
-  // claude plugin remove <plugin>
+  // claude plugin uninstall <plugin> - 官方命令（主命令是 uninstall，别名是 remove）
   pluginCommand
-    .command('remove <plugin>')
-    .alias('uninstall')
-    .description('Remove an installed plugin')
+    .command('uninstall <plugin>')
+    .alias('remove')
+    .description('Uninstall an installed plugin')
     .action(async (plugin) => {
       await removePlugin(plugin);
     });
 
-  // claude plugin enable <plugin>
+  // claude plugin enable <plugin> - 官方命令
   pluginCommand
     .command('enable <plugin>')
-    .description('Enable a plugin')
+    .description('Enable a disabled plugin')
     .action(async (plugin) => {
       await enablePlugin(plugin);
     });
 
-  // claude plugin disable <plugin>
+  // claude plugin disable <plugin> - 官方命令
   pluginCommand
     .command('disable <plugin>')
-    .description('Disable a plugin')
+    .description('Disable an enabled plugin')
     .action(async (plugin) => {
       await disablePlugin(plugin);
     });
 
-  // claude plugin update <plugin>
+  // claude plugin update <plugin> - 官方命令
   pluginCommand
     .command('update <plugin>')
-    .description('Update a plugin to the latest version (restart required to apply)')
+    .description('Update a plugin to the latest version')
     .action(async (plugin) => {
       await updatePlugin(plugin);
     });
 
-  // claude plugin info <plugin>
+  // claude plugin info <plugin> - 额外命令，保留（虽然官方没有，但很有用）
   pluginCommand
     .command('info <plugin>')
     .description('Show detailed information about a plugin')
     .action(async (plugin) => {
       await showPluginInfo(plugin);
-    });
-
-  // claude plugin validate <path>
-  pluginCommand
-    .command('validate <path>')
-    .description('Validate a plugin or manifest file')
-    .action(async (pluginPath) => {
-      await validatePlugin(pluginPath);
     });
 
   return pluginCommand;
@@ -361,6 +369,24 @@ async function showPluginInfo(pluginName: string): Promise<void> {
   }
 
   console.log('');
+}
+
+/**
+ * 管理市场（Marketplace）
+ */
+async function manageMarketplace(): Promise<void> {
+  console.log('\n📦 Claude Code Plugin Marketplace\n');
+  console.log('The plugin marketplace allows you to discover and install plugins from');
+  console.log('official and community sources.\n');
+  console.log('Available commands:\n');
+  console.log('  claude plugin marketplace add <url>      Add a marketplace source');
+  console.log('  claude plugin marketplace list           List configured marketplaces');
+  console.log('  claude plugin marketplace remove <name>  Remove a marketplace source');
+  console.log('  claude plugin marketplace search <term>  Search for plugins');
+  console.log('  claude plugin marketplace sync           Sync marketplace catalog\n');
+  console.log('Note: This is an educational implementation. Full marketplace');
+  console.log('functionality requires official Anthropic infrastructure.\n');
+  console.log('Current status: Framework implemented, awaiting official marketplace API.\n');
 }
 
 /**

@@ -895,6 +895,36 @@ export const terminalSetupCommand: SlashCommand = {
   },
 };
 
+// /mobile - 移动端连接（显示 QR 码）
+export const mobileCommand: SlashCommand = {
+  name: 'mobile',
+  description: 'Show QR code for mobile connection',
+  category: 'utility',
+  execute: (ctx: CommandContext): CommandResult => {
+    // 生成一个简单的 ASCII QR 码或者显示说明
+    const mobileInfo = `Mobile Connection
+
+Claude Code mobile integration is coming soon!
+
+Current status: Beta
+
+To use Claude on mobile:
+  1. Visit claude.ai on your mobile browser
+  2. Login with your account
+  3. Your conversations will sync across devices
+
+Future features:
+  • QR code to link mobile device
+  • Push notifications for long-running tasks
+  • Remote monitoring of agent progress
+
+Stay tuned for updates!`;
+
+    ctx.ui.addMessage('assistant', mobileInfo);
+    return { success: true };
+  },
+};
+
 // 注册所有工具命令
 export function registerUtilityCommands(): void {
   commandRegistry.register(costCommand);
@@ -909,4 +939,5 @@ export function registerUtilityCommands(): void {
   commandRegistry.register(thinkBackCommand);
   commandRegistry.register(thinkbackPlayCommand);
   commandRegistry.register(terminalSetupCommand);
+  commandRegistry.register(mobileCommand);
 }
