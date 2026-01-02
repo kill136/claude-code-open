@@ -1,0 +1,698 @@
+[
+  {
+    "name": "_w9",
+    "signature": "function _w9()",
+    "body": "{let A=\"\";if(typeof process<\"u\"&&typeof process.cwd===\"function\")A=Rw9(Mw9());return{originalCwd:A,totalCostUSD:0,totalAPIDuration:0,totalAPIDurationWithoutRetries:0,totalToolDuration:0,startTime:Date.now(),lastInteractionTime:Date.now(),totalLinesAdded:0,totalLinesRemoved:0,hasUnknownModelCost:!1,cwd:A,modelUsage:{},mainLoopModelOverride:void 0,initialMainLoopModel:null,modelStrings:null,isInteractive:!1,clientType:\"cli\",sessionIngressToken:void 0,oauthTokenFromFd:void 0,apiKeyFromFd:void 0,flagSettingsPath:void 0,allowedSettingSources:[\"userSettings\",\"projectSettings\",\"localSettings\",\"flagSettings\",\"policySettings\"],meter:null,sessionCounter:null,locCounter:null,prCounter:null,commitCounter:null,costCounter:null,tokenCounter:null,codeEditToolDecisionCounter:null,activeTimeCounter:null,se",
+    "keywords": [
+      "function",
+      "userSettings",
+      "projectSettings",
+      "localSettings",
+      "flagSettings",
+      "policySettings",
+      "edit",
+      "request",
+      "agent",
+      "plan",
+      "PlanMode",
+      "session",
+      "persist",
+      "oauth",
+      "token",
+      "auth",
+      "sse",
+      "hook",
+      "permission",
+      "allow"
+    ],
+    "category": "auth",
+    "startIndex": 28694,
+    "estimatedLines": 1
+  },
+  {
+    "name": "yhA",
+    "signature": "function yhA()",
+    "body": "{return O8A(Object.values(r0.modelUsage),\"inputTokens\")}",
+    "keywords": [
+      "inputTokens",
+      "token"
+    ],
+    "category": "auth",
+    "startIndex": 31392,
+    "estimatedLines": 1
+  },
+  {
+    "name": "vhA",
+    "signature": "function vhA()",
+    "body": "{return O8A(Object.values(r0.modelUsage),\"outputTokens\")}",
+    "keywords": [
+      "outputTokens",
+      "token"
+    ],
+    "category": "auth",
+    "startIndex": 31462,
+    "estimatedLines": 1
+  },
+  {
+    "name": "jT0",
+    "signature": "function jT0()",
+    "body": "{return O8A(Object.values(r0.modelUsage),\"cacheReadInputTokens\")}",
+    "keywords": [
+      "cacheReadInputTokens",
+      "token"
+    ],
+    "category": "auth",
+    "startIndex": 31533,
+    "estimatedLines": 1
+  },
+  {
+    "name": "TT0",
+    "signature": "function TT0()",
+    "body": "{return O8A(Object.values(r0.modelUsage),\"cacheCreationInputTokens\")}",
+    "keywords": [
+      "cacheCreationInputTokens",
+      "token"
+    ],
+    "category": "auth",
+    "startIndex": 31612,
+    "estimatedLines": 1
+  },
+  {
+    "name": "jEA",
+    "signature": "function jEA()",
+    "body": "{return r0.tokenCounter}",
+    "keywords": [
+      "token"
+    ],
+    "category": "auth",
+    "startIndex": 33950,
+    "estimatedLines": 1
+  },
+  {
+    "name": "cT0",
+    "signature": "function cT0()",
+    "body": "{return r0.oauthTokenFromFd}",
+    "keywords": [
+      "oauth",
+      "token",
+      "auth"
+    ],
+    "category": "auth",
+    "startIndex": 34765,
+    "estimatedLines": 1
+  },
+  {
+    "name": "T8A",
+    "signature": "function T8A(A)",
+    "body": "{r0.oauthTokenFromFd=A}",
+    "keywords": [
+      "oauth",
+      "token",
+      "auth"
+    ],
+    "category": "auth",
+    "startIndex": 34807,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Ir9",
+    "signature": "function Ir9(A)",
+    "body": "{let Q=A.COMMENT(\"--\",\"$\"),B={className:\"string\",variants:[{begin:/'/,end:/'/,contains:[{begin:/''/}]}]},G={begin:/\"/,end:/\"/,contains:[{begin:/\"\"/}]},Z=[\"true\",\"false\",\"unknown\"],Y=[\"double precision\",\"large object\",\"with timezone\",\"without timezone\"],J=[\"bigint\",\"binary\",\"blob\",\"boolean\",\"char\",\"character\",\"clob\",\"date\",\"dec\",\"decfloat\",\"decimal\",\"float\",\"int\",\"integer\",\"interval\",\"nchar\",\"nclob\",\"national\",\"numeric\",\"real\",\"row\",\"smallint\",\"time\",\"timestamp\",\"varchar\",\"varying\",\"varbinary\"],X=[\"add\",\"asc\",\"collation\",\"desc\",\"final\",\"first\",\"last\",\"view\"],I=[\"abs\",\"acos\",\"all\",\"allocate\",\"alter\",\"and\",\"any\",\"are\",\"array\",\"array_agg\",\"array_max_cardinality\",\"as\",\"asensitive\",\"asin\",\"asymmetric\",\"at\",\"atan\",\"atomic\",\"authorization\",\"avg\",\"begin\",\"begin_frame\",\"begin_partition\",\"between\",\"b",
+    "keywords": [
+      "string",
+      "true",
+      "false",
+      "unknown",
+      "bigint",
+      "binary",
+      "blob",
+      "boolean",
+      "char",
+      "character",
+      "clob",
+      "date",
+      "decfloat",
+      "decimal",
+      "float",
+      "integer",
+      "interval",
+      "nchar",
+      "nclob",
+      "national"
+    ],
+    "category": "auth",
+    "startIndex": 1029322,
+    "estimatedLines": 1
+  },
+  {
+    "name": "GQ4",
+    "signature": "function GQ4(A,Q,B)",
+    "body": "{if(!o1.isObject(A))throw TypeError(\"target must be an object\");Q=Q||new($mA||FormData),B=o1.toFlatObject(B,{metaTokens:!0,dots:!1,indexes:!1},!1,function(E,z){return!o1.isUndefined(z[E])});let G=B.metaTokens,Z=B.visitor||K,Y=B.dots,J=B.indexes,I=(B.Blob||typeof Blob<\"u\"&&Blob)&&o1.isSpecCompliantForm(Q);if(!o1.isFunction(Z))throw TypeError(\"visitor must be a function\");function W(F){if(F===null)return\"\";if(o1.isDate(F))return F.toISOString();if(!I&&o1.isBlob(F))throw new Y2(\"Blob is not supported. Use a Buffer instead.\");if(o1.isArrayBuffer(F)||o1.isTypedArray(F))return I&&typeof Blob===\"function\"?new Blob([F]):Buffer.from(F);return F}function K(F,E,z){let $=F;if(F&&!z&&typeof F===\"object\"){if(o1.endsWith(E,\"{}\"))E=G?E:E.slice(0,-2),F=JSON.stringify(F);else if(o1.isArray(F)&&QQ4(F)||(o1.i",
+    "keywords": [
+      "function",
+      "object",
+      "token"
+    ],
+    "category": "auth",
+    "startIndex": 1375010,
+    "estimatedLines": 1
+  },
+  {
+    "name": "E",
+    "signature": "function E()",
+    "body": "{D&&D(),F&&F(),Z.cancelToken&&Z.cancelToken.unsubscribe(K),Z.signal&&Z.signal.removeEventListener(\"abort\",K)}",
+    "keywords": [
+      "abort",
+      "token"
+    ],
+    "category": "auth",
+    "startIndex": 1413054,
+    "estimatedLines": 1
+  },
+  {
+    "name": "zBQ",
+    "signature": "function zBQ()",
+    "body": "{switch(EBQ()){case\"local\":return\"-local-oauth\";case\"staging\":return\"-staging-oauth\";case\"prod\":return\"\"}}",
+    "keywords": [
+      "local",
+      "staging",
+      "prod",
+      "oauth",
+      "auth"
+    ],
+    "category": "auth",
+    "startIndex": 1427722,
+    "estimatedLines": 1
+  },
+  {
+    "name": "uzA",
+    "signature": "function uzA(A,Q=!1)",
+    "body": "{let B=A.length,G=0,Z=\"\",Y=0,J=16,X=0,I=0,W=0,K=0,V=0;function H(N,M){let R=0,j=0;while(R<N||!M){let P=A.charCodeAt(G);if(P>=48&&P<=57)j=j*16+P-48;else if(P>=65&&P<=70)j=j*16+P-65+10;else if(P>=97&&P<=102)j=j*16+P-97+10;else break;G++,R++}if(R<N)j=-1;return j}function D(N){G=N,Z=\"\",Y=0,J=16,V=0}function F(){let N=G;if(A.charCodeAt(G)===48)G++;else{G++;while(G<A.length&&A5A(A.charCodeAt(G)))G++}if(G<A.length&&A.charCodeAt(G)===46)if(G++,G<A.length&&A5A(A.charCodeAt(G))){G++;while(G<A.length&&A5A(A.charCodeAt(G)))G++}else return V=3,A.substring(N,G);let M=G;if(G<A.length&&(A.charCodeAt(G)===69||A.charCodeAt(G)===101)){if(G++,G<A.length&&A.charCodeAt(G)===43||A.charCodeAt(G)===45)G++;if(G<A.length&&A5A(A.charCodeAt(G))){G++;while(G<A.length&&A5A(A.charCodeAt(G)))G++;M=G}else V=3}return A.subs",
+    "keywords": [
+      "true",
+      "false",
+      "null",
+      "token",
+      "env"
+    ],
+    "category": "auth",
+    "startIndex": 1435400,
+    "estimatedLines": 3
+  },
+  {
+    "name": "Jq1",
+    "signature": "function Jq1(A,Q,B)",
+    "body": "{let G,Z,Y,J,X;if(Q){J=Q.offset,X=J+Q.length,Y=J;while(Y>0&&!mzA(A,Y-1))Y--;let R=X;while(R<A.length&&!mzA(A,R))R++;Z=A.substring(Y,R),G=vB4(Z,B)}else Z=A,G=0,Y=0,J=0,X=A.length;let I=kB4(B,A),W=qBQ.includes(I),K=0,V=0,H;if(B.insertSpaces)H=iq[B.tabSize||4]??Q5A(iq[1],B.tabSize||4);else H=\"\\t\";let D=H===\"\\t\"?\"\\t\":\" \",F=uzA(Z,!1),E=!1;function z(){if(K>1)return Q5A(I,K)+Q5A(H,G+V);let R=H.length*(G+V);if(!W||R>Yq1[D][I].length)return I+Q5A(H,G+V);if(R<=0)return I;return Yq1[D][I][R]}function $(){let R=F.scan();K=0;while(R===15||R===14){if(R===14&&B.keepLines)K+=1;else if(R===14)K=1;R=F.scan()}return E=R===16||F.getTokenError()!==0,R}let L=[];function N(R,j,P){if(!E&&(!Q||j<X&&P>J)&&A.substring(j,P)!==R)L.push({offset:j,length:P-j,content:R})}let M=$();if(B.keepLines&&K>0)N(Q5A(I,K),0,0);if(",
+    "keywords": [
+      "token"
+    ],
+    "category": "auth",
+    "startIndex": 1440518,
+    "estimatedLines": 1
+  },
+  {
+    "name": "$",
+    "signature": "function $()",
+    "body": "{let R=F.scan();K=0;while(R===15||R===14){if(R===14&&B.keepLines)K+=1;else if(R===14)K=1;R=F.scan()}return E=R===16||F.getTokenError()!==0,R}",
+    "keywords": [
+      "token"
+    ],
+    "category": "auth",
+    "startIndex": 1441024,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Wq1",
+    "signature": "function Wq1(A,Q,B=dzA.DEFAULT)",
+    "body": "{let G=uzA(A,!1),Z=[];function Y(s){return s?()=>s(G.getTokenOffset(),G.getTokenLength(),G.getTokenStartLine(),G.getTokenStartCharacter()):()=>!0}function J(s){return s?()=>s(G.getTokenOffset(),G.getTokenLength(),G.getTokenStartLine(),G.getTokenStartCharacter(),()=>Z.slice()):()=>!0}function X(s){return s?(c)=>s(c,G.getTokenOffset(),G.getTokenLength(),G.getTokenStartLine(),G.getTokenStartCharacter()):()=>!0}function I(s){return s?(c)=>s(c,G.getTokenOffset(),G.getTokenLength(),G.getTokenStartLine(),G.getTokenStartCharacter(),()=>Z.slice()):()=>!0}let W=J(Q.onObjectBegin),K=I(Q.onObjectProperty),V=Y(Q.onObjectEnd),H=J(Q.onArrayBegin),D=Y(Q.onArrayEnd),F=I(Q.onLiteralValue),E=X(Q.onSeparator),z=Y(Q.onComment),$=X(Q.onError),L=B&&B.disallowComments,N=B&&B.allowTrailingComma;function M(){while(",
+    "keywords": [
+      "token",
+      "allow",
+      "env"
+    ],
+    "category": "auth",
+    "startIndex": 1444769,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Y",
+    "signature": "function Y(s)",
+    "body": "{return s?()=>s(G.getTokenOffset(),G.getTokenLength(),G.getTokenStartLine(),G.getTokenStartCharacter()):()=>!0}",
+    "keywords": [
+      "token"
+    ],
+    "category": "auth",
+    "startIndex": 1444822,
+    "estimatedLines": 1
+  },
+  {
+    "name": "J",
+    "signature": "function J(s)",
+    "body": "{return s?()=>s(G.getTokenOffset(),G.getTokenLength(),G.getTokenStartLine(),G.getTokenStartCharacter(),()=>Z.slice()):()=>!0}",
+    "keywords": [
+      "token"
+    ],
+    "category": "auth",
+    "startIndex": 1444946,
+    "estimatedLines": 1
+  },
+  {
+    "name": "X",
+    "signature": "function X(s)",
+    "body": "{return s?(c)=>s(c,G.getTokenOffset(),G.getTokenLength(),G.getTokenStartLine(),G.getTokenStartCharacter()):()=>!0}",
+    "keywords": [
+      "token"
+    ],
+    "category": "auth",
+    "startIndex": 1445084,
+    "estimatedLines": 1
+  },
+  {
+    "name": "I",
+    "signature": "function I(s)",
+    "body": "{return s?(c)=>s(c,G.getTokenOffset(),G.getTokenLength(),G.getTokenStartLine(),G.getTokenStartCharacter(),()=>Z.slice()):()=>!0}",
+    "keywords": [
+      "token"
+    ],
+    "category": "auth",
+    "startIndex": 1445211,
+    "estimatedLines": 1
+  },
+  {
+    "name": "M",
+    "signature": "function M()",
+    "body": "{while(!0){let s=G.scan();switch(G.getTokenError()){case 4:R(14);break;case 5:R(15);break;case 3:R(13);break;case 1:if(!L)R(11);break;case 2:R(12);break;case 6:R(16);break}switch(s){case 12:case 13:if(L)R(10);else z();break;case 16:R(1);break;case 15:case 14:break;default:return s}}}",
+    "keywords": [
+      "token"
+    ],
+    "category": "auth",
+    "startIndex": 1445581,
+    "estimatedLines": 1
+  },
+  {
+    "name": "R",
+    "signature": "function R(s,c=[],v=[])",
+    "body": "{if($(s),c.length+v.length>0){let d=G.getToken();while(d!==17){if(c.indexOf(d)!==-1){M();break}else if(v.indexOf(d)!==-1)break;d=M()}}}",
+    "keywords": [
+      "token"
+    ],
+    "category": "auth",
+    "startIndex": 1445877,
+    "estimatedLines": 1
+  },
+  {
+    "name": "j",
+    "signature": "function j(s)",
+    "body": "{let c=G.getTokenValue();if(s)F(c);else K(c),Z.push(c);return M(),!0}",
+    "keywords": [
+      "token",
+      "env"
+    ],
+    "category": "auth",
+    "startIndex": 1446035,
+    "estimatedLines": 1
+  },
+  {
+    "name": "P",
+    "signature": "function P()",
+    "body": "{switch(G.getToken()){case 11:let s=G.getTokenValue(),c=Number(s);if(isNaN(c))R(2),c=0;F(c);break;case 7:F(null);break;case 8:F(!0);break;case 9:F(!1);break;default:return!1}return M(),!0}",
+    "keywords": [
+      "token",
+      "env"
+    ],
+    "category": "auth",
+    "startIndex": 1446117,
+    "estimatedLines": 1
+  },
+  {
+    "name": "b",
+    "signature": "function b()",
+    "body": "{if(G.getToken()!==10)return R(3,[],[2,5]),!1;if(j(!1),G.getToken()===6){if(E(\":\"),M(),!g())R(4,[],[2,5])}else R(5,[],[2,5]);return Z.pop(),!0}",
+    "keywords": [
+      "token"
+    ],
+    "category": "auth",
+    "startIndex": 1446317,
+    "estimatedLines": 1
+  },
+  {
+    "name": "S",
+    "signature": "function S()",
+    "body": "{W(),M();let s=!1;while(G.getToken()!==2&&G.getToken()!==17){if(G.getToken()===5){if(!s)R(4,[],[]);if(E(\",\"),M(),G.getToken()===2&&N)break}else if(s)R(6,[],[]);if(!b())R(4,[],[2,5]);s=!0}if(V(),G.getToken()!==2)R(7,[2],[]);else M();return!0}",
+    "keywords": [
+      "token"
+    ],
+    "category": "auth",
+    "startIndex": 1446472,
+    "estimatedLines": 1
+  },
+  {
+    "name": "u",
+    "signature": "function u()",
+    "body": "{H(),M();let s=!0,c=!1;while(G.getToken()!==4&&G.getToken()!==17){if(G.getToken()===5){if(!c)R(4,[],[]);if(E(\",\"),M(),G.getToken()===4&&N)break}else if(c)R(6,[],[]);if(s)Z.push(0),s=!1;else Z[Z.length-1]++;if(!g())R(4,[],[4,5]);c=!0}if(D(),!s)Z.pop();if(G.getToken()!==4)R(8,[4],[]);else M();return!0}",
+    "keywords": [
+      "token"
+    ],
+    "category": "auth",
+    "startIndex": 1446725,
+    "estimatedLines": 1
+  },
+  {
+    "name": "g",
+    "signature": "function g()",
+    "body": "{switch(G.getToken()){case 3:return u();case 1:return S();case 10:return j(!0);default:return P()}}",
+    "keywords": [
+      "token"
+    ],
+    "category": "auth",
+    "startIndex": 1447038,
+    "estimatedLines": 1
+  },
+  {
+    "name": "sN1",
+    "signature": "function sN1(A)",
+    "body": "{if(A<400&&A>=100)return\"ok\";if(A>=400&&A<500)switch(A){case 401:return\"unauthenticated\";case 403:return\"permission_denied\";case 404:return\"not_found\";case 409:return\"already_exists\";case 413:return\"failed_precondition\";case 429:return\"resource_exhausted\";default:return\"invalid_argument\"}if(A>=500&&A<600)switch(A){case 501:return\"unimplemented\";case 503:return\"unavailable\";case 504:return\"deadline_exceeded\";default:return\"internal_error\"}return\"unknown_error\"}",
+    "keywords": [
+      "unauthenticated",
+      "permission_denied",
+      "not_found",
+      "already_exists",
+      "failed_precondition",
+      "resource_exhausted",
+      "invalid_argument",
+      "unimplemented",
+      "unavailable",
+      "deadline_exceeded",
+      "internal_error",
+      "unknown_error",
+      "auth",
+      "permission"
+    ],
+    "category": "auth",
+    "startIndex": 1571213,
+    "estimatedLines": 1
+  },
+  {
+    "name": "SO1",
+    "signature": "function SO1()",
+    "body": "{let A=vQ(),Q=\".credentials.json\";return{storageDir:A,storagePath:jS4(A,\".credentials.json\")}}",
+    "keywords": [
+      "credential"
+    ],
+    "category": "auth",
+    "startIndex": 2021220,
+    "estimatedLines": 1
+  },
+  {
+    "name": "yO1",
+    "signature": "function yO1()",
+    "body": "{let A=cT0();if(A!==void 0)return A;let Q=process.env.CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR;if(!Q)return T8A(null),null;let B=parseInt(Q,10);if(Number.isNaN(B))return k(`CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR must be a valid file descriptor number, got: ${Q}`,{level:\"error\"}),T8A(null),null;try{let G=jA(),Z=process.platform===\"darwin\"||process.platform===\"freebsd\"?`/dev/fd/${B}`:`/proc/self/fd/${B}`,Y=G.readFileSync(Z,{encoding:\"utf8\"}).trim();if(!Y)return k(\"File descriptor contained empty OAuth token\",{level:\"error\"}),T8A(null),null;return k(`Successfully read OAuth token from file descriptor ${B}`),T8A(Y),Y}catch(G){return k(`Failed to read OAuth token from file descriptor ${B}: ${G instanceof Error?G.message:String(G)}`,{level:\"error\"}),T8A(null),null}}",
+    "keywords": [
+      "error",
+      "darwin",
+      "freebsd",
+      "utf8",
+      "readFile",
+      "message",
+      "oauth",
+      "token",
+      "auth",
+      "env",
+      "CLAUDE_"
+    ],
+    "category": "auth",
+    "startIndex": 2022040,
+    "estimatedLines": 1
+  },
+  {
+    "name": "ZcA",
+    "signature": "function ZcA()",
+    "body": "{let Q=b1().oauthAccount?.accountUuid,B=eq();if(!Q||!B)return;let G=`${D9().BASE_API_URL}/api/claude_cli_profile`;try{return(await SQ.get(G,{headers:{\"x-api-key\":B,\"anthropic-beta\":vc},params:{account_uuid:Q}})).data}catch(Z){t(Z)}}",
+    "keywords": [
+      "url",
+      "oauth",
+      "auth",
+      "CLAUDE_"
+    ],
+    "category": "auth",
+    "startIndex": 2023626,
+    "estimatedLines": 1
+  },
+  {
+    "name": "a5A",
+    "signature": "function a5A(A)",
+    "body": "{let Q=`${D9().BASE_API_URL}/api/oauth/profile`;try{return(await SQ.get(Q,{headers:{Authorization:`Bearer ${A}`,\"Content-Type\":\"application/json\"}})).data}catch(B){t(B)}}",
+    "keywords": [
+      "url",
+      "oauth",
+      "auth"
+    ],
+    "category": "auth",
+    "startIndex": 2023878,
+    "estimatedLines": 1
+  },
+  {
+    "name": "BIQ",
+    "signature": "function BIQ(A,Q,B,G,Z=!1,Y)",
+    "body": "{let J={grant_type:\"authorization_code\",code:A,redirect_uri:Z?D9().MANUAL_REDIRECT_URL:`http://localhost:${G}/callback`,client_id:D9().CLIENT_ID,code_verifier:B,state:Q};if(Y!==void 0)J.expires_in=Y;let X=await SQ.post(D9().TOKEN_URL,J,{headers:{\"Content-Type\":\"application/json\"}});if(X.status!==200)throw Error(X.status===401?\"Authentication failed: Invalid authorization code\":`Token exchange failed (${X.status}): ${X.statusText}`);return n(\"tengu_oauth_token_exchange_success\",{}),X.data}",
+    "keywords": [
+      "authorization_code",
+      "tengu_oauth_token_exchange_success",
+      "http",
+      "url",
+      "oauth",
+      "token",
+      "auth"
+    ],
+    "category": "auth",
+    "startIndex": 2024878,
+    "estimatedLines": 1
+  },
+  {
+    "name": "bO1",
+    "signature": "function bO1(A)",
+    "body": "{let Q={grant_type:\"refresh_token\",refresh_token:A,client_id:D9().CLIENT_ID,scope:Aq1.join(\" \")};try{let B=await SQ.post(D9().TOKEN_URL,Q,{headers:{\"Content-Type\":\"application/json\"}});if(B.status!==200)throw Error(`Token refresh failed: ${B.statusText}`);let G=B.data,{access_token:Z,refresh_token:Y=A,expires_in:J}=G,X=Date.now()+J*1000,I=YcA(G.scope);n(\"tengu_oauth_token_refresh_success\",{});let W=await fO1(Z);if(b1().oauthAccount){let V={};if(W.displayName!==void 0)V.displayName=W.displayName;if(typeof W.hasExtraUsageEnabled===\"boolean\")V.hasExtraUsageEnabled=W.hasExtraUsageEnabled;if(Object.keys(V).length>0)d0((H)=>({...H,oauthAccount:H.oauthAccount?{...H.oauthAccount,...V}:H.oauthAccount}))}return{accessToken:Z,refreshToken:Y,expiresAt:X,scopes:I,subscriptionType:W.subscriptionType,rat",
+    "keywords": [
+      "refresh_token",
+      "tengu_oauth_token_refresh_success",
+      "boolean",
+      "tengu_oauth_token_refresh_failure",
+      "url",
+      "message",
+      "oauth",
+      "token",
+      "auth"
+    ],
+    "category": "auth",
+    "startIndex": 2025405,
+    "estimatedLines": 1
+  },
+  {
+    "name": "ZIQ",
+    "signature": "function ZIQ(A)",
+    "body": "{try{let Q=await SQ.post(D9().API_KEY_URL,null,{headers:{Authorization:`Bearer ${A}`}}),B=Q.data?.raw_key;if(B)return JIQ(B),n(\"tengu_oauth_api_key\",{status:\"success\",statusCode:Q.status}),B;return null}catch(Q){throw n(\"tengu_oauth_api_key\",{status:\"failure\",error:Q instanceof Error?Q.message:String(Q)}),Q}}",
+    "keywords": [
+      "tengu_oauth_api_key",
+      "success",
+      "failure",
+      "url",
+      "message",
+      "oauth",
+      "api_key",
+      "auth"
+    ],
+    "category": "auth",
+    "startIndex": 2026846,
+    "estimatedLines": 1
+  },
+  {
+    "name": "fO1",
+    "signature": "function fO1(A)",
+    "body": "{let Q=await a5A(A),B=Q?.organization?.organization_type,G=null;switch(B){case\"claude_max\":G=\"max\";break;case\"claude_pro\":G=\"pro\";break;case\"claude_enterprise\":G=\"enterprise\";break;case\"claude_team\":G=\"team\";break;default:G=null;break}let Z={subscriptionType:G,rateLimitTier:Q?.organization?.rate_limit_tier??null,hasExtraUsageEnabled:Q?.organization?.has_extra_usage_enabled??null};if(Q?.account?.display_name)Z.displayName=Q.account.display_name;return n(\"tengu_oauth_profile_fetch_success\",{}),Z}",
+    "keywords": [
+      "claude_max",
+      "claude_pro",
+      "claude_enterprise",
+      "enterprise",
+      "claude_team",
+      "team",
+      "tengu_oauth_profile_fetch_success",
+      "fetch",
+      "oauth",
+      "auth",
+      "CLAUDE_"
+    ],
+    "category": "auth",
+    "startIndex": 2027249,
+    "estimatedLines": 1
+  },
+  {
+    "name": "By",
+    "signature": "function By()",
+    "body": "{let Q=b1().oauthAccount?.organizationUuid;if(Q)return Q;let B=d6()?.accessToken;if(B===void 0)return null;let Z=(await a5A(B))?.organization?.uuid;if(!Z)return null;return Z}",
+    "keywords": [
+      "oauth",
+      "token",
+      "auth"
+    ],
+    "category": "auth",
+    "startIndex": 2027769,
+    "estimatedLines": 1
+  },
+  {
+    "name": "YIQ",
+    "signature": "function YIQ()",
+    "body": "{if(b1().oauthAccount||!zB())return!1;let Q=d6();if(Q?.accessToken){let B=await a5A(Q.accessToken);if(B)return hO1({accountUuid:B.account.uuid,emailAddress:B.account.email,organizationUuid:B.organization.uuid,displayName:B.account.display_name||void 0,hasExtraUsageEnabled:B.organization.has_extra_usage_enabled??!1}),!0}return!1}",
+    "keywords": [
+      "oauth",
+      "token",
+      "auth"
+    ],
+    "category": "auth",
+    "startIndex": 2027963,
+    "estimatedLines": 1
+  },
+  {
+    "name": "hO1",
+    "signature": "function hO1({accountUuid:A,emailAddress:Q,organizationUuid:B,displayName:G,hasExtraUsageEnabled:Z})",
+    "body": "{let Y={accountUuid:A,emailAddress:Q,organizationUuid:B,hasExtraUsageEnabled:Z};if(G)Y.displayName=G;d0((J)=>{if(J.oauthAccount?.accountUuid===Y.accountUuid&&J.oauthAccount?.emailAddress===Y.emailAddress&&J.oauthAccount?.organizationUuid===Y.organizationUuid&&J.oauthAccount?.displayName===Y.displayName&&J.oauthAccount?.hasExtraUsageEnabled===Y.hasExtraUsageEnabled)return J;return{...J,oauthAccount:Y}})}",
+    "keywords": [
+      "oauth",
+      "auth"
+    ],
+    "category": "auth",
+    "startIndex": 2028307,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Zs4",
+    "signature": "function Zs4(A,{credentials:Q,credentialDefaultProvider:B})",
+    "body": "{let G;if(Q)if(!Q?.memoized)G=Kl.memoizeIdentityProvider(Q,Kl.isIdentityExpired,Kl.doesIdentityRequireRefresh);else G=Q;else if(B)G=Kl.normalizeProvider(B(Object.assign({},A,{parentClientConfig:A})));else G=async()=>{throw Error(\"@aws-sdk/core::resolveAwsSdkSigV4Config - `credentials` not provided and no credentialDefaultProvider was configured.\")};return G.memoized=!0,G}",
+    "keywords": [
+      "credentials",
+      "credential",
+      "config"
+    ],
+    "category": "auth",
+    "startIndex": 2342288,
+    "estimatedLines": 1
+  },
+  {
+    "name": "TB6",
+    "signature": "function TB6(A)",
+    "body": "{return{schemeId:\"aws.auth#sigv4\",signingProperties:{name:\"bedrock\",region:A.region},propertiesExtractor:(Q,B)=>({signingProperties:{config:Q,context:B}})}}",
+    "keywords": [
+      "bedrock",
+      "auth",
+      "config"
+    ],
+    "category": "auth",
+    "startIndex": 2437008,
+    "estimatedLines": 1
+  },
+  {
+    "name": "A46",
+    "signature": "function A46(A,Q)",
+    "body": "{let G=await(0,t96.sdkStreamMixin)(A.body).transformToString();if(A.statusCode===200){let Z=JSON.parse(G);if(typeof Z.AccessKeyId!==\"string\"||typeof Z.SecretAccessKey!==\"string\"||typeof Z.Token!==\"string\"||typeof Z.Expiration!==\"string\")throw new WP1.CredentialsProviderError(\"HTTP credential provider response not of the required format, an object matching: { AccessKeyId: string, SecretAccessKey: string, Token: string, Expiration: string(rfc3339) }\",{logger:Q});return{accessKeyId:Z.AccessKeyId,secretAccessKey:Z.SecretAccessKey,sessionToken:Z.Token,expiration:(0,s96.parseRfc3339DateTime)(Z.Expiration)}}if(A.statusCode>=400&&A.statusCode<500){let Z={};try{Z=JSON.parse(G)}catch(Y){}throw Object.assign(new WP1.CredentialsProviderError(`Server responded with status: ${A.statusCode}`,{logger:Q}),",
+    "keywords": [
+      "string",
+      "http",
+      "session",
+      "message",
+      "token",
+      "credential",
+      "stream"
+    ],
+    "category": "auth",
+    "startIndex": 2462732,
+    "estimatedLines": 1
+  },
+  {
+    "name": "M46",
+    "signature": "function M46(A,{credentials:Q,credentialDefaultProvider:B})",
+    "body": "{let G;if(Q)if(!Q?.memoized)G=Fl.memoizeIdentityProvider(Q,Fl.isIdentityExpired,Fl.doesIdentityRequireRefresh);else G=Q;else if(B)G=Fl.normalizeProvider(B(Object.assign({},A,{parentClientConfig:A})));else G=async()=>{throw Error(\"@aws-sdk/core::resolveAwsSdkSigV4Config - `credentials` not provided and no credentialDefaultProvider was configured.\")};return G.memoized=!0,G}",
+    "keywords": [
+      "credentials",
+      "credential",
+      "config"
+    ],
+    "category": "auth",
+    "startIndex": 2470727,
+    "estimatedLines": 1
+  },
+  {
+    "name": "u66",
+    "signature": "function u66(A)",
+    "body": "{return{schemeId:\"aws.auth#sigv4\",signingProperties:{name:\"sso-oauth\",region:A.region},propertiesExtractor:(Q,B)=>({signingProperties:{config:Q,context:B}})}}",
+    "keywords": [
+      "oauth",
+      "auth",
+      "config"
+    ],
+    "category": "auth",
+    "startIndex": 2482642,
+    "estimatedLines": 1
+  },
+  {
+    "name": "m66",
+    "signature": "function m66(A)",
+    "body": "{return{schemeId:\"smithy.api#noAuth\"}}",
+    "keywords": [
+      "oauth",
+      "auth"
+    ],
+    "category": "auth",
+    "startIndex": 2482815,
+    "estimatedLines": 1
+  },
+  {
+    "name": "t36",
+    "signature": "function t36(A={})",
+    "body": "{return(0,s36.loadConfig)({...CNQ.NODE_REGION_CONFIG_OPTIONS,async default(){if(!$NQ.warning.silence)console.warn(\"@aws-sdk - WARN - default STS region of us-east-1 used. See @aws-sdk/credential-providers README and set a region explicitly.\");return\"us-east-1\"}},{...CNQ.NODE_REGION_CONFIG_FILE_OPTIONS,...A})}",
+    "keywords": [
+      "credential",
+      "config"
+    ],
+    "category": "auth",
+    "startIndex": 2529141,
+    "estimatedLines": 1
+  },
+  {
+    "name": "WZ6",
+    "signature": "function WZ6(A)",
+    "body": "{return{schemeId:\"aws.auth#sigv4\",signingProperties:{name:\"awsssoportal\",region:A.region},propertiesExtractor:(Q,B)=>({signingProperties:{config:Q,context:B}})}}",
+    "keywords": [
+      "awsssoportal",
+      "auth",
+      "config"
+    ],
+    "category": "auth",
+    "startIndex": 2557046,
+    "estimatedLines": 1
+  },
+  {
+    "name": "HiA",
+    "signature": "function HiA(A)",
+    "body": "{return{schemeId:\"smithy.api#noAuth\"}}",
+    "keywords": [
+      "oauth",
+      "auth"
+    ],
+    "category": "auth",
+    "startIndex": 2557222,
+    "estimatedLines": 1
+  },
+  {
+    "name": "zX6",
+    "signature": "function zX6(A)",
+    "body": "{return{schemeId:\"aws.auth#sigv4\",signingProperties:{name:\"signin\",region:A.region},propertiesExtractor:(Q,B)=>({signingProperties:{config:Q,context:B}})}}",
+    "keywords": [
+      "signin",
+      "auth",
+      "config"
+    ],
+    "category": "auth",
+    "startIndex": 2587729,
+    "estimatedLines": 1
+  }
+]

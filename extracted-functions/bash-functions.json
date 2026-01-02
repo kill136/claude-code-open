@@ -1,0 +1,715 @@
+[
+  {
+    "name": "I",
+    "signature": "function I(W)",
+    "body": "{if(G)throw TypeError(\"Generator is already executing.\");while(B)try{if(G=1,Z&&(Y=W[0]&2?Z.return:W[0]?Z.throw||((Y=Z.return)&&Y.call(Z),0):Z.next)&&!(Y=Y.call(Z,W[1])).done)return Y;if(Z=0,Y)W=[W[0]&2,Y.value];switch(W[0]){case 0:case 1:Y=W;break;case 4:return B.label++,{value:W[1],done:!1};case 5:B.label++,Z=W[1],W=[0];continue;case 7:W=B.ops.pop(),B.trys.pop();continue;default:if((Y=B.trys,!(Y=Y.length>0&&Y[Y.length-1]))&&(W[0]===6||W[0]===2)){B=0;continue}if(W[0]===3&&(!Y||W[1]>Y[0]&&W[1]<Y[3])){B.label=W[1];break}if(W[0]===6&&B.label<Y[1]){B.label=Y[1],Y=W;break}if(Y&&B.label<Y[2]){B.label=Y[2],B.ops.push(W);break}if(Y[2])B.ops.pop();B.trys.pop();continue}W=Q.call(A,B)}catch(K){W=[6,K],Z=0}finally{G=Y=0}if(W[0]&5)throw W[1];return{value:W[0]?W[1]:void 0,done:!0}}",
+    "keywords": [
+      "exec"
+    ],
+    "category": "bash",
+    "startIndex": 96158,
+    "estimatedLines": 1
+  },
+  {
+    "name": "I",
+    "signature": "function I(W)",
+    "body": "{if(G)throw TypeError(\"Generator is already executing.\");while(B)try{if(G=1,Z&&(Y=W[0]&2?Z.return:W[0]?Z.throw||((Y=Z.return)&&Y.call(Z),0):Z.next)&&!(Y=Y.call(Z,W[1])).done)return Y;if(Z=0,Y)W=[W[0]&2,Y.value];switch(W[0]){case 0:case 1:Y=W;break;case 4:return B.label++,{value:W[1],done:!1};case 5:B.label++,Z=W[1],W=[0];continue;case 7:W=B.ops.pop(),B.trys.pop();continue;default:if((Y=B.trys,!(Y=Y.length>0&&Y[Y.length-1]))&&(W[0]===6||W[0]===2)){B=0;continue}if(W[0]===3&&(!Y||W[1]>Y[0]&&W[1]<Y[3])){B.label=W[1];break}if(W[0]===6&&B.label<Y[1]){B.label=Y[1],Y=W;break}if(Y&&B.label<Y[2]){B.label=Y[2],B.ops.push(W);break}if(Y[2])B.ops.pop();B.trys.pop();continue}W=Q.call(A,B)}catch(K){W=[6,K],Z=0}finally{G=Y=0}if(W[0]&5)throw W[1];return{value:W[0]?W[1]:void 0,done:!0}}",
+    "keywords": [
+      "exec"
+    ],
+    "category": "bash",
+    "startIndex": 99045,
+    "estimatedLines": 1
+  },
+  {
+    "name": "uO9",
+    "signature": "function uO9(A,Q)",
+    "body": "{if(Q===void 0)Q=0;return hO9.operate(function(B,G){B.subscribe(gO9.createOperatorSubscriber(G,function(Z){return Az1.executeSchedule(G,A,function(){return G.next(Z)},Q)},function(){return Az1.executeSchedule(G,A,function(){return G.complete()},Q)},function(Z){return Az1.executeSchedule(G,A,function(){return G.error(Z)},Q)}))})}",
+    "keywords": [
+      "exec"
+    ],
+    "category": "bash",
+    "startIndex": 103458,
+    "estimatedLines": 1
+  },
+  {
+    "name": "BM9",
+    "signature": "function BM9(A,Q)",
+    "body": "{return new eO9.Observable(function(B){var G;return ey0.executeSchedule(B,Q,function(){G=A[AM9.iterator](),ey0.executeSchedule(B,Q,function(){var Z,Y,J;try{Z=G.next(),Y=Z.value,J=Z.done}catch(X){B.error(X);return}if(J)B.complete();else B.next(Y)},0,!0)}),function(){return QM9.isFunction(G===null||G===void 0?void 0:G.return)&&G.return()}})}",
+    "keywords": [
+      "exec"
+    ],
+    "category": "bash",
+    "startIndex": 105006,
+    "estimatedLines": 1
+  },
+  {
+    "name": "ZM9",
+    "signature": "function ZM9(A,Q)",
+    "body": "{if(!A)throw Error(\"Iterable cannot be null\");return new GM9.Observable(function(B){Bv0.executeSchedule(B,Q,function(){var G=A[Symbol.asyncIterator]();Bv0.executeSchedule(B,Q,function(){G.next().then(function(Z){if(Z.done)B.complete();else B.next(Z.value)})},0,!0)})})}",
+    "keywords": [
+      "exec"
+    ],
+    "category": "bash",
+    "startIndex": 105515,
+    "estimatedLines": 1
+  },
+  {
+    "name": "GR9",
+    "signature": "function GR9(A,Q)",
+    "body": "{var B=sM9.isValidDate(A)?{first:A}:typeof A===\"number\"?{each:A}:A,G=B.first,Z=B.each,Y=B.with,J=Y===void 0?ZR9:Y,X=B.scheduler,I=X===void 0?Q!==null&&Q!==void 0?Q:rM9.asyncScheduler:X,W=B.meta,K=W===void 0?null:W;if(G==null&&Z==null)throw TypeError(\"No timeout provided.\");return tM9.operate(function(V,H){var D,F,E=null,z=0,$=function(L){F=BR9.executeSchedule(H,I,function(){try{D.unsubscribe(),eM9.innerFrom(J({meta:K,lastValue:E,seen:z})).subscribe(H)}catch(N){H.error(N)}},L)};D=V.subscribe(QR9.createOperatorSubscriber(H,function(L){F===null||F===void 0||F.unsubscribe(),z++,H.next(E=L),Z>0&&$(Z)},void 0,void 0,function(){if(!(F===null||F===void 0?void 0:F.closed))F===null||F===void 0||F.unsubscribe();E=null})),!z&&$(G!=null?typeof G===\"number\"?G:+G-I.now():Z)})}",
+    "keywords": [
+      "number",
+      "exec"
+    ],
+    "category": "bash",
+    "startIndex": 111540,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Gk0",
+    "signature": "function Gk0(A,Q,B)",
+    "body": "{if(A)fR9.executeSchedule(B,A,Q);else Q()}",
+    "keywords": [
+      "exec"
+    ],
+    "category": "bash",
+    "startIndex": 116755,
+    "estimatedLines": 1
+  },
+  {
+    "name": "dR9",
+    "signature": "function dR9(A,Q,B,G,Z,Y,J,X)",
+    "body": "{var I=[],W=0,K=0,V=!1,H=function(){if(V&&!I.length&&!W)Q.complete()},D=function(E){return W<G?F(E):I.push(E)},F=function(E){Y&&Q.next(E),W++;var z=!1;uR9.innerFrom(B(E,K++)).subscribe(Wk0.createOperatorSubscriber(Q,function($){if(Z===null||Z===void 0||Z($),Y)D($);else Q.next($)},function(){z=!0},void 0,function(){if(z)try{W--;var $=function(){var L=I.shift();if(J)mR9.executeSchedule(Q,J,function(){return F(L)});else F(L)};while(I.length&&W<G)$();H()}catch(L){Q.error(L)}}))};return A.subscribe(Wk0.createOperatorSubscriber(Q,D,function(){V=!0,H()})),function(){X===null||X===void 0||X()}}",
+    "keywords": [
+      "exec"
+    ],
+    "category": "bash",
+    "startIndex": 116945,
+    "estimatedLines": 1
+  },
+  {
+    "name": "I",
+    "signature": "function I(W)",
+    "body": "{if(G)throw TypeError(\"Generator is already executing.\");while(B)try{if(G=1,Z&&(Y=W[0]&2?Z.return:W[0]?Z.throw||((Y=Z.return)&&Y.call(Z),0):Z.next)&&!(Y=Y.call(Z,W[1])).done)return Y;if(Z=0,Y)W=[W[0]&2,Y.value];switch(W[0]){case 0:case 1:Y=W;break;case 4:return B.label++,{value:W[1],done:!1};case 5:B.label++,Z=W[1],W=[0];continue;case 7:W=B.ops.pop(),B.trys.pop();continue;default:if((Y=B.trys,!(Y=Y.length>0&&Y[Y.length-1]))&&(W[0]===6||W[0]===2)){B=0;continue}if(W[0]===3&&(!Y||W[1]>Y[0]&&W[1]<Y[3])){B.label=W[1];break}if(W[0]===6&&B.label<Y[1]){B.label=Y[1],Y=W;break}if(Y&&B.label<Y[2]){B.label=Y[2],B.ops.push(W);break}if(Y[2])B.ops.pop();B.trys.pop();continue}W=Q.call(A,B)}catch(K){W=[6,K],Z=0}finally{G=Y=0}if(W[0]&5)throw W[1];return{value:W[0]?W[1]:void 0,done:!0}}",
+    "keywords": [
+      "exec"
+    ],
+    "category": "bash",
+    "startIndex": 122367,
+    "estimatedLines": 1
+  },
+  {
+    "name": "XT9",
+    "signature": "function XT9(A)",
+    "body": "{var Q,B,G=[];for(var Z=1;Z<arguments.length;Z++)G[Z-1]=arguments[Z];var Y=(Q=JT9.popScheduler(G))!==null&&Q!==void 0?Q:YT9.asyncScheduler,J=(B=G[0])!==null&&B!==void 0?B:null,X=G[1]||1/0;return BT9.operate(function(I,W){var K=[],V=!1,H=function(E){var{buffer:z,subs:$}=E;$.unsubscribe(),ZT9.arrRemove(K,E),W.next(z),V&&D()},D=function(){if(K){var E=new QT9.Subscription;W.add(E);var z=[],$={buffer:z,subs:E};K.push($),vb0.executeSchedule(E,Y,function(){return H($)},A)}};if(J!==null&&J>=0)vb0.executeSchedule(W,Y,D,J,!0);else V=!0;D();var F=GT9.createOperatorSubscriber(W,function(E){var z,$,L=K.slice();try{for(var N=AT9(L),M=N.next();!M.done;M=N.next()){var R=M.value,j=R.buffer;j.push(E),X<=j.length&&H(R)}}catch(P){z={error:P}}finally{try{if(M&&!M.done&&($=N.return))$.call(N)}finally{if(z)throw",
+    "keywords": [
+      "exec"
+    ],
+    "category": "bash",
+    "startIndex": 132531,
+    "estimatedLines": 1
+  },
+  {
+    "name": "kk9",
+    "signature": "function kk9(A)",
+    "body": "{var Q,B,G=[];for(var Z=1;Z<arguments.length;Z++)G[Z-1]=arguments[Z];var Y=(Q=vk9.popScheduler(G))!==null&&Q!==void 0?Q:Tk9.asyncScheduler,J=(B=G[0])!==null&&B!==void 0?B:null,X=G[1]||1/0;return Sk9.operate(function(I,W){var K=[],V=!1,H=function(z){var{window:$,subs:L}=z;$.complete(),L.unsubscribe(),yk9.arrRemove(K,z),V&&D()},D=function(){if(K){var z=new Pk9.Subscription;W.add(z);var $=new jk9.Subject,L={window:$,subs:z,seen:0};K.push(L),W.next($.asObservable()),qu0.executeSchedule(z,Y,function(){return H(L)},A)}};if(J!==null&&J>=0)qu0.executeSchedule(W,Y,D,J,!0);else V=!0;D();var F=function(z){return K.slice().forEach(z)},E=function(z){F(function($){var L=$.window;return z(L)}),z(W),W.unsubscribe()};return I.subscribe(xk9.createOperatorSubscriber(W,function(z){F(function($){$.window.next(",
+    "keywords": [
+      "exec"
+    ],
+    "category": "bash",
+    "startIndex": 174165,
+    "estimatedLines": 1
+  },
+  {
+    "name": "jm9",
+    "signature": "function jm9(A)",
+    "body": "{if(A=String(A),A.length>100)return;var Q=/^(-?(?:\\d+)?\\.?\\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|years?|yrs?|y)?$/i.exec(A);if(!Q)return;var B=parseFloat(Q[1]),G=(Q[2]||\"ms\").toLowerCase();switch(G){case\"years\":case\"year\":case\"yrs\":case\"yr\":case\"y\":return B*_m9;case\"weeks\":case\"week\":case\"w\":return B*Rm9;case\"days\":case\"day\":case\"d\":return B*ot;case\"hours\":case\"hour\":case\"hrs\":case\"hr\":case\"h\":return B*N3A;case\"minutes\":case\"minute\":case\"mins\":case\"min\":case\"m\":return B*q3A;case\"seconds\":case\"second\":case\"secs\":case\"sec\":case\"s\":return B*w3A;case\"milliseconds\":case\"millisecond\":case\"msecs\":case\"msec\":case\"ms\":return B;default:return}}",
+    "keywords": [
+      "years",
+      "year",
+      "weeks",
+      "week",
+      "days",
+      "hours",
+      "hour",
+      "minutes",
+      "minute",
+      "mins",
+      "seconds",
+      "second",
+      "secs",
+      "milliseconds",
+      "millisecond",
+      "msecs",
+      "msec",
+      "exec"
+    ],
+    "category": "bash",
+    "startIndex": 215350,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Xm0",
+    "signature": "function Xm0(A)",
+    "body": "{if(A.match(/[\\\\/]/))return L3A(\"Path has slash in directory, bailing\"),A;var Q=oEA.join(\".\",A);if(Jm0(Q))return L3A(\"Found executable in currect directory: \".concat(Q)),rEA.realpathSync(Q);var B=process.env.PATH.split(Im0?\";\":\":\");for(var G=0,Z=B;G<Z.length;G++){var Y=Z[G],J=oEA.join(Y,A);if(Jm0(J))return rEA.realpathSync(J)}return L3A(\"Failed to find executable anywhere in path\"),A}",
+    "keywords": [
+      "exec",
+      "env"
+    ],
+    "category": "bash",
+    "startIndex": 226806,
+    "estimatedLines": 1
+  },
+  {
+    "name": "ngA",
+    "signature": "function ngA(A,Q)",
+    "body": "{if(process.platform!==\"win32\")return{cmd:Xm0(A),args:Q};if(!rEA.existsSync(A)){var B=[\".exe\",\".bat\",\".cmd\",\".ps1\"];for(var G=0,Z=B;G<Z.length;G++){var Y=Z[G],J=Xm0(\"\".concat(A).concat(Y));if(rEA.existsSync(J))return ngA(J,Q)}}if(A.match(/\\.ps1$/i)){var X=oEA.join(process.env.SYSTEMROOT,\"System32\",\"WindowsPowerShell\",\"v1.0\",\"PowerShell.exe\"),I=[\"-ExecutionPolicy\",\"Unrestricted\",\"-NoLogo\",\"-NonInteractive\",\"-File\",A];return{cmd:X,args:I.concat(Q)}}if(A.match(/\\.(bat|cmd)$/i)){var X=oEA.join(process.env.SYSTEMROOT,\"System32\",\"cmd.exe\"),W=Vd9([\"/C\",A],Q,!0);return{cmd:X,args:W}}if(A.match(/\\.(js)$/i)){var X=process.execPath,K=[A];return{cmd:X,args:K.concat(Q)}}return{cmd:A,args:Q}}",
+    "keywords": [
+      "win32",
+      "System32",
+      "WindowsPowerShell",
+      "Unrestricted",
+      "exec",
+      "shell",
+      "env"
+    ],
+    "category": "bash",
+    "startIndex": 227208,
+    "estimatedLines": 1
+  },
+  {
+    "name": "A$1",
+    "signature": "function A$1(A,Q,B)",
+    "body": "{var G=ngA(A,Q!==null&&Q!==void 0?Q:[]),Z=G.cmd,Y=G.args;if(!Im0)return sEA(Z,Y,Object.assign({},B||{},{detached:!0}));var J=[Z].concat(Y),X=oEA.join(__dirname,\"..\",\"..\",\"vendor\",\"jobber\",\"Jobber.exe\"),I=jO(jO({},B!==null&&B!==void 0?B:{}),{detached:!0,jobber:!0});return L3A(\"spawnDetached: \".concat(X,\", \").concat(J)),sEA(X,J,I)}",
+    "keywords": [
+      "vendor",
+      "jobber",
+      "spawn"
+    ],
+    "category": "bash",
+    "startIndex": 227912,
+    "estimatedLines": 1
+  },
+  {
+    "name": "sEA",
+    "signature": "function sEA(A,Q,B)",
+    "body": "{B=B!==null&&B!==void 0?B:{};var G=new Mc.Observable(function(Z){var{stdin:Y,jobber:J,split:X,encoding:I}=B,W=Kd9(B,[\"stdin\",\"jobber\",\"split\",\"encoding\"]),K=ngA(A,Q),V=K.cmd,H=K.args;L3A(\"spawning process: \".concat(V,\" \").concat(H.join(),\", \").concat(JSON.stringify(W)));var D=(0,Dd9.spawn)(V,H,W),F=function(N){return function(M){if(M.length<1)return;if(B.echoOutput)(N===\"stdout\"?process.stdout:process.stderr).write(M);var R=\"<< String sent back was too long >>\";try{if(typeof M===\"string\")R=M.toString();else R=M.toString(I||\"utf8\")}catch(j){R=\"<< Lost chunk of process output for \".concat(A,\" - length was \").concat(M.length,\">>\")}Z.next({source:N,text:R})}},E=new Mc.Subscription;if(B.stdin)if(D.stdin)E.add(B.stdin.subscribe({next:function(N){return D.stdin.write(N)},error:Z.error.bind(Z),com",
+    "keywords": [
+      "stdin",
+      "jobber",
+      "split",
+      "encoding",
+      "stdout",
+      "string",
+      "utf8",
+      "pipe",
+      "data",
+      "close",
+      "stderr",
+      "error",
+      "spawn",
+      "chunk"
+    ],
+    "category": "bash",
+    "startIndex": 228262,
+    "estimatedLines": 1
+  },
+  {
+    "name": "ym0",
+    "signature": "function ym0(A,Q)",
+    "body": "{let B=A.options.env||process.env,G=process.cwd(),Z=A.options.cwd!=null,Y=Z&&process.chdir!==void 0&&!process.chdir.disabled;if(Y)try{process.chdir(A.options.cwd)}catch(X){}let J;try{J=Od9.sync(A.command,{path:B[Md9({env:B})],pathExt:Q?xm0.delimiter:void 0})}catch(X){}finally{if(Y)process.chdir(G)}if(J)J=xm0.resolve(Z?A.options.cwd:\"\",J);return J}",
+    "keywords": [
+      "command",
+      "env"
+    ],
+    "category": "bash",
+    "startIndex": 234600,
+    "estimatedLines": 1
+  },
+  {
+    "name": "ud9",
+    "signature": "function ud9(A)",
+    "body": "{A.file=pm0(A);let Q=A.file&&bd9(A.file);if(Q)return A.args.unshift(A.file),A.command=Q,pm0(A);return A.file}",
+    "keywords": [
+      "command"
+    ],
+    "category": "bash",
+    "startIndex": 235979,
+    "estimatedLines": 1
+  },
+  {
+    "name": "md9",
+    "signature": "function md9(A)",
+    "body": "{if(!fd9)return A;let Q=ud9(A),B=!hd9.test(Q);if(A.options.forceShell||B){let G=gd9.test(Q);A.command=kd9.normalize(A.command),A.command=cm0.command(A.command),A.args=A.args.map((Y)=>cm0.argument(Y,G));let Z=[A.command].concat(A.args).join(\" \");A.args=[\"/d\",\"/s\",\"/c\",`\"${Z}\"`],A.command=process.env.comspec||\"cmd.exe\",A.options.windowsVerbatimArguments=!0}return A}",
+    "keywords": [
+      "shell",
+      "command",
+      "env"
+    ],
+    "category": "bash",
+    "startIndex": 236103,
+    "estimatedLines": 1
+  },
+  {
+    "name": "dd9",
+    "signature": "function dd9(A,Q,B)",
+    "body": "{if(Q&&!Array.isArray(Q))B=Q,Q=null;Q=Q?Q.slice(0):[],B=Object.assign({},B);let G={command:A,args:Q,options:B,file:void 0,original:{command:A,args:Q}};return B.shell?G:md9(G)}",
+    "keywords": [
+      "shell",
+      "command"
+    ],
+    "category": "bash",
+    "startIndex": 236484,
+    "estimatedLines": 1
+  },
+  {
+    "name": "X$1",
+    "signature": "function X$1(A,Q)",
+    "body": "{return Object.assign(Error(`${Q} ${A.command} ENOENT`),{code:\"ENOENT\",errno:\"ENOENT\",syscall:`${Q} ${A.command}`,path:A.command,spawnargs:A.args})}",
+    "keywords": [
+      "ENOENT",
+      "spawn",
+      "command"
+    ],
+    "category": "bash",
+    "startIndex": 236753,
+    "estimatedLines": 1
+  },
+  {
+    "name": "nm0",
+    "signature": "function nm0(A,Q)",
+    "body": "{if(J$1&&A===1&&!Q.file)return X$1(Q.original,\"spawn\");return null}",
+    "keywords": [
+      "spawn"
+    ],
+    "category": "bash",
+    "startIndex": 237076,
+    "estimatedLines": 1
+  },
+  {
+    "name": "cd9",
+    "signature": "function cd9(A,Q)",
+    "body": "{if(J$1&&A===1&&!Q.file)return X$1(Q.original,\"spawnSync\");return null}",
+    "keywords": [
+      "spawnSync",
+      "spawn"
+    ],
+    "category": "bash",
+    "startIndex": 237160,
+    "estimatedLines": 1
+  },
+  {
+    "name": "sm0",
+    "signature": "function sm0(A,Q,B)",
+    "body": "{let G=I$1(A,Q,B),Z=rm0.spawn(G.command,G.args,G.options);return W$1.hookChildProcess(Z,G),Z}",
+    "keywords": [
+      "spawn",
+      "command",
+      "hook"
+    ],
+    "category": "bash",
+    "startIndex": 237411,
+    "estimatedLines": 1
+  },
+  {
+    "name": "ld9",
+    "signature": "function ld9(A,Q,B)",
+    "body": "{let G=I$1(A,Q,B),Z=rm0.spawnSync(G.command,G.args,G.options);return Z.error=Z.error||W$1.verifyENOENTSync(Z.status,G),Z}",
+    "keywords": [
+      "spawn",
+      "command"
+    ],
+    "category": "bash",
+    "startIndex": 237523,
+    "estimatedLines": 1
+  },
+  {
+    "name": "et",
+    "signature": "function et(A,Q,B)",
+    "body": "{let G=Yp0(A,Q,B),Z=x$1(A,Q),Y=y$1(A,Q);k$1(Y,G.options),Nd0(G.options);let J;try{J=b$1.spawn(G.file,G.args,G.options)}catch(D){let F=new b$1.ChildProcess,E=Promise.reject(eEA({error:D,stdout:\"\",stderr:\"\",all:\"\",command:Z,escapedCommand:Y,parsed:G,timedOut:!1,isCanceled:!1,killed:!1}));return S$1(F,E),F}let X=od0(J),I=qd0(J,G.options,X),W=Ld0(J,G.options,I),K={isCanceled:!1};J.kill=Ud0.bind(null,J.kill.bind(J)),J.cancel=wd0.bind(null,J,K);let H=Gd0(async()=>{let[{error:D,exitCode:F,signal:E,timedOut:z},$,L,N]=await nd0(J,G.options,W),M=BzA(G.options,$),R=BzA(G.options,L),j=BzA(G.options,N);if(D||F!==0||E!==null){let P=eEA({error:D,exitCode:F,signal:E,stdout:M,stderr:R,all:j,command:Z,escapedCommand:Y,parsed:G,timedOut:z,isCanceled:K.isCanceled||(G.options.signal?G.options.signal.aborted:!1",
+    "keywords": [
+      "spawn",
+      "command"
+    ],
+    "category": "bash",
+    "startIndex": 260134,
+    "estimatedLines": 1
+  },
+  {
+    "name": "R3A",
+    "signature": "function R3A(A,Q,B)",
+    "body": "{let G=Yp0(A,Q,B),Z=x$1(A,Q),Y=y$1(A,Q);k$1(Y,G.options);let J=cd0(G.options),X;try{X=b$1.spawnSync(G.file,G.args,{...G.options,input:J})}catch(K){throw eEA({error:K,stdout:\"\",stderr:\"\",all:\"\",command:Z,escapedCommand:Y,parsed:G,timedOut:!1,isCanceled:!1,killed:!1})}let I=BzA(G.options,X.stdout,X.error),W=BzA(G.options,X.stderr,X.error);if(X.error||X.status!==0||X.signal!==null){let K=eEA({stdout:I,stderr:W,error:X.error,signal:X.signal,exitCode:X.status,command:Z,escapedCommand:Y,parsed:G,timedOut:X.error&&X.error.code===\"ETIMEDOUT\",isCanceled:!1,killed:X.signal!==null});if(!G.options.reject)return K;throw K}return{command:Z,escapedCommand:Y,exitCode:0,stdout:I,stderr:W,failed:!1,timedOut:!1,isCanceled:!1,killed:!1}}",
+    "keywords": [
+      "ETIMEDOUT",
+      "spawn",
+      "command"
+    ],
+    "category": "bash",
+    "startIndex": 261193,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Jp0",
+    "signature": "function Jp0(A)",
+    "body": "{function Q(B,...G){if(!Array.isArray(B))return Jp0({...A,...B});let[Z,...Y]=v$1(B,G);return et(Z,Y,Gp0(A))}return Q.sync=(B,...G)=>{if(!Array.isArray(B))throw TypeError(\"Please use $(options).sync`command` instead of $.sync(options)`command`.\");let[Z,...Y]=v$1(B,G);return R3A(Z,Y,Gp0(A))},Q}",
+    "keywords": [
+      "command"
+    ],
+    "category": "bash",
+    "startIndex": 261939,
+    "estimatedLines": 1
+  },
+  {
+    "name": "xZ",
+    "signature": "function xZ(A,Q,B=10*g$1*h$1)",
+    "body": "{let G;if(Q===void 0)G={};else if(Q instanceof AbortSignal)G={abortSignal:Q,timeout:B};else G=Q;let{abortSignal:Z,timeout:Y=10*g$1*h$1,input:J,stdio:X=[\"ignore\",\"pipe\",\"pipe\"]}=G;Z?.throwIfAborted();let I=performance.now();try{let W=R3A(A,{env:process.env,maxBuffer:1e6,timeout:Y,cwd:t1(),stdio:X,shell:!0,reject:!1,input:J}),K=performance.now()-I;if(K>Xp0)k(`[SLOW OPERATION DETECTED] execSyncWithDefaults_DEPRECATED (${K.toFixed(1)}ms): ${A.slice(0,100)}`);if(!W.stdout)return null;return W.stdout.trim()||null}catch{let W=performance.now()-I;if(W>Xp0)k(`[SLOW OPERATION DETECTED] execSyncWithDefaults_DEPRECATED (${W.toFixed(1)}ms): ${A.slice(0,100)}`);return null}}",
+    "keywords": [
+      "ignore",
+      "pipe",
+      "exec",
+      "shell",
+      "env"
+    ],
+    "category": "bash",
+    "startIndex": 263308,
+    "estimatedLines": 1
+  },
+  {
+    "name": "ZzA",
+    "signature": "function ZzA(A,Q={})",
+    "body": "{let{abortSignal:B,timeout:G=10*g$1*h$1}=Q;B?.throwIfAborted();try{let Z=await et(A,{env:process.env,maxBuffer:1e6,signal:B,timeout:G,cwd:t1(),shell:!0,reject:!1});if(!Z.stdout)return null;return Z.stdout.trim()||null}catch{return null}}",
+    "keywords": [
+      "shell",
+      "env"
+    ],
+    "category": "bash",
+    "startIndex": 264012,
+    "estimatedLines": 1
+  },
+  {
+    "name": "g6",
+    "signature": "function g6(A,Q,{abortSignal:B,timeout:G=10*m$1*u$1,preserveOutputOnError:Z=!0,cwd:Y,env:J,maxBuffer:X,shell:I,stdin:W}={timeout:10*m$1*u$1,preserveOutputOnError:!0,maxBuffer:1e6})",
+    "body": "{return new Promise((K)=>{et(A,Q,{maxBuffer:X,signal:B,timeout:G,cwd:Y,env:J,shell:I,stdin:W,reject:!1}).then((V)=>{if(V.failed)if(Z){let H=V.exitCode??1;K({stdout:V.stdout||\"\",stderr:V.stderr||\"\",code:H,error:typeof V.signal===\"string\"?V.signal:String(H)})}else K({stdout:\"\",stderr:\"\",code:V.exitCode??1});else K({stdout:V.stdout,stderr:V.stderr,code:0})}).catch((V)=>{t(V),K({stdout:\"\",stderr:\"\",code:1})})})}",
+    "keywords": [
+      "string",
+      "shell",
+      "env"
+    ],
+    "category": "bash",
+    "startIndex": 264559,
+    "estimatedLines": 1
+  },
+  {
+    "name": "_3A",
+    "signature": "function _3A()",
+    "body": "{let A=VuA();return{rgPath:A.command,rgArgs:A.args}}",
+    "keywords": [
+      "command"
+    ],
+    "category": "bash",
+    "startIndex": 266300,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Fp0",
+    "signature": "function Fp0()",
+    "body": "{let A=VuA();return{mode:A.mode,path:A.command,working:KuA?.working??null}}",
+    "keywords": [
+      "command"
+    ],
+    "category": "bash",
+    "startIndex": 267572,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Rc9",
+    "signature": "function Rc9(A)",
+    "body": "{return new RegExp(A.toString()+\"|\").exec(\"\").length-1}",
+    "keywords": [
+      "exec"
+    ],
+    "category": "bash",
+    "startIndex": 272301,
+    "estimatedLines": 1
+  },
+  {
+    "name": "_c9",
+    "signature": "function _c9(A,Q)",
+    "body": "{let B=A&&A.exec(Q);return B&&B.index===0}",
+    "keywords": [
+      "exec"
+    ],
+    "category": "bash",
+    "startIndex": 272371,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Tc9",
+    "signature": "function Tc9(A,Q=\"|\")",
+    "body": "{let B=0;return A.map((G)=>{B+=1;let Z=B,Y=YzA(G),J=\"\";while(Y.length>0){let X=jc9.exec(Y);if(!X){J+=Y;break}if(J+=Y.substring(0,X.index),Y=Y.substring(X.index+X[0].length),X[0][0]===\"\\\\\"&&X[1])J+=\"\\\\\"+String(Number(X[1])+Z);else if(J+=X[0],X[0]===\"(\")B++}return J}).map((G)=>`(${G})`).join(Q)}",
+    "keywords": [
+      "exec"
+    ],
+    "category": "bash",
+    "startIndex": 272487,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Bl9",
+    "signature": "function Bl9(A,{plugins:Q})",
+    "body": "{function B(X,I){return new RegExp(YzA(X),\"m\"+(A.case_insensitive?\"i\":\"\")+(I?\"g\":\"\"))}class G{constructor(){this.matchIndexes={},this.regexes=[],this.matchAt=1,this.position=0}addRule(X,I){I.position=this.position++,this.matchIndexes[this.matchAt]=I,this.regexes.push([I,X]),this.matchAt+=Rc9(X)+1}compile(){if(this.regexes.length===0)this.exec=()=>null;let X=this.regexes.map((I)=>I[1]);this.matcherRe=B(Tc9(X),!0),this.lastIndex=0}exec(X){this.matcherRe.lastIndex=this.lastIndex;let I=this.matcherRe.exec(X);if(!I)return null;let W=I.findIndex((V,H)=>H>0&&V!==void 0),K=this.matchIndexes[W];return I.splice(0,W),Object.assign(I,K)}}class Z{constructor(){this.rules=[],this.multiRegexes=[],this.count=0,this.lastIndex=0,this.regexIndex=0}getMatcher(X){if(this.multiRegexes[X])return this.multiRegexe",
+    "keywords": [
+      "begin",
+      "illegal",
+      "object",
+      "self",
+      "exec",
+      "pattern",
+      "allow"
+    ],
+    "category": "bash",
+    "startIndex": 276285,
+    "estimatedLines": 1
+  },
+  {
+    "name": "K",
+    "signature": "function K(YA)",
+    "body": "{let RA=YA.className+\" \";RA+=YA.parentNode?YA.parentNode.className:\"\";let EA=I.languageDetectRe.exec(RA);if(EA){let xA=d(EA[1]);if(!xA)$p0(J.replace(\"{}\",EA[1])),$p0(\"Falling back to no-highlight mode for this block.\",YA);return xA?EA[1]:\"no-highlight\"}return RA.split(/\\s+/).find((xA)=>W(xA)||d(xA))}",
+    "keywords": [
+      "exec"
+    ],
+    "category": "bash",
+    "startIndex": 282393,
+    "estimatedLines": 1
+  },
+  {
+    "name": "H",
+    "signature": "function H(YA,RA,EA,xA)",
+    "body": "{function DA($1,a1){let z0=MA.case_insensitive?a1[0].toLowerCase():a1[0];return Object.prototype.hasOwnProperty.call($1.keywords,z0)&&$1.keywords[z0]}function mA(){if(!_1.keywords){AQ.addText(l0);return}let $1=0;_1.keywordPatternRe.lastIndex=0;let a1=_1.keywordPatternRe.exec(l0),z0=\"\";while(a1){z0+=l0.substring($1,a1.index);let m0=DA(_1,a1);if(m0){let[j0,FA]=m0;if(AQ.addText(z0),z0=\"\",XQ+=FA,j0.startsWith(\"_\"))z0+=a1[0];else{let OA=MA.classNameAliases[j0]||j0;AQ.addKeyword(a1[0],OA)}}else z0+=a1[0];$1=_1.keywordPatternRe.lastIndex,a1=_1.keywordPatternRe.exec(l0)}z0+=l0.substr($1),AQ.addText(z0)}function AA(){if(l0===\"\")return;let $1=null;if(typeof _1.subLanguage===\"string\"){if(!Q[_1.subLanguage]){AQ.addText(l0);return}$1=H(_1.subLanguage,l0,!0,H0[_1.subLanguage]),H0[_1.subLanguage]=$1.top}",
+    "keywords": [
+      "string",
+      "begin",
+      "illegal",
+      "Illegal",
+      "exec",
+      "pattern",
+      "message"
+    ],
+    "category": "bash",
+    "startIndex": 283186,
+    "estimatedLines": 1
+  },
+  {
+    "name": "mA",
+    "signature": "function mA()",
+    "body": "{if(!_1.keywords){AQ.addText(l0);return}let $1=0;_1.keywordPatternRe.lastIndex=0;let a1=_1.keywordPatternRe.exec(l0),z0=\"\";while(a1){z0+=l0.substring($1,a1.index);let m0=DA(_1,a1);if(m0){let[j0,FA]=m0;if(AQ.addText(z0),z0=\"\",XQ+=FA,j0.startsWith(\"_\"))z0+=a1[0];else{let OA=MA.classNameAliases[j0]||j0;AQ.addKeyword(a1[0],OA)}}else z0+=a1[0];$1=_1.keywordPatternRe.lastIndex,a1=_1.keywordPatternRe.exec(l0)}z0+=l0.substr($1),AQ.addText(z0)}",
+    "keywords": [
+      "exec",
+      "pattern"
+    ],
+    "category": "bash",
+    "startIndex": 283359,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Tl9",
+    "signature": "function Tl9(A)",
+    "body": "{let Q={keyword:\"boolean byte word String\",built_in:\"KeyboardController MouseController SoftwareSerial EthernetServer EthernetClient LiquidCrystal RobotControl GSMVoiceCall EthernetUDP EsploraTFT HttpClient RobotMotor WiFiClient GSMScanner FileSystem Scheduler GSMServer YunClient YunServer IPAddress GSMClient GSMModem Keyboard Ethernet Console GSMBand Esplora Stepper Process WiFiUDP GSM_SMS Mailbox USBHost Firmata PImage Client Server GSMPIN FileIO Bridge Serial EEPROM Stream Mouse Audio Servo File Task GPRS WiFi Wire TFT GSM SPI SD \",_:\"setup loop runShellCommandAsynchronously analogWriteResolution retrieveCallingNumber printFirmwareVersion analogReadResolution sendDigitalPortPair noListenOnLocalhost readJoystickButton setFirmwareVersion readJoystickSwitch scrollDisplayRight getVoiceCallS",
+    "keywords": [
+      "Arduino",
+      "shell",
+      "command",
+      "http",
+      "request",
+      "task",
+      "background",
+      "ink",
+      "message",
+      "stream",
+      "sse",
+      "config"
+    ],
+    "category": "bash",
+    "startIndex": 340066,
+    "estimatedLines": 1
+  },
+  {
+    "name": "fl9",
+    "signature": "function fl9(A)",
+    "body": "{let Q=\"false synchronized int abstract float private char boolean static null if const for true while long throw strictfp finally protected import native final return void enum else extends implements break transient new catch instanceof byte super volatile case assert short package default double public try this switch continue throws privileged aspectOf adviceexecution proceed cflowbelow cflow initialization preinitialization staticinitialization withincode target within execution getWithinTypeName handler thisJoinPoint thisJoinPointStaticPart thisEnclosingJoinPointStaticPart declare parents warning error soft precedence thisAspectInstance\",B=\"get set args call\";return{name:\"AspectJ\",keywords:Q,illegal:/<\\/|#/,contains:[A.COMMENT(/\\/\\*\\*/,/\\*\\//,{relevance:0,contains:[{begin:/\\w+@/,rele",
+    "keywords": [
+      "AspectJ",
+      "doctag",
+      "class",
+      "aspect",
+      "function",
+      "params",
+      "meta",
+      "AutoHotkey",
+      "number",
+      "variable",
+      "built_in",
+      "title",
+      "EndRegion",
+      "forcedef",
+      "forceref",
+      "ignorefunc",
+      "include",
+      "NoTrayIcon",
+      "OnAutoItStartRegister",
+      "pragma"
+    ],
+    "category": "bash",
+    "startIndex": 351774,
+    "estimatedLines": 3
+  },
+  {
+    "name": "ll9",
+    "signature": "function ll9(A)",
+    "body": "{let Q={},B={begin:/\\$\\{/,end:/\\}/,contains:[\"self\",{begin:/:-/,contains:[Q]}]};Object.assign(Q,{className:\"variable\",variants:[{begin:cl9(/\\$[\\w\\d#@][\\w\\d_]*/,\"(?![\\\\w\\\\d])(?![$])\")},B]});let G={className:\"subst\",begin:/\\$\\(/,end:/\\)/,contains:[A.BACKSLASH_ESCAPE]},Z={begin:/<<-?\\s*(?=\\w+)/,starts:{contains:[A.END_SAME_AS_BEGIN({begin:/(\\w+)/,end:/(\\w+)/,className:\"string\"})]}},Y={className:\"string\",begin:/\"/,end:/\"/,contains:[A.BACKSLASH_ESCAPE,Q,G]};G.contains.push(Y);let J={className:\"\",begin:/\\\\\"/},X={className:\"string\",begin:/'/,end:/'/},I={begin:/\\$\\(\\(/,end:/\\)\\)/,contains:[{begin:/\\d+#[0-9a-f]+/,className:\"number\"},A.NUMBER_MODE,Q]},W=[\"fish\",\"bash\",\"zsh\",\"sh\",\"csh\",\"ksh\",\"tcsh\",\"dash\",\"scsh\"],K=A.SHEBANG({binary:`(${W.join(\"|\")})`,relevance:10}),V={className:\"function\",begin:/\\w[",
+    "keywords": [
+      "self",
+      "variable",
+      "subst",
+      "string",
+      "number",
+      "fish",
+      "bash",
+      "tcsh",
+      "dash",
+      "scsh",
+      "function",
+      "Bash",
+      "exec",
+      "command",
+      "glob",
+      "pattern",
+      "history"
+    ],
+    "category": "bash",
+    "startIndex": 371304,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Ii9",
+    "signature": "function Ii9(A)",
+    "body": "{return{name:\"CMake\",aliases:[\"cmake.in\"],case_insensitive:!0,keywords:{keyword:\"break cmake_host_system_information cmake_minimum_required cmake_parse_arguments cmake_policy configure_file continue elseif else endforeach endfunction endif endmacro endwhile execute_process file find_file find_library find_package find_path find_program foreach function get_cmake_property get_directory_property get_filename_component get_property if include include_guard list macro mark_as_advanced math message option return separate_arguments set_directory_properties set_property set site_name string unset variable_watch while add_compile_definitions add_compile_options add_custom_command add_custom_target add_definitions add_dependencies add_executable add_library add_link_options add_subdirectory add_tes",
+    "keywords": [
+      "CMake",
+      "variable",
+      "exec",
+      "command",
+      "ink",
+      "component",
+      "message",
+      "config"
+    ],
+    "category": "bash",
+    "startIndex": 392753,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Mi9",
+    "signature": "function Mi9(A)",
+    "body": "{return{name:\"CSP\",case_insensitive:!1,keywords:{$pattern:\"[a-zA-Z][a-zA-Z0-9_-]*\",keyword:\"base-uri child-src connect-src default-src font-src form-action frame-ancestors frame-src img-src media-src object-src plugin-types report-uri sandbox script-src style-src\"},contains:[{className:\"string\",begin:\"'\",end:\"'\"},{className:\"attribute\",begin:\"^Content\",end:\":\",excludeEnd:!0}]}}",
+    "keywords": [
+      "string",
+      "attribute",
+      "sandbox",
+      "pattern"
+    ],
+    "category": "bash",
+    "startIndex": 417560,
+    "estimatedLines": 1
+  },
+  {
+    "name": "li9",
+    "signature": "function li9(A)",
+    "body": "{return{name:\"Dockerfile\",aliases:[\"docker\"],case_insensitive:!0,keywords:\"from maintainer expose env arg user onbuild stopsignal\",contains:[A.HASH_COMMENT_MODE,A.APOS_STRING_MODE,A.QUOTE_STRING_MODE,A.NUMBER_MODE,{beginKeywords:\"run cmd entrypoint volume add copy workdir label healthcheck shell\",starts:{end:/[^\\\\]$/,subLanguage:\"bash\"}}],illegal:\"</\"}}",
+    "keywords": [
+      "Dockerfile",
+      "docker",
+      "bash",
+      "shell",
+      "rg ",
+      "ink",
+      "env"
+    ],
+    "category": "bash",
+    "startIndex": 437601,
+    "estimatedLines": 1
+  },
+  {
+    "name": "ti9",
+    "signature": "function ti9(A)",
+    "body": "{let Q={variants:[A.COMMENT(\"--\",\"$\"),A.COMMENT(/\\{-/,/-\\}/,{contains:[\"self\"]})]},B={className:\"type\",begin:\"\\\\b[A-Z][\\\\w']*\",relevance:0},G={begin:\"\\\\(\",end:\"\\\\)\",illegal:'\"',contains:[{className:\"type\",begin:\"\\\\b[A-Z][\\\\w]*(\\\\((\\\\.\\\\.|,|\\\\w+)\\\\))?\"},Q]},Z={begin:/\\{/,end:/\\}/,contains:G.contains},Y={className:\"string\",begin:\"'\\\\\\\\?.\",end:\"'\",illegal:\".\"};return{name:\"Elm\",keywords:\"let in if then else case of where module import exposing type alias as infix infixl infixr port effect command subscription\",contains:[{beginKeywords:\"port effect module\",end:\"exposing\",keywords:\"port effect module where command subscription exposing\",contains:[G,Q],illegal:\"\\\\W\\\\.|;\"},{begin:\"import\",end:\"$\",keywords:\"import as exposing\",contains:[G,Q],illegal:\"\\\\W\\\\.|;\"},{begin:\"type\",end:\"$\",keywords:\"type",
+    "keywords": [
+      "self",
+      "type",
+      "string",
+      "exposing",
+      "import",
+      "port",
+      "command",
+      "ink"
+    ],
+    "category": "bash",
+    "startIndex": 444250,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Yn9",
+    "signature": "function Yn9(A)",
+    "body": "{return{name:\"Erlang REPL\",keywords:{built_in:\"spawn spawn_link self\",keyword:\"after and andalso|10 band begin bnot bor bsl bsr bxor case catch cond div end fun if let not of or orelse|10 query receive rem try when xor\"},contains:[{className:\"meta\",begin:\"^[0-9]+> \",relevance:10},A.COMMENT(\"%\",\"$\"),{className:\"number\",begin:\"\\\\b(\\\\d+(_\\\\d+)*#[a-fA-F0-9]+(_[a-fA-F0-9]+)*|\\\\d+(_\\\\d+)*(\\\\.\\\\d+(_\\\\d+)*)?([eE][-+]?\\\\d+)?)\",relevance:0},A.APOS_STRING_MODE,A.QUOTE_STRING_MODE,{begin:Zn9(/\\?(::)?/,/([A-Z]\\w*)/,/((::)[A-Z]\\w*)*/)},{begin:\"->\"},{begin:\"ok\"},{begin:\"!\"},{begin:\"(\\\\b[a-z'][a-zA-Z0-9_']*:[a-z'][a-zA-Z0-9_']*)|(\\\\b[a-z'][a-zA-Z0-9_']*)\",relevance:0},{begin:\"[A-Z][a-zA-Z0-9_']*\",relevance:0}]}}",
+    "keywords": [
+      "meta",
+      "number",
+      "spawn",
+      "ink"
+    ],
+    "category": "bash",
+    "startIndex": 449477,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Vn9",
+    "signature": "function Vn9(A)",
+    "body": "{let Q={className:\"params\",begin:\"\\\\(\",end:\"\\\\)\"},B={variants:[A.COMMENT(\"!\",\"$\",{relevance:0}),A.COMMENT(\"^C[ ]\",\"$\",{relevance:0}),A.COMMENT(\"^C$\",\"$\",{relevance:0})]},G=/(_[a-z_\\d]+)?/,Z=/([de][+-]?\\d+)?/,Y={className:\"number\",variants:[{begin:QU1(/\\b\\d+/,/\\.(\\d*)/,Z,G)},{begin:QU1(/\\b\\d+/,Z,G)},{begin:QU1(/\\.\\d+/,Z,G)}],relevance:0},J={className:\"function\",beginKeywords:\"subroutine function program\",illegal:\"[${=\\\\n]\",contains:[A.UNDERSCORE_TITLE_MODE,Q]},X={className:\"string\",relevance:0,variants:[A.APOS_STRING_MODE,A.QUOTE_STRING_MODE]};return{name:\"Fortran\",case_insensitive:!0,aliases:[\"f90\",\"f95\"],keywords:{literal:\".False. .True.\",keyword:\"kind do concurrent local shared while private call intrinsic where elsewhere type endtype endmodule endselect endinterface end enddo endif if f",
+    "keywords": [
+      "params",
+      "number",
+      "function",
+      "string",
+      "Fortran",
+      "exec",
+      "command",
+      "ink",
+      "sse",
+      "env"
+    ],
+    "category": "bash",
+    "startIndex": 457724,
+    "estimatedLines": 1
+  },
+  {
+    "name": "En9",
+    "signature": "function En9(A)",
+    "body": "{let Q={keyword:\"abort acronym acronyms alias all and assign binary card diag display else eq file files for free ge gt if integer le loop lt maximizing minimizing model models ne negative no not option options or ord positive prod put putpage puttl repeat sameas semicont semiint smax smin solve sos1 sos2 sum system table then until using while xor yes\",literal:\"eps inf na\",built_in:\"abs arccos arcsin arctan arctan2 Beta betaReg binomial ceil centropy cos cosh cvPower div div0 eDist entropy errorf execSeed exp fact floor frac gamma gammaReg log logBeta logGamma log10 log2 mapVal max min mod ncpCM ncpF ncpVUpow ncpVUsin normal pi poly power randBinomial randLinear randTriangle round rPower sigmoid sign signPower sin sinh slexp sllog10 slrec sqexp sqlog10 sqr sqrec sqrt tan tanh trunc unifor",
+    "keywords": [
+      "params",
+      "symbol",
+      "comment",
+      "GAMS",
+      "meta",
+      "table",
+      "function",
+      "title",
+      "exec",
+      "ink"
+    ],
+    "category": "bash",
+    "startIndex": 463714,
+    "estimatedLines": 1
+  }
+]

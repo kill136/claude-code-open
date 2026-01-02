@@ -1,0 +1,784 @@
+[
+  {
+    "name": "oI",
+    "signature": "function oI(A,Q)",
+    "body": "{let B=performance.now();try{return Q()}finally{let G=performance.now()-B;if(G>PC9)k(`[SLOW OPERATION DETECTED] fs.${A} (${G.toFixed(1)}ms)`)}}",
+    "keywords": [
+      "fs."
+    ],
+    "category": "file",
+    "startIndex": 8337,
+    "estimatedLines": 1
+  },
+  {
+    "name": "vT0",
+    "signature": "function vT0(A,Q)",
+    "body": "{r0.meter=A,r0.sessionCounter=Q(\"claude_code.session.count\",{description:\"Count of CLI sessions started\"}),r0.locCounter=Q(\"claude_code.lines_of_code.count\",{description:\"Count of lines of code modified, with the 'type' attribute indicating whether lines were added or removed\"}),r0.prCounter=Q(\"claude_code.pull_request.count\",{description:\"Number of pull requests created\"}),r0.commitCounter=Q(\"claude_code.commit.count\",{description:\"Number of git commits created\"}),r0.costCounter=Q(\"claude_code.cost.usage\",{description:\"Cost of the Claude Code session\",unit:\"USD\"}),r0.tokenCounter=Q(\"claude_code.token.usage\",{description:\"Number of tokens used\",unit:\"tokens\"}),r0.codeEditToolDecisionCounter=Q(\"claude_code.code_edit_tool.decision\",{description:\"Count of code editing tool permission decision",
+    "keywords": [
+      "type",
+      "tokens",
+      "edit",
+      "request",
+      "session",
+      "token",
+      "permission",
+      "CLAUDE_"
+    ],
+    "category": "file",
+    "startIndex": 32775,
+    "estimatedLines": 1
+  },
+  {
+    "name": "TEA",
+    "signature": "function TEA()",
+    "body": "{return r0.codeEditToolDecisionCounter}",
+    "keywords": [
+      "edit"
+    ],
+    "category": "file",
+    "startIndex": 33988,
+    "estimatedLines": 1
+  },
+  {
+    "name": "NP0",
+    "signature": "function NP0()",
+    "body": "{if(fw9(),rhA){let A=bw9(),Q=yw9(A),B=jA();if(!B.existsSync(Q))B.mkdirSync(Q);B.writeFileSync(A,$P0(),{encoding:\"utf8\",flush:!0}),k(\"Startup profiling report:\"),k($P0())}}",
+    "keywords": [
+      "utf8",
+      "writeFile"
+    ],
+    "category": "file",
+    "startIndex": 40327,
+    "estimatedLines": 1
+  },
+  {
+    "name": "dl9",
+    "signature": "function dl9(A)",
+    "body": "{return{name:\"X++\",aliases:[\"x++\"],keywords:{keyword:[\"abstract\",\"as\",\"asc\",\"avg\",\"break\",\"breakpoint\",\"by\",\"byref\",\"case\",\"catch\",\"changecompany\",\"class\",\"client\",\"client\",\"common\",\"const\",\"continue\",\"count\",\"crosscompany\",\"delegate\",\"delete_from\",\"desc\",\"display\",\"div\",\"do\",\"edit\",\"else\",\"eventhandler\",\"exists\",\"extends\",\"final\",\"finally\",\"firstfast\",\"firstonly\",\"firstonly1\",\"firstonly10\",\"firstonly100\",\"firstonly1000\",\"flush\",\"for\",\"forceliterals\",\"forcenestedloop\",\"forceplaceholders\",\"forceselectorder\",\"forupdate\",\"from\",\"generateonly\",\"group\",\"hint\",\"if\",\"implements\",\"in\",\"index\",\"insert_recordset\",\"interface\",\"internal\",\"is\",\"join\",\"like\",\"maxof\",\"minof\",\"mod\",\"namespace\",\"new\",\"next\",\"nofetch\",\"notexists\",\"optimisticlock\",\"order\",\"outer\",\"pessimisticlock\",\"print\",\"private\",\"protecte",
+    "keywords": [
+      "abstract",
+      "break",
+      "breakpoint",
+      "byref",
+      "case",
+      "catch",
+      "changecompany",
+      "class",
+      "client",
+      "common",
+      "const",
+      "continue",
+      "count",
+      "crosscompany",
+      "delegate",
+      "delete_from",
+      "desc",
+      "display",
+      "edit",
+      "else"
+    ],
+    "category": "file",
+    "startIndex": 369551,
+    "estimatedLines": 1
+  },
+  {
+    "name": "il9",
+    "signature": "function il9(A)",
+    "body": "{return{name:\"BASIC\",case_insensitive:!0,illegal:\"^.\",keywords:{$pattern:\"[a-zA-Z][a-zA-Z0-9_$%!#]*\",keyword:\"ABS ASC AND ATN AUTO|0 BEEP BLOAD|10 BSAVE|10 CALL CALLS CDBL CHAIN CHDIR CHR$|10 CINT CIRCLE CLEAR CLOSE CLS COLOR COM COMMON CONT COS CSNG CSRLIN CVD CVI CVS DATA DATE$ DEFDBL DEFINT DEFSNG DEFSTR DEF|0 SEG USR DELETE DIM DRAW EDIT END ENVIRON ENVIRON$ EOF EQV ERASE ERDEV ERDEV$ ERL ERR ERROR EXP FIELD FILES FIX FOR|0 FRE GET GOSUB|10 GOTO HEX$ IF THEN ELSE|0 INKEY$ INP INPUT INPUT# INPUT$ INSTR IMP INT IOCTL IOCTL$ KEY ON OFF LIST KILL LEFT$ LEN LET LINE LLIST LOAD LOC LOCATE LOF LOG LPRINT USING LSET MERGE MID$ MKDIR MKD$ MKI$ MKS$ MOD NAME NEW NEXT NOISE NOT OCT$ ON OR PEN PLAY STRIG OPEN OPTION BASE OUT PAINT PALETTE PCOPY PEEK PMAP POINT POKE POS PRINT PRINT] PSET PRESET PUT",
+    "keywords": [
+      "BASIC",
+      "symbol",
+      "number",
+      "shell",
+      "edit",
+      "pattern",
+      "ink",
+      "resume",
+      "env"
+    ],
+    "category": "file",
+    "startIndex": 373252,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Co9",
+    "signature": "function Co9(A)",
+    "body": "{let Q=[\"string\",\"char\",\"byte\",\"int\",\"long\",\"bool\",\"decimal\",\"single\",\"double\",\"DateTime\",\"xml\",\"array\",\"hashtable\",\"void\"],B=\"Add|Clear|Close|Copy|Enter|Exit|Find|Format|Get|Hide|Join|Lock|Move|New|Open|Optimize|Pop|Push|Redo|Remove|Rename|Reset|Resize|Search|Select|Set|Show|Skip|Split|Step|Switch|Undo|Unlock|Watch|Backup|Checkpoint|Compare|Compress|Convert|ConvertFrom|ConvertTo|Dismount|Edit|Expand|Export|Group|Import|Initialize|Limit|Merge|Mount|Out|Publish|Restore|Save|Sync|Unpublish|Update|Approve|Assert|Build|Complete|Confirm|Deny|Deploy|Disable|Enable|Install|Invoke|Register|Request|Restart|Resume|Start|Stop|Submit|Suspend|Uninstall|Unregister|Wait|Debug|Measure|Ping|Repair|Resolve|Test|Trace|Connect|Disconnect|Read|Receive|Send|Write|Block|Grant|Protect|Revoke|Unblock|Unprotect|Use",
+    "keywords": [
+      "string",
+      "char",
+      "byte",
+      "long",
+      "bool",
+      "decimal",
+      "single",
+      "double",
+      "DateTime",
+      "array",
+      "hashtable",
+      "void",
+      "variable",
+      "keyword",
+      "literal",
+      "doctag",
+      "built_in",
+      "class",
+      "function",
+      "title"
+    ],
+    "category": "file",
+    "startIndex": 921976,
+    "estimatedLines": 1
+  },
+  {
+    "name": "po9",
+    "signature": "function po9(A)",
+    "body": "{let B=\"abstract as async await become box break const continue crate do dyn else enum extern false final fn for if impl in let loop macro match mod move mut override priv pub ref return self Self static struct super trait true try type typeof unsafe unsized use virtual where while yield\",G=\"drop i8 i16 i32 i64 i128 isize u8 u16 u32 u64 u128 usize f32 f64 str char bool Box Option Result String Vec Copy Send Sized Sync Drop Fn FnMut FnOnce ToOwned Clone Debug PartialEq PartialOrd Eq Ord AsRef AsMut Into From Default Iterator Extend IntoIterator DoubleEndedIterator ExactSizeIterator SliceConcatExt ToString assert! assert_eq! bitflags! bytes! cfg! col! concat! concat_idents! debug_assert! debug_assert_eq! env! panic! file! format! format_args! include_bin! include_str! line! local_data_key! m",
+    "keywords": [
+      "Rust",
+      "self",
+      "string",
+      "symbol",
+      "number",
+      "function",
+      "meta",
+      "class",
+      "type",
+      "edit",
+      "pattern",
+      "ink",
+      "sse",
+      "env"
+    ],
+    "category": "file",
+    "startIndex": 961644,
+    "estimatedLines": 1
+  },
+  {
+    "name": "SB4",
+    "signature": "function SB4()",
+    "body": "{if(process.env.CURSOR_TRACE_ID)return\"cursor\";if(process.env.VSCODE_GIT_ASKPASS_MAIN?.includes(\"/.cursor-server/\"))return\"cursor\";if(process.env.VSCODE_GIT_ASKPASS_MAIN?.includes(\"/.windsurf-server/\"))return\"windsurf\";let A=process.env.__CFBundleIdentifier?.toLowerCase();if(A?.includes(\"vscodium\"))return\"codium\";if(A?.includes(\"windsurf\"))return\"windsurf\";if(A?.includes(\"com.google.android.studio\"))return\"androidstudio\";if(A){for(let Q of Gq1)if(A.includes(Q))return Q}if(process.env.VisualStudioVersion)return\"visualstudio\";if(process.env.TERMINAL_EMULATOR===\"JetBrains-JediTerm\"){if(process.platform===\"darwin\")return\"pycharm\";return\"pycharm\"}if(process.env.TERM===\"xterm-ghostty\")return\"ghostty\";if(process.env.TERM?.includes(\"kitty\"))return\"kitty\";if(process.env.TERM_PROGRAM)return process.",
+    "keywords": [
+      "cursor",
+      "windsurf",
+      "vscodium",
+      "codium",
+      "androidstudio",
+      "visualstudio",
+      "darwin",
+      "pycharm",
+      "ghostty",
+      "kitty",
+      "screen",
+      "konsole",
+      "xterm",
+      "terminator",
+      "alacritty",
+      "tilix",
+      "cygwin",
+      "conemu",
+      "rxvt",
+      "termite"
+    ],
+    "category": "file",
+    "startIndex": 1430177,
+    "estimatedLines": 1
+  },
+  {
+    "name": "PBQ",
+    "signature": "function PBQ(A,Q)",
+    "body": "{let B=Q.slice(0).sort((Z,Y)=>{let J=Z.offset-Y.offset;if(J===0)return Z.length-Y.length;return J}),G=A.length;for(let Z=B.length-1;Z>=0;Z--){let Y=B[Z];if(Y.offset+Y.length<=G)A=fmA(A,Y);else throw Error(\"Overlapping edit\");G=Y.offset}return A}",
+    "keywords": [
+      "edit"
+    ],
+    "category": "file",
+    "startIndex": 1450810,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Cq1",
+    "signature": "function Cq1(A)",
+    "body": "{V24(A),A.gracefulify=Cq1,A.createReadStream=R,A.createWriteStream=j;var Q=A.readFile;A.readFile=B;function B(S,u,g){if(typeof u===\"function\")g=u,u=null;return s(S,u,g);function s(c,v,d,e){return Q(c,v,function(QA){if(QA&&(QA.code===\"EMFILE\"||QA.code===\"ENFILE\"))X5A([s,[c,v,d],QA,e||Date.now(),Date.now()]);else if(typeof d===\"function\")d.apply(this,arguments)})}}var G=A.writeFile;A.writeFile=Z;function Z(S,u,g,s){if(typeof g===\"function\")s=g,g=null;return c(S,u,g,s);function c(v,d,e,QA,TA){return G(v,d,e,function(wA){if(wA&&(wA.code===\"EMFILE\"||wA.code===\"ENFILE\"))X5A([c,[v,d,e,QA],wA,TA||Date.now(),Date.now()]);else if(typeof QA===\"function\")QA.apply(this,arguments)})}}var Y=A.appendFile;if(Y)A.appendFile=J;function J(S,u,g,s){if(typeof g===\"function\")s=g,g=null;return c(S,u,g,s);function",
+    "keywords": [
+      "function",
+      "EMFILE",
+      "ENFILE",
+      "ReadStream",
+      "WriteStream",
+      "FileReadStream",
+      "FileWriteStream",
+      "error",
+      "open",
+      "readFile",
+      "writeFile",
+      "stream",
+      "config"
+    ],
+    "category": "file",
+    "startIndex": 1468506,
+    "estimatedLines": 1
+  },
+  {
+    "name": "jq1",
+    "signature": "function jq1(A,Q,B)",
+    "body": "{if(!Q.realpath)return B(null,M24.resolve(A));Q.fs.realpath(A,B)}",
+    "keywords": [
+      "fs."
+    ],
+    "category": "file",
+    "startIndex": 1479243,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Rq1",
+    "signature": "function Rq1(A,Q,B)",
+    "body": "{let G=ozA(A,Q);Q.fs.mkdir(G,(Z)=>{if(!Z)return K2Q.probe(G,Q.fs,(Y,J,X)=>{if(Y)return Q.fs.rmdir(G,()=>{}),B(Y);B(null,J,X)});if(Z.code!==\"EEXIST\")return B(Z);if(Q.stale<=0)return B(Object.assign(Error(\"Lock file is already being held\"),{code:\"ELOCKED\",file:A}));Q.fs.stat(G,(Y,J)=>{if(Y){if(Y.code===\"ENOENT\")return Rq1(A,{...Q,stale:0},B);return B(Y)}if(!V2Q(J,Q))return B(Object.assign(Error(\"Lock file is already being held\"),{code:\"ELOCKED\",file:A}));H2Q(A,Q,(X)=>{if(X)return B(X);Rq1(A,{...Q,stale:0},B)})})})}",
+    "keywords": [
+      "EEXIST",
+      "ELOCKED",
+      "ENOENT",
+      "fs."
+    ],
+    "category": "file",
+    "startIndex": 1479327,
+    "estimatedLines": 1
+  },
+  {
+    "name": "H2Q",
+    "signature": "function H2Q(A,Q,B)",
+    "body": "{Q.fs.rmdir(ozA(A,Q),(G)=>{if(G&&G.code!==\"ENOENT\")return B(G);B()})}",
+    "keywords": [
+      "ENOENT",
+      "fs."
+    ],
+    "category": "file",
+    "startIndex": 1479926,
+    "estimatedLines": 1
+  },
+  {
+    "name": "omA",
+    "signature": "function omA(A,Q)",
+    "body": "{let B=Qh[A];if(B.updateTimeout)return;if(B.updateDelay=B.updateDelay||Q.update,B.updateTimeout=setTimeout(()=>{B.updateTimeout=null,Q.fs.stat(B.lockfilePath,(G,Z)=>{let Y=B.lastUpdate+Q.stale<Date.now();if(G){if(G.code===\"ENOENT\"||Y)return Mq1(A,B,Object.assign(G,{code:\"ECOMPROMISED\"}));return B.updateDelay=1000,omA(A,Q)}if(B.mtime.getTime()!==Z.mtime.getTime())return Mq1(A,B,Object.assign(Error(\"Unable to update lock within the stale threshold\"),{code:\"ECOMPROMISED\"}));let X=K2Q.getMtime(B.mtimePrecision);Q.fs.utimes(B.lockfilePath,X,X,(I)=>{let W=B.lastUpdate+Q.stale<Date.now();if(B.released)return;if(I){if(I.code===\"ENOENT\"||W)return Mq1(A,B,Object.assign(I,{code:\"ECOMPROMISED\"}));return B.updateDelay=1000,omA(A,Q)}B.mtime=X,B.lastUpdate=Date.now(),B.updateDelay=null,omA(A,Q)})})},B.up",
+    "keywords": [
+      "ENOENT",
+      "ECOMPROMISED",
+      "fs."
+    ],
+    "category": "file",
+    "startIndex": 1480014,
+    "estimatedLines": 1
+  },
+  {
+    "name": "T24",
+    "signature": "function T24(A,Q,B)",
+    "body": "{Q={stale:1e4,realpath:!0,fs:_q1,...Q},Q.stale=Math.max(Q.stale||0,2000),jq1(A,Q,(G,Z)=>{if(G)return B(G);Q.fs.stat(ozA(Z,Q),(Y,J)=>{if(Y)return Y.code===\"ENOENT\"?B(null,!1):B(Y);return B(null,!V2Q(J,Q))})})}",
+    "keywords": [
+      "ENOENT",
+      "fs."
+    ],
+    "category": "file",
+    "startIndex": 1482026,
+    "estimatedLines": 1
+  },
+  {
+    "name": "y64",
+    "signature": "function y64(A,Q)",
+    "body": "{if(A!==\"keypress\")return!1;if(!Q||!Q.tagName)return!0;if(Q.tagName===\"INPUT\"||Q.tagName===\"TEXTAREA\"||Q.isContentEditable)return!1;return!0}",
+    "keywords": [
+      "keypress",
+      "INPUT",
+      "TEXTAREA",
+      "edit"
+    ],
+    "category": "file",
+    "startIndex": 1501695,
+    "estimatedLines": 1
+  },
+  {
+    "name": "JL4",
+    "signature": "function JL4(A)",
+    "body": "{return new Promise((Q,B)=>{ZL4.readFile(A,\"utf8\",(G,Z)=>{if(G)B(G);else Q(Z)})})}",
+    "keywords": [
+      "utf8",
+      "readFile"
+    ],
+    "category": "file",
+    "startIndex": 1713053,
+    "estimatedLines": 1
+  },
+  {
+    "name": "BO4",
+    "signature": "function BO4()",
+    "body": "{let A=LA.main&&LA.main.paths||[],Q=QO4(),B={},G={};return Q.forEach((Z)=>{let Y=Z,J=()=>{let X=Y;if(Y=lZQ.dirname(X),!Y||X===Y||G[X])return;if(A.indexOf(Y)<0)return J();let I=lZQ.join(X,\"package.json\");if(G[X]=!0,!cZQ.existsSync(I))return J();try{let W=JSON.parse(cZQ.readFileSync(I,\"utf8\"));B[W.name]=W.version}catch(W){}};J()}),B}",
+    "keywords": [
+      "utf8",
+      "readFile"
+    ],
+    "category": "file",
+    "startIndex": 1726877,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Jb4",
+    "signature": "function Jb4()",
+    "body": "{if(process.env.TERMINAL_EMULATOR===\"JetBrains-JediTerm\"){if(DQ.platform!==\"darwin\")return Yb4()||\"pycharm\"}return DQ.terminal}",
+    "keywords": [
+      "darwin",
+      "pycharm",
+      "edit",
+      "env"
+    ],
+    "category": "file",
+    "startIndex": 2108839,
+    "estimatedLines": 1
+  },
+  {
+    "name": "in8",
+    "signature": "function in8()",
+    "body": "{let A=[\"/etc/machine-id\",\"/var/lib/dbus/machine-id\"];for(let Q of A)try{return(await cn8.promises.readFile(Q,{encoding:\"utf8\"})).trim()}catch(B){ln8.diag.debug(`error reading machine id: ${B}`)}return}",
+    "keywords": [
+      "utf8",
+      "readFile"
+    ],
+    "category": "file",
+    "startIndex": 3612397,
+    "estimatedLines": 1
+  },
+  {
+    "name": "b",
+    "signature": "function b(c,v,d)",
+    "body": "{for(var e=[],QA=null,TA=e,wA=0,zA=[],SA=0;SA<v.length;SA++){var _A=v[SA],YA=c,RA=W.parse(_A.stackError);A:{var EA=RA,xA=j(EA,YA,R);if(xA!==-1)YA=xA;else{for(var DA=0;DA<YA.length&&5>DA;DA++)if(xA=j(EA,YA,DA),xA!==-1){R=DA,YA=xA;break A}YA=-1}}A:{if(EA=RA,xA=E().get(_A.primitive),xA!==void 0){for(DA=0;DA<xA.length&&DA<EA.length;DA++)if(xA[DA].source!==EA[DA].source){DA<EA.length-1&&P(EA[DA].functionName,_A.primitive)&&DA++,DA<EA.length-1&&P(EA[DA].functionName,_A.primitive)&&DA++,EA=DA;break A}}EA=-1}if(RA=YA===-1||EA===-1||2>YA-EA?null:RA.slice(EA,YA-1),RA!==null){if(YA=0,QA!==null){for(;YA<RA.length&&YA<QA.length&&RA[RA.length-YA-1].source===QA[QA.length-YA-1].source;)YA++;for(QA=QA.length-1;QA>YA;QA--)TA=zA.pop()}for(QA=RA.length-YA-1;1<=QA;QA--)YA=[],EA=RA[QA],(xA=RA[QA-1].functionName",
+    "keywords": [
+      "Context",
+      "DebugValue",
+      "Reducer",
+      "State",
+      "edit",
+      "hook"
+    ],
+    "category": "file",
+    "startIndex": 4020701,
+    "estimatedLines": 1
+  },
+  {
+    "name": "NA",
+    "signature": "function NA()",
+    "body": "{return typeof W7.env.EDITOR_URL===\"string\"?W7.env.EDITOR_URL:\"\"}",
+    "keywords": [
+      "string",
+      "edit",
+      "url",
+      "env"
+    ],
+    "category": "file",
+    "startIndex": 4088338,
+    "estimatedLines": 1
+  },
+  {
+    "name": "PA",
+    "signature": "function PA()",
+    "body": "{try{var f=localStorageGetItem(LOCAL_STORAGE_OPEN_IN_EDITOR_URL);if(f!=null)return JSON.parse(f)}catch(o){}return NA()}",
+    "keywords": [
+      "edit",
+      "url"
+    ],
+    "category": "file",
+    "startIndex": 4088416,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Wx",
+    "signature": "function Wx(pA)",
+    "body": "{var A1=ZC(pA);if(A1==null)return null;var{_debugOwner:L1,_debugSource:q1,stateNode:A0,key:JQ,memoizedProps:rQ,memoizedState:S9,dependencies:p9,tag:U9,type:c9}=A1,Q3=W5(A1),tX=(U9===t2||U9===e8||U9===S2)&&(!!S9||!!p9),n7=!tX&&U9!==C0,BK=E1(c9),$E=!1,FH=null;if(U9===V0||U9===t2||U9===r4||U9===N5||U9===w4||U9===S2||U9===e8){if($E=!0,A0&&A0.context!=null){var Qj=Q3===ZZ&&!(c9.contextTypes||c9.contextType);if(!Qj)FH=A0.context}}else if(BK===Nq||BK===k_){var DY=c9._context||c9;FH=DY._currentValue||null;var GK=A1.return;while(GK!==null){var Dx=GK.type,mp=E1(Dx);if(mp===YX||mp===f_){var St=Dx._context||Dx.context;if(St===DY){FH=GK.memoizedProps.value;break}}GK=GK.return}}var Bj=!1;if(FH!==null)Bj=!!c9.contextTypes,FH={value:FH};var Gj=null;if(L1){Gj=[];var JC=L1;while(JC!==null)Gj.push(HH(JC)),JC",
+    "keywords": [
+      "xstyle",
+      "function",
+      "edit",
+      "render",
+      "hook"
+    ],
+    "category": "file",
+    "startIndex": 4162576,
+    "estimatedLines": 1
+  },
+  {
+    "name": "I5",
+    "signature": "function I5(IQ)",
+    "body": "{var wQ=VA.get(IQ);if(wQ==null)return null;var PQ=Qx(wQ),gQ=PQ.displayName,E2=PQ.key,m4=XV(wQ),s4=null,h8=null,uY=null,SZ=null,iI=null,W5=wQ._currentElement;if(W5!==null){uY=W5.props,iI=W5._source!=null?W5._source:null;var IV=W5._owner;if(IV){h8=[];while(IV!=null)if(h8.push({displayName:Qx(IV).displayName||\"Unknown\",id:C0(IV),key:W5.key,type:XV(IV)}),IV._currentElement)IV=IV._currentElement._owner}}var BU=wQ._instance;if(BU!=null)s4=BU.context||null,SZ=BU.state||null;var KG=[],eW=[];return{id:IQ,canEditHooks:!1,canEditFunctionProps:!1,canEditHooksAndDeletePaths:!1,canEditHooksAndRenamePaths:!1,canEditFunctionPropsDeletePaths:!1,canEditFunctionPropsRenamePaths:!1,canToggleError:!1,isErrored:!1,targetErrorBoundaryID:null,canToggleSuspense:!1,canViewSource:m4===ZZ||m4===pX,hasLegacyContext:!0",
+    "keywords": [
+      "Unknown",
+      "edit",
+      "render",
+      "hook"
+    ],
+    "category": "file",
+    "startIndex": 4213941,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Rf",
+    "signature": "function Rf(f,o,r,HA)",
+    "body": "{f.addListener(\"NativeStyleEditor_measure\",function(VA){var{id:J1,rendererID:R1}=VA;IH(o,f,r,J1,R1)}),f.addListener(\"NativeStyleEditor_renameAttribute\",function(VA){var{id:J1,rendererID:R1,oldName:E1,newName:B1,value:S1}=VA;jp(o,J1,R1,E1,B1,S1),setTimeout(function(){return IH(o,f,r,J1,R1)})}),f.addListener(\"NativeStyleEditor_setValue\",function(VA){var{id:J1,rendererID:R1,name:E1,value:B1}=VA;Tp(o,J1,R1,E1,B1),setTimeout(function(){return IH(o,f,r,J1,R1)})}),f.send(\"isNativeStyleEditorSupported\",{isSupported:!0,validAttributes:HA})}",
+    "keywords": [
+      "NativeStyleEditor_measure",
+      "NativeStyleEditor_renameAttribute",
+      "NativeStyleEditor_setValue",
+      "isNativeStyleEditorSupported",
+      "edit",
+      "render"
+    ],
+    "category": "file",
+    "startIndex": 4221047,
+    "estimatedLines": 1
+  },
+  {
+    "name": "IH",
+    "signature": "function IH(f,o,r,HA,VA)",
+    "body": "{var J1=f.getInstanceAndStyle({id:HA,rendererID:VA});if(!J1||!J1.style){o.send(\"NativeStyleEditor_styleAndLayout\",{id:HA,layout:null,style:null});return}var{instance:R1,style:E1}=J1,B1=r(E1),S1=jf.get(HA);if(S1!=null)B1=Object.assign({},B1,S1);if(!R1||typeof R1.measure!==\"function\"){o.send(\"NativeStyleEditor_styleAndLayout\",{id:HA,layout:null,style:B1||null});return}R1.measure(function(n1,C0,V0,TQ,aQ,S2){if(typeof n1!==\"number\"){o.send(\"NativeStyleEditor_styleAndLayout\",{id:HA,layout:null,style:B1||null});return}var HB=B1!=null&&Mf(\"margin\",B1)||_f,t2=B1!=null&&Mf(\"padding\",B1)||_f;o.send(\"NativeStyleEditor_styleAndLayout\",{id:HA,layout:{x:n1,y:C0,width:V0,height:TQ,left:aQ,top:S2,margin:HB,padding:t2},style:B1||null})})}",
+    "keywords": [
+      "NativeStyleEditor_styleAndLayout",
+      "function",
+      "number",
+      "margin",
+      "padding",
+      "edit",
+      "render"
+    ],
+    "category": "file",
+    "startIndex": 4221655,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Rl1",
+    "signature": "function Rl1({error:A})",
+    "body": "{let Q=A.stack?A.stack.split(`\n`).slice(1):void 0,B=Q?LWB.parseLine(Q[0]):void 0,G=NWB(B?.file),Z,Y=0;if(G&&B?.line&&YeA.existsSync(G)){let J=YeA.readFileSync(G,\"utf8\");if(Z=HWB(J,B.line),Z)for(let{line:X}of Z)Y=Math.max(Y,String(X).length)}return qK.default.createElement(lU,{flexDirection:\"column\",padding:1},qK.default.createElement(lU,null,qK.default.createElement(C,{backgroundColor:\"error\",color:\"text\"},\" \",\"ERROR\",\" \"),qK.default.createElement(C,null,\" \",A.message)),B&&G&&qK.default.createElement(lU,{marginTop:1},qK.default.createElement(C,{dimColor:!0},G,\":\",B.line,\":\",B.column)),B&&Z&&qK.default.createElement(lU,{marginTop:1,flexDirection:\"column\"},Z.map(({line:J,value:X})=>qK.default.createElement(lU,{key:J},qK.default.createElement(lU,{width:Y+1},qK.default.createElement(C,{dimColo",
+    "keywords": [
+      "utf8",
+      "column",
+      "error",
+      "text",
+      "ERROR",
+      "readFile",
+      "background",
+      "message"
+    ],
+    "category": "file",
+    "startIndex": 4290300,
+    "estimatedLines": 3
+  },
+  {
+    "name": "il1",
+    "signature": "function il1()",
+    "body": "{let{env:A}=vKB,{TERM:Q,TERM_PROGRAM:B}=A;if(vKB.platform!==\"win32\")return Q!==\"linux\";return Boolean(A.WT_SESSION)||Boolean(A.TERMINUS_SUBLIME)||A.ConEmuTask===\"{cmd::Cmder}\"||B===\"Terminus-Sublime\"||B===\"vscode\"||Q===\"xterm-256color\"||Q===\"alacritty\"||Q===\"rxvt-unicode\"||Q===\"rxvt-unicode-256color\"||A.TERMINAL_EMULATOR===\"JetBrains-JediTerm\"}",
+    "keywords": [
+      "win32",
+      "linux",
+      "vscode",
+      "alacritty",
+      "edit",
+      "task",
+      "session",
+      "env"
+    ],
+    "category": "file",
+    "startIndex": 4332172,
+    "estimatedLines": 1
+  },
+  {
+    "name": "vDB",
+    "signature": "function vDB(A)",
+    "body": "{let Q=JB3(A);if(!Q)return null;let B=Q,G;try{if(GB3(B))G=jA().readFileBytesSync(B);else{let I=YB3();if(I&&B===QB3(I))G=jA().readFileBytesSync(I)}}catch(I){return t(I),null}if(!G)return null;let Z=BB3(B).slice(1).toLowerCase()||\"png\",Y=await fYA(G,G.length,Z),J=Y.buffer.toString(\"base64\"),X=SDB(J);return{path:B,base64:J,mediaType:X,dimensions:Y.dimensions}}",
+    "keywords": [
+      "base64",
+      "readFile"
+    ],
+    "category": "file",
+    "startIndex": 4479939,
+    "estimatedLines": 1
+  },
+  {
+    "name": "UB3",
+    "signature": "function UB3(A)",
+    "body": "{let B=rE(X0A(),\".wezterm.lua\");try{let G=\"\",Z=!1;if(jA().existsSync(B)){if(Z=!0,G=jA().readFileSync(B,{encoding:\"utf-8\"}),G.includes('mods=\"SHIFT\"')&&G.includes('key=\"Enter\"'))return`${sQ(\"warning\",A)(\"Found existing WezTerm Shift+Enter key binding. Remove it to continue.\")}${A9}${V1.dim(`See ${B}`)}${A9}`;let Y=mYA(4).toString(\"hex\"),J=`${B}.${Y}.bak`;try{jA().copyFileSync(B,J)}catch(X){return t(X instanceof Error?X:Error(String(X))),`${sQ(\"warning\",A)(\"Error backing up existing WezTerm config. Bailing out.\")}${A9}${V1.dim(`See ${B}`)}${A9}${V1.dim(`Backup path: ${J}`)}${A9}`}}if(!Z)G=`local wezterm = require 'wezterm'\nlocal config = wezterm.config_builder()\n\nconfig.keys = {\n  {key=\"Enter\", mods=\"SHIFT\", action=wezterm.action{SendString=\"\\\\x1b\\\\r\"}},\n}\n\nreturn config\n`;else{let Y=G.match",
+    "keywords": [
+      "SHIFT",
+      "Enter",
+      "warning",
+      "wezterm",
+      "readFile",
+      "config"
+    ],
+    "category": "file",
+    "startIndex": 4485581,
+    "estimatedLines": 20
+  },
+  {
+    "name": "Ti1",
+    "signature": "function Ti1(A=\"VSCode\",Q)",
+    "body": "{let B=A===\"VSCode\"?\"Code\":A,G=rE(X0A(),uYA()===\"win32\"?rE(\"AppData\",\"Roaming\",B,\"User\"):uYA()===\"darwin\"?rE(\"Library\",\"Application Support\",B,\"User\"):rE(\".config\",B,\"User\")),Z=rE(G,\"keybindings.json\");try{let Y=\"[]\",J=[];if(!jA().existsSync(G))jA().mkdirSync(G);if(jA().existsSync(Z)){Y=jA().readFileSync(Z,{encoding:\"utf-8\"}),J=xBQ(Y)??[];let K=mYA(4).toString(\"hex\"),V=`${Z}.${K}.bak`;try{jA().copyFileSync(Z,V)}catch{return`${sQ(\"warning\",Q)(`Error backing up existing ${A} terminal keybindings. Bailing out.`)}${A9}${V1.dim(`See ${Z}`)}${A9}${V1.dim(`Backup path: ${V}`)}${A9}`}}if(J.find((K)=>K.key===\"shift+enter\"&&K.command===\"workbench.action.terminal.sendSequence\"&&K.when===\"terminalFocus\"))return`${sQ(\"warning\",Q)(`Found existing ${A} terminal Shift+Enter key binding. Remove it to conti",
+    "keywords": [
+      "VSCode",
+      "Code",
+      "win32",
+      "AppData",
+      "Roaming",
+      "User",
+      "darwin",
+      "Library",
+      "warning",
+      "terminalFocus",
+      "success",
+      "command",
+      "readFile",
+      "writeFile",
+      "config"
+    ],
+    "category": "file",
+    "startIndex": 4490039,
+    "estimatedLines": 1
+  },
+  {
+    "name": "RB3",
+    "signature": "function RB3(A)",
+    "body": "{let Q=rE(X0A(),\".config\",\"zed\"),B=rE(Q,\"keymap.json\");try{let G=\"[]\";if(!jA().existsSync(Q))jA().mkdirSync(Q);if(jA().existsSync(B)){if(G=jA().readFileSync(B,{encoding:\"utf-8\"}),G.includes(\"shift-enter\"))return`${sQ(\"warning\",A)(\"Found existing Zed Shift+Enter key binding. Remove it to continue.\")}${A9}${V1.dim(`See ${B}`)}${A9}`;let Y=mYA(4).toString(\"hex\"),J=`${B}.${Y}.bak`;try{jA().copyFileSync(B,J)}catch{return`${sQ(\"warning\",A)(\"Error backing up existing Zed keymap. Bailing out.\")}${A9}${V1.dim(`See ${B}`)}${A9}${V1.dim(`Backup path: ${J}`)}${A9}`}}let Z;try{if(Z=JSON.parse(G),!Array.isArray(Z))Z=[]}catch{Z=[]}return Z.push({context:\"Terminal\",bindings:{\"shift-enter\":[\"terminal::SendText\",\"\\x1B\\r\"]}}),jA().writeFileSync(B,JSON.stringify(Z,null,2)+`\n`,{encoding:\"utf-8\",flush:!1}),`${s",
+    "keywords": [
+      "warning",
+      "Terminal",
+      "success",
+      "readFile",
+      "writeFile",
+      "config"
+    ],
+    "category": "file",
+    "startIndex": 4496787,
+    "estimatedLines": 2
+  },
+  {
+    "name": "GFB",
+    "signature": "function GFB()",
+    "body": "{if(Pg.length===0)return;let A;try{let Q=eDB(vQ(),\"history.jsonl\"),B=jA();if(!B.existsSync(Q))B.writeFileSync(Q,\"\",{encoding:\"utf8\",flush:!0,mode:384});A=await AFB.lock(Q,{stale:1e4,retries:{retries:3,minTimeout:50}});let G=Pg.map((Z)=>JSON.stringify(Z)+`\n`);Pg=[],B.appendFileSync(Q,G.join(\"\"),{mode:384})}catch(Q){k(`Failed to write prompt history: ${Q}`)}finally{if(A)await A()}}",
+    "keywords": [
+      "utf8",
+      "writeFile",
+      "history"
+    ],
+    "category": "file",
+    "startIndex": 4499707,
+    "estimatedLines": 2
+  },
+  {
+    "name": "XzB",
+    "signature": "function XzB(A)",
+    "body": "{let Q=jA(),G=Q.statSync(A).size;if(G===0)throw Error(`PDF file is empty: ${A}`);if(G>JzB)throw Error(`PDF file size (${HI(G)}) exceeds maximum allowed size (${HI(JzB)}). PDF files must be less than 32MB.`);let Y=Q.readFileBytesSync(A).toString(\"base64\");return{type:\"pdf\",file:{filePath:A,base64:Y,originalSize:G}}}",
+    "keywords": [
+      "base64",
+      "readFile",
+      "allow"
+    ],
+    "category": "file",
+    "startIndex": 4645121,
+    "estimatedLines": 1
+  },
+  {
+    "name": "nA1",
+    "signature": "function nA1(A)",
+    "body": "{switch(A){case\"bypassPermissions\":return\"bypassPermissions\";case\"acceptEdits\":return\"acceptEdits\";case\"plan\":return\"plan\";case\"delegate\":return\"delegate\";case\"dontAsk\":return\"dontAsk\";case\"default\":return\"default\";default:return\"default\"}}",
+    "keywords": [
+      "bypassPermissions",
+      "acceptEdits",
+      "plan",
+      "delegate",
+      "dontAsk",
+      "default",
+      "edit",
+      "task",
+      "permission"
+    ],
+    "category": "file",
+    "startIndex": 4653408,
+    "estimatedLines": 1
+  },
+  {
+    "name": "fg",
+    "signature": "function fg(A)",
+    "body": "{switch(A){case\"default\":return\"Default\";case\"plan\":return\"Plan Mode\";case\"delegate\":return\"Delegate Mode\";case\"acceptEdits\":return\"Accept edits\";case\"bypassPermissions\":return\"Bypass Permissions\";case\"dontAsk\":return\"Don't Ask\"}}",
+    "keywords": [
+      "default",
+      "Default",
+      "plan",
+      "delegate",
+      "acceptEdits",
+      "bypassPermissions",
+      "dontAsk",
+      "edit",
+      "task",
+      "permission"
+    ],
+    "category": "file",
+    "startIndex": 4653663,
+    "estimatedLines": 1
+  },
+  {
+    "name": "zzB",
+    "signature": "function zzB(A)",
+    "body": "{switch(A){case\"default\":return\"\";case\"plan\":return\"⏸\";case\"delegate\":return\"⇢\";case\"acceptEdits\":return\"⏵⏵\";case\"bypassPermissions\":return\"⏵⏵\";case\"dontAsk\":return\"⏵⏵\"}}",
+    "keywords": [
+      "default",
+      "plan",
+      "delegate",
+      "acceptEdits",
+      "bypassPermissions",
+      "dontAsk",
+      "edit",
+      "task",
+      "permission"
+    ],
+    "category": "file",
+    "startIndex": 4653956,
+    "estimatedLines": 1
+  },
+  {
+    "name": "$CB",
+    "signature": "function $CB()",
+    "body": "{return z6.createElement(C,{dimColor:!0},\"Claude Code will be able to read files in this directory and make edits when auto-accept edits is on.\")}",
+    "keywords": [
+      "edit"
+    ],
+    "category": "file",
+    "startIndex": 4708320,
+    "estimatedLines": 1
+  },
+  {
+    "name": "MCB",
+    "signature": "function MCB(A,Q)",
+    "body": "{let B=q4(A),G=jA().readFileSync(B,{encoding:\"utf-8\"}),Z=JSON.parse(G),Y=Z.metadata.language_info?.name??\"python\";if(Q){let J=Z.cells.find((X)=>X.id===Q);if(!J)throw Error(`Cell with ID \"${Q}\" not found in notebook`);return[OCB(J,Z.cells.indexOf(J),Y,!0)]}return Z.cells.map((J,X)=>OCB(J,X,Y,!1))}",
+    "keywords": [
+      "python",
+      "readFile"
+    ],
+    "category": "file",
+    "startIndex": 4714459,
+    "estimatedLines": 1
+  },
+  {
+    "name": "e_B",
+    "signature": "function e_B()",
+    "body": "{if((0,s_B.platform)()!==\"linux\")return!1;try{(0,r_B.statSync)(BjB.GCE_LINUX_BIOS_PATHS.BIOS_DATE);let A=(0,r_B.readFileSync)(BjB.GCE_LINUX_BIOS_PATHS.BIOS_VENDOR,\"utf8\");return/Google/.test(A)}catch(A){return!1}}",
+    "keywords": [
+      "linux",
+      "utf8",
+      "readFile"
+    ],
+    "category": "file",
+    "startIndex": 5231319,
+    "estimatedLines": 1
+  },
+  {
+    "name": "kj3",
+    "signature": "function kj3()",
+    "body": "{try{return xuB.readFileSync(\"/proc/self/cgroup\",\"utf8\").includes(\"docker\")}catch{return!1}}",
+    "keywords": [
+      "utf8",
+      "docker",
+      "readFile"
+    ],
+    "category": "file",
+    "startIndex": 5713711,
+    "estimatedLines": 1
+  },
+  {
+    "name": "gT3",
+    "signature": "function gT3(A,Q,B)",
+    "body": "{if(!u00())return await B();let G=ymB(\"sha1\").update(JSON.stringify(A)).digest(\"hex\").slice(0,12),Z=vmB(process.env.CLAUDE_CODE_TEST_FIXTURES_ROOT??t1(),`fixtures/${Q}-${G}.json`);if(jA().existsSync(Z))return JSON.parse(jA().readFileSync(Z,{encoding:\"utf8\"}));if(DQ.isCI)throw Error(`Fixture missing: ${Z}. Re-run npm test locally, then commit the result.`);let Y=await B();if(!jA().existsSync(B91(Z)))jA().mkdirSync(B91(Z));return jA().writeFileSync(Z,JSON.stringify(Y,null,2),{encoding:\"utf8\",flush:!1}),Y}",
+    "keywords": [
+      "sha1",
+      "utf8",
+      "readFile",
+      "writeFile",
+      "env",
+      "CLAUDE_"
+    ],
+    "category": "file",
+    "startIndex": 5767671,
+    "estimatedLines": 1
+  },
+  {
+    "name": "m00",
+    "signature": "function m00(A,Q)",
+    "body": "{if(!u00())return await Q();let B=GJ(A.filter((J)=>{if(J.type!==\"user\")return!0;if(J.isMeta)return!1;return!0})),G=mT3(B.map((J)=>J.message.content),xmB),Z=vmB(process.env.CLAUDE_CODE_TEST_FIXTURES_ROOT??t1(),`fixtures/${G.map((J)=>ymB(\"sha1\").update(JSON.stringify(J)).digest(\"hex\").slice(0,6)).join(\"-\")}.json`);if(jA().existsSync(Z)){let J=JSON.parse(jA().readFileSync(Z,{encoding:\"utf8\"}));return J.output.forEach(uT3),J.output.map((X,I)=>SmB(X,pT3,I))}if(DQ.isCI)throw Error(`Anthropic API fixture missing: ${Z}. Re-run npm test locally, then commit the result. Input messages:\n${JSON.stringify(G,null,2)}`);let Y=await Q();if(DQ.isCI)return Y;if(!jA().existsSync(B91(Z)))jA().mkdirSync(B91(Z));return jA().writeFileSync(Z,JSON.stringify({input:G,output:Y.map((J,X)=>SmB(J,xmB,X))},null,2),{enco",
+    "keywords": [
+      "user",
+      "sha1",
+      "utf8",
+      "readFile",
+      "writeFile",
+      "message",
+      "env",
+      "CLAUDE_"
+    ],
+    "category": "file",
+    "startIndex": 5768204,
+    "estimatedLines": 2
+  },
+  {
+    "name": "Jz",
+    "signature": "function Jz(A)",
+    "body": "{let Q=rC(A);if(!jA().existsSync(Q))return null;try{return jA().readFileSync(Q,{encoding:\"utf-8\"})}catch(B){return t(B instanceof Error?B:Error(String(B))),null}}",
+    "keywords": [
+      "readFile"
+    ],
+    "category": "file",
+    "startIndex": 5787281,
+    "estimatedLines": 1
+  },
+  {
+    "name": "HdB",
+    "signature": "function HdB(A)",
+    "body": "{if(A?.file_path?.startsWith(Hw()))return\"Reading Plan\";if(A?.file_path&&JIA(A.file_path))return\"Read agent output\";return\"Read\"}",
+    "keywords": [
+      "Read",
+      "file_path",
+      "agent",
+      "plan"
+    ],
+    "category": "file",
+    "startIndex": 5790343,
+    "estimatedLines": 1
+  },
+  {
+    "name": "DdB",
+    "signature": "function DdB(A)",
+    "body": "{if(!A?.file_path)return null;let Q=JIA(A.file_path);if(Q)return Q;return r3(A.file_path)}",
+    "keywords": [
+      "file_path"
+    ],
+    "category": "file",
+    "startIndex": 5790487,
+    "estimatedLines": 1
+  },
+  {
+    "name": "zP3",
+    "signature": "function zP3(A,Q)",
+    "body": "{let G=jA().statSync(A).size,Z=jA().readFileBytesSync(A),Y=BA1(Z);try{let J=await _DB(Z,Q,Y);return{type:\"image\",file:{base64:J.base64,type:J.mediaType,originalSize:G}}}catch(J){t(J);try{let X=await Promise.resolve().then(() => l(qi1(),1)),W=await(X.default||X)(Z).resize(400,400,{fit:\"inside\",withoutEnlargement:!0}).jpeg({quality:20}).toBuffer();return H91(W,\"jpeg\",G)}catch(X){t(X);let I=Y.split(\"/\")[1]||\"png\";return H91(Z,I,G)}}}",
+    "keywords": [
+      "image",
+      "inside",
+      "jpeg",
+      "readFile"
+    ],
+    "category": "file",
+    "startIndex": 5791452,
+    "estimatedLines": 1
+  },
+  {
+    "name": "CP3",
+    "signature": "function CP3(A,Q)",
+    "body": "{let G=jA().statSync(A).size;if(G===0)throw Error(`Image file is empty: ${A}`);let Z=jA().readFileBytesSync(A),J=BA1(Z).split(\"/\")[1]||\"png\";try{let X=await fYA(Z,G,J);return H91(X.buffer,X.mediaType,G,X.dimensions)}catch(X){return t(X),H91(Z,J,G)}}",
+    "keywords": [
+      "readFile"
+    ],
+    "category": "file",
+    "startIndex": 5791909,
+    "estimatedLines": 1
+  }
+]

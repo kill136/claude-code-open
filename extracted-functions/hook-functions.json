@@ -1,0 +1,637 @@
+[
+  {
+    "name": "lhA",
+    "signature": "function lhA(A)",
+    "body": "{if(!r0.registeredHooks)r0.registeredHooks={};for(let[Q,B]of Object.entries(A)){let G=Q;if(!r0.registeredHooks[G])r0.registeredHooks[G]=[];r0.registeredHooks[G].push(...B)}}",
+    "keywords": [
+      "hook"
+    ],
+    "category": "hook",
+    "startIndex": 36223,
+    "estimatedLines": 1
+  },
+  {
+    "name": "ihA",
+    "signature": "function ihA()",
+    "body": "{return r0.registeredHooks}",
+    "keywords": [
+      "hook"
+    ],
+    "category": "hook",
+    "startIndex": 36411,
+    "estimatedLines": 1
+  },
+  {
+    "name": "JE1",
+    "signature": "function JE1()",
+    "body": "{if(!ZE1)ZE1=LA(\"perf_hooks\").performance;return ZE1}",
+    "keywords": [
+      "perf_hooks",
+      "hook"
+    ],
+    "category": "hook",
+    "startIndex": 39474,
+    "estimatedLines": 1
+  },
+  {
+    "name": "xN4",
+    "signature": "function xN4()",
+    "body": "{if(TN4.NODE_VERSION.major>=14)SN4.setHooksAsyncContextStrategy();else PN4.setDomainAsyncContextStrategy()}",
+    "keywords": [
+      "hook"
+    ],
+    "category": "hook",
+    "startIndex": 1706733,
+    "estimatedLines": 1
+  },
+  {
+    "name": "tsA",
+    "signature": "function tsA(A)",
+    "body": "{return mp1(dYB(),`hook-${A}.sh`)}",
+    "keywords": [
+      "hook"
+    ],
+    "category": "hook",
+    "startIndex": 3662402,
+    "estimatedLines": 1
+  },
+  {
+    "name": "S",
+    "signature": "function S(c,v)",
+    "body": "{for(var d=[],e=0;e<c.length;e++){var QA=c[e];QA.name===\"DebugValue\"&&QA.subHooks.length===0?(c.splice(e,1),e--,d.push(QA)):S(QA.subHooks,QA)}v!==null&&(d.length===1?v.value=d[0].value:1<d.length&&(v.value=d.map(function(TA){return TA.value})))}",
+    "keywords": [
+      "DebugValue",
+      "hook"
+    ],
+    "category": "hook",
+    "startIndex": 4022261,
+    "estimatedLines": 1
+  },
+  {
+    "name": "$O",
+    "signature": "function $O(pA,A1)",
+    "body": "{switch(W5(A1)){case ZZ:case pX:case QH:case iW:if(pA===null)return{context:null,didHooksChange:!1,isFirstMount:!0,props:null,state:null};else{var L1={context:FE(A1),didHooksChange:!1,isFirstMount:!1,props:c5(pA.memoizedProps,A1.memoizedProps),state:c5(pA.memoizedState,A1.memoizedState)},q1=F6(pA.memoizedState,A1.memoizedState);return L1.hooks=q1,L1.didHooksChange=q1!==null&&q1.length>0,L1}default:return null}}",
+    "keywords": [
+      "hook"
+    ],
+    "category": "hook",
+    "startIndex": 4148629,
+    "estimatedLines": 1
+  },
+  {
+    "name": "VV",
+    "signature": "function VV(pA,A1)",
+    "body": "{return function(q1){switch(A1){case\"hooks\":if(q1.length===1)return!0;if(q1[q1.length-2]===\"hookSource\"&&q1[q1.length-1]===\"fileName\")return!0;if(q1[q1.length-1]===\"subHooks\"||q1[q1.length-2]===\"subHooks\")return!0;break;default:break}var A0=pA===null?e_:e_[pA];if(!A0)return!1;for(var JQ=0;JQ<q1.length;JQ++)if(A0=A0[q1[JQ]],!A0)return!1;return!0}}",
+    "keywords": [
+      "hooks",
+      "hookSource",
+      "fileName",
+      "subHooks",
+      "hook"
+    ],
+    "category": "hook",
+    "startIndex": 4164991,
+    "estimatedLines": 1
+  },
+  {
+    "name": "pi",
+    "signature": "function pi(A)",
+    "body": "{return A.filter((Q)=>Q.data?.type!==\"hook_progress\")}",
+    "keywords": [
+      "hook_progress",
+      "hook"
+    ],
+    "category": "hook",
+    "startIndex": 4501871,
+    "estimatedLines": 1
+  },
+  {
+    "name": "E93",
+    "signature": "function E93(A=!1)",
+    "body": "{let Q=process.cwd(),B=[];for(let G of qLA)B.push(yg.resolve(Q,G)),B.push(`**/${G}`);for(let G of xA1())B.push(yg.resolve(Q,G)),B.push(`**/${G}/**`);if(B.push(yg.resolve(Q,\".git/hooks\")),B.push(\"**/.git/hooks/**\"),!A)B.push(yg.resolve(Q,\".git/config\")),B.push(\"**/.git/config\");return[...new Set(B)]}",
+    "keywords": [
+      "hook",
+      "config"
+    ],
+    "category": "hook",
+    "startIndex": 4556069,
+    "estimatedLines": 1
+  },
+  {
+    "name": "_65",
+    "signature": "function _65(A)",
+    "body": "{let Q={PreToolUse:[],PostToolUse:[],PostToolUseFailure:[],Notification:[],UserPromptSubmit:[],SessionStart:[],SessionEnd:[],Stop:[],SubagentStart:[],SubagentStop:[],PreCompact:[],PermissionRequest:[]};if(!A.hooksConfig)return Q;for(let[B,G]of Object.entries(A.hooksConfig)){let Z=B;if(!Q[Z])continue;for(let Y of G){let J=[];for(let X of Y.hooks)if(X.type===\"command\")J.push(R65(X.command,A.path,X.timeout));if(J.length>0)Q[Z].push({matcher:Y.matcher,hooks:J,pluginName:A.name})}}return Q}",
+    "keywords": [
+      "command",
+      "request",
+      "subagent",
+      "agent",
+      "session",
+      "hook",
+      "PreToolUse",
+      "PostToolUse",
+      "permission",
+      "config"
+    ],
+    "category": "hook",
+    "startIndex": 6866582,
+    "estimatedLines": 1
+  },
+  {
+    "name": "a62",
+    "signature": "function a62()",
+    "body": "{if(n62)return;n62=!0,TC.subscribe((A)=>{if(A===\"policySettings\")k(\"Plugin hooks: reloading due to policySettings change\"),Ho(),tG0(),Vo()})}",
+    "keywords": [
+      "policySettings",
+      "hook",
+      "setting"
+    ],
+    "category": "hook",
+    "startIndex": 6867122,
+    "estimatedLines": 1
+  },
+  {
+    "name": "hO2",
+    "signature": "function hO2(A,Q,B,G)",
+    "body": "{if(!HD())return AX.trace.getActiveSpan()||B_().startSpan(\"dummy\");let Z=B_(),Y=iVA.getStore()||lVA.getStore(),J=nVA(\"hook\",{hook_event:A,hook_name:Q,num_hooks:B,hook_definitions:G}),X=Y?AX.trace.setSpan(AX.context.active(),Y):AX.context.active(),I=Z.startSpan(\"claude_code.hook\",{attributes:J},X),W=CL(I);return vV.set(W,{span:I,startTime:Date.now(),attributes:J}),I}",
+    "keywords": [
+      "dummy",
+      "hook",
+      "CLAUDE_"
+    ],
+    "category": "hook",
+    "startIndex": 8167003,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Pj2",
+    "signature": "function Pj2(A,Q)",
+    "body": "{let B=Kd.get(A);if(B)k(`Hooks: Adding stdout to ${A}: ${Q.substring(0,50)}...`),B.stdout+=Q;else k(`Hooks: Attempted to add output to unknown process ${A}`)}",
+    "keywords": [
+      "hook"
+    ],
+    "category": "hook",
+    "startIndex": 8363692,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Sj2",
+    "signature": "function Sj2(A,Q)",
+    "body": "{let B=Kd.get(A);if(B)k(`Hooks: Adding stderr to ${A}: ${Q.substring(0,50)}...`),B.stderr+=Q;else k(`Hooks: Attempted to add stderr to unknown process ${A}`)}",
+    "keywords": [
+      "hook"
+    ],
+    "category": "hook",
+    "startIndex": 8363867,
+    "estimatedLines": 1
+  },
+  {
+    "name": "yj2",
+    "signature": "function yj2(A)",
+    "body": "{for(let Q of A){let B=Kd.get(Q);if(B&&B.responseAttachmentSent)k(`Hooks: Removing delivered hook ${Q}`),Kd.delete(Q)}}",
+    "keywords": [
+      "hook"
+    ],
+    "category": "hook",
+    "startIndex": 8365715,
+    "estimatedLines": 1
+  },
+  {
+    "name": "tx5",
+    "signature": "function tx5()",
+    "body": "{let A=await xj2();if(A.length===0)return[];k(`Hooks: getAsyncHookResponseAttachments found ${A.length} responses`);let Q=A.map(({processId:B,response:G,hookName:Z,hookEvent:Y,toolName:J,stdout:X,stderr:I,exitCode:W})=>{return k(`Hooks: Creating attachment for ${B} (${Z}): ${JSON.stringify(G)}`),{type:\"async_hook_response\",processId:B,hookName:Z,hookEvent:Y,toolName:J,response:G,stdout:X,stderr:I,exitCode:W}});if(A.length>0){let B=A.map((G)=>G.processId);yj2(B),k(`Hooks: Removed ${B.length} delivered hooks from registry`)}return k(`Hooks: getAsyncHookResponseAttachments found ${Q.length} attachments`),Q}",
+    "keywords": [
+      "async_hook_response",
+      "hook"
+    ],
+    "category": "hook",
+    "startIndex": 8378673,
+    "estimatedLines": 1
+  },
+  {
+    "name": "EX1",
+    "signature": "function EX1()",
+    "body": "{if(!LF0)LF0=LA(\"perf_hooks\").performance;return LF0}",
+    "keywords": [
+      "perf_hooks",
+      "hook"
+    ],
+    "category": "hook",
+    "startIndex": 8548946,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Bl5",
+    "signature": "function Bl5(A)",
+    "body": "{if(A._nid=A.ownerDocument._nextnid++,A.ownerDocument._nodes[A._nid]=A,A.nodeType===jz.ELEMENT_NODE){var Q=A.getAttribute(\"id\");if(Q)A.ownerDocument.addId(Q,A);if(A._roothook)A._roothook()}}",
+    "keywords": [
+      "hook"
+    ],
+    "category": "hook",
+    "startIndex": 8882272,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Bu2",
+    "signature": "function Bu2(A)",
+    "body": "{return A.map((Q)=>({matcher:Q.matcher,hooks:Q.hooks.map((B)=>B.hook).filter((B)=>B.type!==\"function\")}))}",
+    "keywords": [
+      "function",
+      "hook"
+    ],
+    "category": "hook",
+    "startIndex": 9039427,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Ki2",
+    "signature": "function Ki2({message:A,messages:Q,toolUseID:B,progressMessagesForMessage:G,style:Z,tool:Y,tools:J,verbose:X,width:I})",
+    "body": "{let[W]=A2(),K=Wi2.useContext(nU);if(!A.toolUseResult||!Y)return null;let V=Y.renderToolResultMessage(A.toolUseResult,pi(G),{style:Z,theme:W,tools:J,verbose:X});if(V===null)return null;return OS.createElement(T,{flexDirection:\"column\"},OS.createElement(T,{flexDirection:\"row\",width:I},V,!K&&OS.createElement(C,null,Ji2)),OS.createElement(W4A,null,OS.createElement(AK1,{hookEvent:\"PostToolUse\",messages:Q,toolUseID:B,verbose:X})))}",
+    "keywords": [
+      "column",
+      "PostToolUse",
+      "render",
+      "message",
+      "hook"
+    ],
+    "category": "hook",
+    "startIndex": 9361055,
+    "estimatedLines": 1
+  },
+  {
+    "name": "es5",
+    "signature": "function es5(A,Q,B,G,Z,{verbose:Y,inProgressToolCallCount:J},X)",
+    "body": "{let I=Z.filter((W)=>W.data.type!==\"hook_progress\");try{let W=A.renderToolUseProgressMessage(I,{tools:Q,verbose:Y,terminalSize:X,inProgressToolCallCount:J??1});return rF.default.createElement(rF.default.Fragment,null,rF.default.createElement(W4A,null,rF.default.createElement(AK1,{hookEvent:\"PreToolUse\",messages:B,toolUseID:G,verbose:Y})),W)}catch(W){return t(Error(`Error rendering tool use progress message for ${A.name}: ${W}`)),null}}",
+    "keywords": [
+      "hook_progress",
+      "PreToolUse",
+      "render",
+      "message",
+      "hook"
+    ],
+    "category": "hook",
+    "startIndex": 9365602,
+    "estimatedLines": 1
+  },
+  {
+    "name": "e17",
+    "signature": "function e17(A)",
+    "body": "{switch(A.type){case\"hook\":return\"hook\";case\"user\":return A.permanent?\"user_permanent\":\"user_temporary\"}}",
+    "keywords": [
+      "hook",
+      "user",
+      "user_permanent",
+      "user_temporary"
+    ],
+    "category": "hook",
+    "startIndex": 9603436,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Ew0",
+    "signature": "function Ew0()",
+    "body": "{if(!Hw0)Hw0=LA(\"perf_hooks\").performance;return Hw0}",
+    "keywords": [
+      "perf_hooks",
+      "hook"
+    ],
+    "category": "hook",
+    "startIndex": 9616085,
+    "estimatedLines": 1
+  },
+  {
+    "name": "eU0",
+    "signature": "function eU0(A,Q)",
+    "body": "{let B=new Map;for(let J of A){if(s69(J)){let X=J.message.content[0]?.id;if(X){if(!B.has(X))B.set(X,{toolUse:null,preHooks:[],toolResult:null,postHooks:[]});B.get(X).toolUse=J}continue}if(iDA(J)&&J.attachment.hookEvent===\"PreToolUse\"){let X=J.attachment.toolUseID;if(!B.has(X))B.set(X,{toolUse:null,preHooks:[],toolResult:null,postHooks:[]});B.get(X).preHooks.push(J);continue}if(J.type===\"user\"&&J.message.content[0]?.type===\"tool_result\"){let X=J.message.content[0].tool_use_id;if(!B.has(X))B.set(X,{toolUse:null,preHooks:[],toolResult:null,postHooks:[]});B.get(X).toolResult=J;continue}if(iDA(J)&&J.attachment.hookEvent===\"PostToolUse\"){let X=J.attachment.toolUseID;if(!B.has(X))B.set(X,{toolUse:null,preHooks:[],toolResult:null,postHooks:[]});B.get(X).postHooks.push(J);continue}}let G=[],Z=new S",
+    "keywords": [
+      "PreToolUse",
+      "user",
+      "tool_result",
+      "PostToolUse",
+      "system",
+      "api_error",
+      "message",
+      "hook"
+    ],
+    "category": "hook",
+    "startIndex": 9912773,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Xi2",
+    "signature": "function Xi2(A,Q,B)",
+    "body": "{return A.filter((G)=>G.type===\"progress\"&&G.data.type===\"hook_progress\"&&G.data.hookEvent===B&&G.parentToolUseID===Q).length}",
+    "keywords": [
+      "progress",
+      "hook_progress",
+      "hook"
+    ],
+    "category": "hook",
+    "startIndex": 9914663,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Ii2",
+    "signature": "function Ii2(A,Q,B)",
+    "body": "{return new Set(A.filter((Z)=>iDA(Z)&&Z.attachment.toolUseID===Q&&Z.attachment.hookEvent===B).map((Z)=>Z.attachment.hookName)).size}",
+    "keywords": [
+      "hook"
+    ],
+    "category": "hook",
+    "startIndex": 9914808,
+    "estimatedLines": 1
+  },
+  {
+    "name": "js2",
+    "signature": "function js2(A,Q,B)",
+    "body": "{let G=B.inProgressHookCounts.get(A)?.get(Q)??0,Z=B.resolvedHookCounts.get(A)?.get(Q)??0;return G>Z}",
+    "keywords": [
+      "hook"
+    ],
+    "category": "hook",
+    "startIndex": 9916103,
+    "estimatedLines": 1
+  },
+  {
+    "name": "$v2",
+    "signature": "function $v2(A,Q,B,G,Z,Y,J,X)",
+    "body": "{return{type:\"system\",subtype:\"stop_hook_summary\",hookCount:A,hookInfos:Q,hookErrors:B,preventedContinuation:G,stopReason:Z,hasOutput:Y,level:J,timestamp:new Date().toISOString(),uuid:U_(),toolUseID:X}}",
+    "keywords": [
+      "system",
+      "stop_hook_summary",
+      "hook"
+    ],
+    "category": "hook",
+    "startIndex": 9940503,
+    "estimatedLines": 1
+  },
+  {
+    "name": "iY9",
+    "signature": "function iY9({hookEventMetadata:A,totalHooksCount:Q,configDifference:B,restrictedByPolicy:G,onSelectEvent:Z,onCancel:Y})",
+    "body": "{let J=`${Q} hook${Q!==1?\"s\":\"\"}`;return UJ.createElement(I6,{title:\"Hooks\",subtitle:J,onCancel:Y,borderDimColor:!1},UJ.createElement(T,{flexDirection:\"column\",gap:1},G&&UJ.createElement(T,{flexDirection:\"column\"},UJ.createElement(C,{color:\"suggestion\"},G1.info,\" Hooks Restricted by Policy\"),UJ.createElement(C,{dimColor:!0},\"Only hooks from managed settings can run. User-defined hooks from ~/.claude/settings.json, .claude/settings.json, and .claude/settings.local.json are blocked.\")),B&&UJ.createElement(T,{flexDirection:\"column\"},UJ.createElement(C,{color:\"warning\"},G1.warning,\" Settings Changed\"),UJ.createElement(C,{dimColor:!0},\"Hook settings have been modified outside of this menu. Review the following changes carefully:\"),UJ.createElement(C,{dimColor:!0},B)),UJ.createElement(T,{flexDir",
+    "keywords": [
+      "Hooks",
+      "column",
+      "suggestion",
+      "warning",
+      "hook",
+      "setting"
+    ],
+    "category": "hook",
+    "startIndex": 10300041,
+    "estimatedLines": 1
+  },
+  {
+    "name": "aY9",
+    "signature": "function aY9({selectedEvent:A,matchersForSelectedEvent:Q,hooksByEventAndMatcher:B,eventDescription:G,onSelect:Z,onCancel:Y})",
+    "body": "{let J=aL.useMemo(()=>{return Q.map((X)=>{let I=B[A]?.[X]||[],W=Array.from(new Set(I.map((K)=>K.source)));return{matcher:X,sources:W,hookCount:I.length}})},[Q,B,A]);return aL.createElement(I6,{title:`${A} - Tool Matchers`,subtitle:G,onCancel:Y,borderDimColor:!1},aL.createElement(T,{flexDirection:\"column\"},aL.createElement(x0,{options:[{label:`+ Add new matcher${G1.ellipsis}`,value:\"add-new\"},...J.map((X)=>{return{label:`[${X.sources.map(rY9).join(\", \")}] ${X.matcher}`,value:X.matcher,description:`${X.hookCount} hook${X.hookCount!==1?\"s\":\"\"}`}})],onChange:(X)=>{if(X===\"add-new\")Z(null);else Z(X)},onCancel:Y}),Q.length===0&&aL.createElement(T,{marginLeft:2},aL.createElement(C,{dimColor:!0},\"No matchers configured yet\"))))}",
+    "keywords": [
+      "column",
+      "hook",
+      "config"
+    ],
+    "category": "hook",
+    "startIndex": 10301303,
+    "estimatedLines": 1
+  },
+  {
+    "name": "QJ9",
+    "signature": "function QJ9({selectedMatcher:A,selectedEvent:Q,onDelete:B,onCancel:G})",
+    "body": "{return p$.createElement(I6,{title:\"Delete matcher?\",onCancel:G,borderDimColor:!1},p$.createElement(T,{flexDirection:\"column\",gap:1},p$.createElement(T,{flexDirection:\"column\",marginX:2},p$.createElement(C,{bold:!0},A),p$.createElement(C,{dimColor:!0},\"Event: \",Q)),p$.createElement(C,null,\"This matcher has no hooks configured. Delete it?\"),p$.createElement(x0,{onChange:(Z)=>Z===\"yes\"?B():G(),onCancel:G,options:[{label:\"Yes\",value:\"yes\"},{label:\"No\",value:\"no\"}]})))}",
+    "keywords": [
+      "column",
+      "hook",
+      "config"
+    ],
+    "category": "hook",
+    "startIndex": 10305246,
+    "estimatedLines": 1
+  },
+  {
+    "name": "GJ9",
+    "signature": "function GJ9({selectedEvent:A,selectedMatcher:Q,hooksForSelectedMatcher:B,hookEventMetadata:G,onSelect:Z,onCancel:Y})",
+    "body": "{let J=G.matcherMetadata!==void 0?`${A} - Matcher: ${Q}`:A;return xS.createElement(I6,{title:J,subtitle:G.description,onCancel:Y,borderDimColor:!1},xS.createElement(T,{flexDirection:\"column\"},xS.createElement(x0,{options:[{label:`+ Add new hook${G1.ellipsis}`,value:\"add-new\"},...B.map((X,I)=>({label:X.source===\"pluginHook\"?`${d$(X.config)} (read-only)`:d$(X.config),value:I.toString(),description:X.source===\"pluginHook\"?`${KO0(X.source)} - disable ${X.pluginName?X.pluginName:\"plugin\"} to remove`:KO0(X.source),disabled:X.source===\"pluginHook\"}))],onChange:(X)=>{if(X===\"add-new\")Z(null);else{let I=parseInt(X,10),W=B[I];if(W)Z(W)}},onCancel:Y}),B.length===0&&xS.createElement(T,{marginLeft:2},xS.createElement(C,{dimColor:!0},\"No hooks configured yet\"))))}",
+    "keywords": [
+      "column",
+      "pluginHook",
+      "plugin",
+      "hook",
+      "config"
+    ],
+    "category": "hook",
+    "startIndex": 10305839,
+    "estimatedLines": 1
+  },
+  {
+    "name": "IJ9",
+    "signature": "function IJ9(A,Q)",
+    "body": "{let B={PreToolUse:{},PostToolUse:{},PostToolUseFailure:{},Notification:{},UserPromptSubmit:{},SessionStart:{},SessionEnd:{},Stop:{},SubagentStart:{},SubagentStop:{},PreCompact:{},PermissionRequest:{}},G=nbA(Q);DJ9(A).forEach((Y)=>{let J=B[Y.event];if(J){let X=G[Y.event].matcherMetadata!==void 0?Y.matcher||\"\":\"\";if(!J[X])J[X]=[];J[X].push(Y)}});let Z=ihA();if(Z)for(let[Y,J]of Object.entries(Z)){let X=Y,I=B[X];if(!I)continue;for(let W of J){let K=W.matcher||\"\";if(!I[K])I[K]=[];for(let V of W.hooks)if(V.type===\"callback\")I[K].push({event:X,config:{type:\"command\",command:\"[Plugin Hook]\"},matcher:W.matcher,source:\"pluginHook\",pluginName:W.pluginName})}}return B}",
+    "keywords": [
+      "callback",
+      "command",
+      "pluginHook",
+      "request",
+      "subagent",
+      "agent",
+      "session",
+      "hook",
+      "PreToolUse",
+      "PostToolUse",
+      "permission",
+      "config"
+    ],
+    "category": "hook",
+    "startIndex": 10307512,
+    "estimatedLines": 1
+  },
+  {
+    "name": "EJ9",
+    "signature": "function EJ9({toolNames:A,onExit:Q})",
+    "body": "{let[B,G]=kI.useState([]),[Z,Y]=kI.useState({mode:\"select-event\"}),[J,X]=kI.useState(0),[I,W]=kI.useState(()=>{return zQ()?.disableAllHooks===!0&&gB(\"policySettings\")?.disableAllHooks===!0}),[K,V]=kI.useState(()=>{return gB(\"policySettings\")?.allowManagedHooksOnly===!0});iYA((wA)=>{if(wA===\"policySettings\"){let SA=zQ()?.disableAllHooks===!0;W(SA&&gB(\"policySettings\")?.disableAllHooks===!0),V(gB(\"policySettings\")?.allowManagedHooksOnly===!0)}});let[H,D]=kI.useState(\"\"),[F,E]=kI.useState(\"\"),z=Z.mode,$=\"event\"in Z?Z.event:\"PreToolUse\",L=\"matcher\"in Z?Z.matcher:null,[N]=LQ(),{mcp:M}=N,R=kI.useMemo(()=>[...A,...M.tools.map((wA)=>wA.name)],[A,M.tools]),j=kI.useMemo(()=>IJ9(N,R),[R,J,N]),P=kI.useMemo(()=>WJ9(j,$),[j,$]),b=kI.useMemo(()=>KJ9(j,$,L),[j,$,L]);x1((wA,zA)=>{if(z===\"save-hook\")return;",
+    "keywords": [
+      "policySettings",
+      "event",
+      "PreToolUse",
+      "matcher",
+      "system",
+      "command",
+      "tengu_hook_deleted",
+      "column",
+      "disabled",
+      "enable",
+      "Exit",
+      "exit",
+      "localSettings",
+      "exec",
+      "mcp",
+      "useState",
+      "useEffect",
+      "sse",
+      "hook",
+      "allow"
+    ],
+    "category": "hook",
+    "startIndex": 10312279,
+    "estimatedLines": 3
+  },
+  {
+    "name": "FJ9",
+    "signature": "function FJ9(A,Q,B)",
+    "body": "{let G=VFA.reduce((Z,Y,J)=>{return Z[Y]=J,Z},{});return[...A].sort((Z,Y)=>{let J=Q[B]?.[Z]||[],X=Q[B]?.[Y]||[],I=Array.from(new Set(J.map((D)=>D.source))),W=Array.from(new Set(X.map((D)=>D.source))),K=(D)=>D===\"pluginHook\"?999:G[D],V=Math.min(...I.map(K)),H=Math.min(...W.map(K));if(V!==H)return V-H;return Z.localeCompare(Y)})}",
+    "keywords": [
+      "pluginHook",
+      "hook"
+    ],
+    "category": "hook",
+    "startIndex": 10622982,
+    "estimatedLines": 1
+  },
+  {
+    "name": "zM0",
+    "signature": "function zM0()",
+    "body": "{let A=gB(\"policySettings\");if(A?.allowManagedHooksOnly===!0)return A.hooks??{};return zQ().hooks??{}}",
+    "keywords": [
+      "policySettings",
+      "hook",
+      "allow",
+      "setting"
+    ],
+    "category": "hook",
+    "startIndex": 10623373,
+    "estimatedLines": 1
+  },
+  {
+    "name": "yo",
+    "signature": "function yo()",
+    "body": "{return gB(\"policySettings\")?.allowManagedHooksOnly===!0}",
+    "keywords": [
+      "policySettings",
+      "hook",
+      "allow",
+      "setting"
+    ],
+    "category": "hook",
+    "startIndex": 10623489,
+    "estimatedLines": 1
+  },
+  {
+    "name": "CM0",
+    "signature": "function CM0(A)",
+    "body": "{if(!A)return null;let Q={},B=Object.keys(A).sort();for(let G of B){let Z=A[G];if(!Z)continue;let Y=[...Z].sort((J,X)=>{let I=J.matcher||\"\",W=X.matcher||\"\";return I.localeCompare(W)});Q[G]=Y.map((J)=>({matcher:J.matcher,hooks:[...J.hooks].sort((X,I)=>d$(X).localeCompare(d$(I)))}))}return Q}",
+    "keywords": [
+      "hook"
+    ],
+    "category": "hook",
+    "startIndex": 10623559,
+    "estimatedLines": 1
+  },
+  {
+    "name": "$J9",
+    "signature": "function $J9()",
+    "body": "{if(us===null)return null;let A=CM0(zM0()),Q=JSON.stringify(us),B=JSON.stringify(A);if(Q===B)return null;let G=[],Z=new Set(Object.keys(us||{})),Y=new Set(Object.keys(A||{}));for(let J of Y)if(!Z.has(J))G.push(`Added hooks for event: ${J}`);for(let J of Z)if(!Y.has(J))G.push(`Removed all hooks for event: ${J}`);for(let J of Z)if(Y.has(J)){let X=us?.[J]||[],I=A?.[J]||[];if(JSON.stringify(X)!==JSON.stringify(I)){let W=[],K=new Map(X.map((H)=>[H.matcher||\"\",H])),V=new Map(I.map((H)=>[H.matcher||\"\",H]));for(let[H]of V)if(!K.has(H))W.push(`  - Added matcher: ${H||\"(no matcher)\"}`);for(let[H]of K)if(!V.has(H))W.push(`  - Removed matcher: ${H||\"(no matcher)\"}`);for(let[H,D]of V)if(K.has(H)){let F=K.get(H);if(JSON.stringify(F.hooks)!==JSON.stringify(D.hooks))W.push(`  - Modified hooks for matcher:",
+    "keywords": [
+      "hook",
+      "config"
+    ],
+    "category": "hook",
+    "startIndex": 10623939,
+    "estimatedLines": 2
+  },
+  {
+    "name": "OJ7",
+    "signature": "function OJ7(A)",
+    "body": "{let Q={},B=aW9();if(B)for(let[Z,Y]of Object.entries(B))Q[Z]=Y.map((J)=>({matcher:J.matcher,hooks:J.hooks}));let G=ihA();if(G){let Z=yo();for(let[Y,J]of Object.entries(G)){if(!Q[Y])Q[Y]=[];for(let X of J){if(Z&&X.pluginName)continue;Q[Y].push({matcher:X.matcher,hooks:X.hooks})}}}if(A){let Z=h0(),Y=PI1(A,Z);for(let[X,I]of Y.entries()){if(!Q[X])Q[X]=[];for(let W of I)Q[X].push({matcher:W.matcher,hooks:W.hooks})}let J=Zu2(A,Z);for(let[X,I]of J.entries()){if(!Q[X])Q[X]=[];for(let W of I)Q[X].push({matcher:W.matcher,hooks:W.hooks})}}return Q}",
+    "keywords": [
+      "hook"
+    ],
+    "category": "hook",
+    "startIndex": 10643312,
+    "estimatedLines": 1
+  },
+  {
+    "name": "qM0",
+    "signature": "function qM0(A,Q,B)",
+    "body": "{try{let Z=OJ7(A)?.[Q]??[],Y=void 0;switch(B.hook_event_name){case\"PreToolUse\":case\"PostToolUse\":case\"PostToolUseFailure\":case\"PermissionRequest\":Y=B.tool_name;break;case\"SessionStart\":Y=B.source;break;case\"PreCompact\":Y=B.trigger;break;case\"Notification\":Y=B.notification_type;break;case\"SessionEnd\":Y=B.reason;break;case\"SubagentStart\":Y=B.agent_type;break;default:break}k(`Getting matching hook commands for ${Q} with query: ${Y}`),k(`Found ${Z.length} hook matchers in settings`);let J;if(!Y)J=Z.flatMap((D)=>D.hooks);else J=Z.filter((D)=>!D.matcher||LJ7(Y,D.matcher)).flatMap((D)=>D.hooks);let X=Array.from(new Map(J.filter((D)=>D.type===\"command\").map((D)=>[D.command,D])).values()),I=Array.from(new Map(J.filter((D)=>D.type===\"prompt\").map((D)=>[D.prompt,D])).values()),W=Array.from(new Map(J.",
+    "keywords": [
+      "PreToolUse",
+      "PostToolUse",
+      "PostToolUseFailure",
+      "PermissionRequest",
+      "SessionStart",
+      "PreCompact",
+      "Notification",
+      "SessionEnd",
+      "SubagentStart",
+      "command",
+      "prompt",
+      "agent",
+      "callback",
+      "function",
+      "request",
+      "subagent",
+      "session",
+      "hook",
+      "permission",
+      "setting"
+    ],
+    "category": "hook",
+    "startIndex": 10643870,
+    "estimatedLines": 1
+  },
+  {
+    "name": "uF0",
+    "signature": "function uF0(A,Q)",
+    "body": "{return`${A} hook error: ${Q.blockingError}`}",
+    "keywords": [
+      "hook"
+    ],
+    "category": "hook",
+    "startIndex": 10644993,
+    "estimatedLines": 1
+  },
+  {
+    "name": "mF0",
+    "signature": "function mF0(A)",
+    "body": "{return`Stop hook feedback:\n${A.blockingError}`}",
+    "keywords": [
+      "hook"
+    ],
+    "category": "hook",
+    "startIndex": 10645055,
+    "estimatedLines": 2
+  },
+  {
+    "name": "Cw0",
+    "signature": "function Cw0(A)",
+    "body": "{return`UserPromptSubmit operation blocked by hook:\n${A.blockingError}`}",
+    "keywords": [
+      "hook"
+    ],
+    "category": "hook",
+    "startIndex": 10645118,
+    "estimatedLines": 2
+  },
+  {
+    "name": "CH9",
+    "signature": "function CH9(A)",
+    "body": "{if(A===null||A.disableAllHooks)return!1;if(A.statusLine)return!0;if(A.fileSuggestion)return!0;if(!A.hooks)return!1;for(let Q of Object.values(A.hooks))if(Q.length>0)return!0;return!1}",
+    "keywords": [
+      "hook"
+    ],
+    "category": "hook",
+    "startIndex": 10800793,
+    "estimatedLines": 1
+  },
+  {
+    "name": "tx5",
+    "signature": "async function tx5()",
+    "body": "{let A=await xj2();if(A.length===0)return[];k(`Hooks: getAsyncHookResponseAttachments found ${A.length} responses`);let Q=A.map(({processId:B,response:G,hookName:Z,hookEvent:Y,toolName:J,stdout:X,stderr:I,exitCode:W})=>{return k(`Hooks: Creating attachment for ${B} (${Z}): ${JSON.stringify(G)}`),{type:\"async_hook_response\",processId:B,hookName:Z,hookEvent:Y,toolName:J,response:G,stdout:X,stderr:I,exitCode:W}});if(A.length>0){let B=A.map((G)=>G.processId);yj2(B),k(`Hooks: Removed ${B.length} delivered hooks from registry`)}return k(`Hooks: getAsyncHookResponseAttachments found ${Q.length} attachments`),Q}",
+    "keywords": [
+      "async_hook_response",
+      "hook"
+    ],
+    "category": "hook",
+    "startIndex": 8378667,
+    "estimatedLines": 1
+  }
+]

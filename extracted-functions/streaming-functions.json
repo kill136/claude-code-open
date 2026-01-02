@@ -1,0 +1,744 @@
+[
+  {
+    "name": "DO9",
+    "signature": "function DO9(A)",
+    "body": "{return TypeError(\"You provided \"+(A!==null&&typeof A===\"object\"?\"an invalid object\":\"'\"+A+\"'\")+\" where a stream was expected. You can provide an Observable, Promise, ReadableStream, Array, AsyncIterable, or Iterable.\")}",
+    "keywords": [
+      "object",
+      "stream"
+    ],
+    "category": "streaming",
+    "startIndex": 95082,
+    "estimatedLines": 1
+  },
+  {
+    "name": "kO9",
+    "signature": "function kO9(A)",
+    "body": "{if(A instanceof Z3A.Observable)return A;if(A!=null){if(jO9.isInteropObservable(A))return yy0(A);if(RO9.isArrayLike(A))return vy0(A);if(_O9.isPromise(A))return ky0(A);if(TO9.isAsyncIterable(A))return eE1(A);if(SO9.isIterable(A))return by0(A);if(xy0.isReadableStreamLike(A))return fy0(A)}throw PO9.createInvalidObservableTypeError(A)}",
+    "keywords": [
+      "stream"
+    ],
+    "category": "streaming",
+    "startIndex": 100957,
+    "estimatedLines": 1
+  },
+  {
+    "name": "fy0",
+    "signature": "function fy0(A)",
+    "body": "{return eE1(xy0.readableStreamLikeToAsyncGenerator(A))}",
+    "keywords": [
+      "stream"
+    ],
+    "category": "streaming",
+    "startIndex": 102328,
+    "estimatedLines": 1
+  },
+  {
+    "name": "XM9",
+    "signature": "function XM9(A,Q)",
+    "body": "{return YM9.scheduleAsyncIterable(JM9.readableStreamLikeToAsyncGenerator(A),Q)}",
+    "keywords": [
+      "stream"
+    ],
+    "category": "streaming",
+    "startIndex": 105964,
+    "estimatedLines": 1
+  },
+  {
+    "name": "qM9",
+    "signature": "function qM9(A,Q)",
+    "body": "{if(A!=null){if(DM9.isInteropObservable(A))return IM9.scheduleObservable(A,Q);if(EM9.isArrayLike(A))return KM9.scheduleArray(A,Q);if(FM9.isPromise(A))return WM9.schedulePromise(A,Q);if(CM9.isAsyncIterable(A))return HM9.scheduleAsyncIterable(A,Q);if(zM9.isIterable(A))return VM9.scheduleIterable(A,Q);if(UM9.isReadableStreamLike(A))return wM9.scheduleReadableStreamLike(A,Q)}throw $M9.createInvalidObservableTypeError(A)}",
+    "keywords": [
+      "stream"
+    ],
+    "category": "streaming",
+    "startIndex": 106321,
+    "estimatedLines": 1
+  },
+  {
+    "name": "tC1",
+    "signature": "function tC1(A,Q={})",
+    "body": "{let B=am9(A,{streamIsTTY:A&&A.isTTY,...Q});return nm9(B)}",
+    "keywords": [
+      "stream"
+    ],
+    "category": "streaming",
+    "startIndex": 223071,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Zi9",
+    "signature": "function Zi9(A)",
+    "body": "{let Q=\"assembly module package import alias class interface object given value assign void function new of extends satisfies abstracts in out return break continue throw assert dynamic if else switch case for while try catch finally then let this outer super is exists nonempty\",B=\"shared abstract formal default actual variable late native deprecated final sealed annotation suppressWarnings small\",G=\"doc by license see throws tagged\",Z={className:\"subst\",excludeBegin:!0,excludeEnd:!0,begin:/``/,end:/``/,keywords:Q,relevance:10},Y=[{className:\"string\",begin:'\"\"\"',end:'\"\"\"',relevance:10},{className:\"string\",begin:'\"',end:'\"',contains:[Z]},{className:\"string\",begin:\"'\",end:\"'\"},{className:\"number\",begin:\"#[0-9a-fA-F_]+|\\\\$[01_]+|[0-9_]+(?:\\\\.[0-9_](?:[eE][+-]?\\\\d+)?)?[kMGTPmunpf]?\",relevance:",
+    "keywords": [
+      "subst",
+      "string",
+      "number",
+      "Ceylon",
+      "self",
+      "meta",
+      "sse"
+    ],
+    "category": "streaming",
+    "startIndex": 387079,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Un9",
+    "signature": "function Un9(A)",
+    "body": "{return{name:\"GLSL\",keywords:{keyword:\"break continue discard do else for if return while switch case default attribute binding buffer ccw centroid centroid varying coherent column_major const cw depth_any depth_greater depth_less depth_unchanged early_fragment_tests equal_spacing flat fractional_even_spacing fractional_odd_spacing highp in index inout invariant invocations isolines layout line_strip lines lines_adjacency local_size_x local_size_y local_size_z location lowp max_vertices mediump noperspective offset origin_upper_left out packed patch pixel_center_integer point_mode points precise precision quads r11f_g11f_b10f r16 r16_snorm r16f r16i r16ui r32f r32i r32ui r8 r8_snorm r8i r8ui readonly restrict rg16 rg16_snorm rg16f rg16i rg16ui rg32f rg32i rg32ui rg8 rg8_snorm rg8i rg8ui rg",
+    "keywords": [
+      "GLSL",
+      "meta",
+      "glob",
+      "fetch",
+      "plan",
+      "component",
+      "stream",
+      "sse",
+      "env"
+    ],
+    "category": "streaming",
+    "startIndex": 481115,
+    "estimatedLines": 1
+  },
+  {
+    "name": "_n9",
+    "signature": "function _n9(A)",
+    "body": "{let B=GU1([A.C_LINE_COMMENT_MODE,A.C_BLOCK_COMMENT_MODE,A.COMMENT(\"/\\\\*\\\\*\",\"\\\\*/\",{relevance:0,contains:[{begin:/\\w+@/,relevance:0},{className:\"doctag\",begin:\"@[A-Za-z]+\"}]})]),G={className:\"regexp\",begin:/~?\\/[^\\/\\n]+\\//,contains:[A.BACKSLASH_ESCAPE]},Z=GU1([A.BINARY_NUMBER_MODE,A.C_NUMBER_MODE]),Y=GU1([{begin:/\"\"\"/,end:/\"\"\"/},{begin:/'''/,end:/'''/},{begin:\"\\\\$/\",end:\"/\\\\$\",relevance:10},A.APOS_STRING_MODE,A.QUOTE_STRING_MODE],{className:\"string\"});return{name:\"Groovy\",keywords:{built_in:\"this super\",literal:\"true false null\",keyword:\"byte short char int long boolean float double void def as in assert trait abstract static volatile transient public private protected synchronized final class interface enum if else for while switch case break default continue throw throws try catch final",
+    "keywords": [
+      "doctag",
+      "regexp",
+      "string",
+      "Groovy",
+      "groovy",
+      "class",
+      "meta",
+      "attr",
+      "self",
+      "symbol",
+      "ink",
+      "sse"
+    ],
+    "category": "streaming",
+    "startIndex": 543237,
+    "estimatedLines": 1
+  },
+  {
+    "name": "en9",
+    "signature": "function en9(A)",
+    "body": "{var Q=\"[À-ʸa-zA-Z_$][À-ʸa-zA-Z_$0-9]*\",B=Q+\"(<\"+Q+\"(\\\\s*,\\\\s*\"+Q+\")*>)?\",G=\"false synchronized int abstract float private char boolean var static null if const for true while long strictfp finally protected import native final void enum else break transient catch instanceof byte super volatile case assert short package default double public try this switch continue throws protected public private module requires exports do\",Z={className:\"meta\",begin:\"@\"+Q,contains:[{begin:/\\(/,end:/\\)/,contains:[\"self\"]}]};let Y=tn9;return{name:\"Java\",aliases:[\"jsp\"],keywords:G,illegal:/<\\/|#/,contains:[A.COMMENT(\"/\\\\*\\\\*\",\"\\\\*/\",{relevance:0,contains:[{begin:/\\w+@/,relevance:0},{className:\"doctag\",begin:\"@[A-Za-z]+\"}]}),{begin:/import java\\.[a-z]+\\./,keywords:\"import\",relevance:2},A.C_LINE_COMMENT_MODE,A",
+    "keywords": [
+      "meta",
+      "self",
+      "Java",
+      "doctag",
+      "import",
+      "class",
+      "record",
+      "params",
+      "function",
+      "while",
+      "finally",
+      "return",
+      "void",
+      "else",
+      "break",
+      "catch",
+      "instanceof",
+      "with",
+      "throw",
+      "case"
+    ],
+    "category": "streaming",
+    "startIndex": 640733,
+    "estimatedLines": 2
+  },
+  {
+    "name": "ea9",
+    "signature": "function ea9(A)",
+    "body": "{let Q={keyword:\"if then not for in while do return else elseif break continue switch and or unless when class extends super local import export from using\",literal:\"true false nil\",built_in:\"_G _VERSION assert collectgarbage dofile error getfenv getmetatable ipairs load loadfile loadstring module next pairs pcall print rawequal rawget rawset require select setfenv setmetatable tonumber tostring type unpack xpcall coroutine debug io math os package string table\"},B=\"[A-Za-z$_][0-9A-Za-z$_]*\",G={className:\"subst\",begin:/#\\{/,end:/\\}/,keywords:Q},Z=[A.inherit(A.C_NUMBER_MODE,{starts:{end:\"(\\\\s*/)?\",relevance:0}}),{className:\"string\",variants:[{begin:/'/,end:/'/,contains:[A.BACKSLASH_ESCAPE]},{begin:/\"/,end:/\"/,contains:[A.BACKSLASH_ESCAPE,G]}]},{className:\"built_in\",begin:\"@__\"+A.IDENT_RE},{",
+    "keywords": [
+      "subst",
+      "string",
+      "built_in",
+      "params",
+      "self",
+      "MoonScript",
+      "moon",
+      "function",
+      "class",
+      "extends",
+      "name",
+      "ink",
+      "sse",
+      "env"
+    ],
+    "category": "streaming",
+    "startIndex": 874920,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Go9",
+    "signature": "function Go9(A)",
+    "body": "{let Q={keyword:\"rec with let in inherit assert if else then\",literal:\"true false or and null\",built_in:\"import abort baseNameOf dirOf isNull builtins map removeAttrs throw toString derivation\"},B={className:\"subst\",begin:/\\$\\{/,end:/\\}/,keywords:Q},G={begin:/[a-zA-Z0-9-_]+(\\s*=)/,returnBegin:!0,relevance:0,contains:[{className:\"attr\",begin:/\\S+/}]},Z={className:\"string\",contains:[B],variants:[{begin:\"''\",end:\"''\"},{begin:'\"',end:'\"'}]},Y=[A.NUMBER_MODE,A.HASH_COMMENT_MODE,A.C_BLOCK_COMMENT_MODE,Z,G];return B.contains=Y,{name:\"Nix\",aliases:[\"nixos\"],keywords:Q,contains:Y}}",
+    "keywords": [
+      "subst",
+      "attr",
+      "string",
+      "nixos",
+      "sse"
+    ],
+    "category": "streaming",
+    "startIndex": 882443,
+    "estimatedLines": 1
+  },
+  {
+    "name": "$o9",
+    "signature": "function $o9(A)",
+    "body": "{return{name:\"Processing\",keywords:{keyword:\"BufferedReader PVector PFont PImage PGraphics HashMap boolean byte char color double float int long String Array FloatDict FloatList IntDict IntList JSONArray JSONObject Object StringDict StringList Table TableRow XML false synchronized int abstract float private char boolean static null if const for true while long throw strictfp finally protected import native final return void enum else break transient new catch instanceof byte super volatile case assert short package default double public try this switch continue throws protected public private\",literal:\"P2D P3D HALF_PI PI QUARTER_PI TAU TWO_PI\",title:\"setup draw\",built_in:\"displayHeight displayWidth mouseY mouseX mousePressed pmouseX pmouseY key keyCode pixels focused frameCount frameRate h",
+    "keywords": [
+      "Processing",
+      "request",
+      "background",
+      "token",
+      "stream",
+      "sse"
+    ],
+    "category": "streaming",
+    "startIndex": 926385,
+    "estimatedLines": 1
+  },
+  {
+    "name": "No9",
+    "signature": "function No9(A)",
+    "body": "{return{name:\"Protocol Buffers\",keywords:{keyword:\"package import option optional required repeated group oneof\",built_in:\"double float int32 int64 uint32 uint64 sint32 sint64 fixed32 fixed64 sfixed32 sfixed64 bool string bytes\",literal:\"true false\"},contains:[A.QUOTE_STRING_MODE,A.NUMBER_MODE,A.C_LINE_COMMENT_MODE,A.C_BLOCK_COMMENT_MODE,{className:\"class\",beginKeywords:\"message enum service\",end:/\\{/,illegal:/\\n/,contains:[A.inherit(A.TITLE_MODE,{starts:{endsWithParent:!0,excludeEnd:!0}})]},{className:\"function\",beginKeywords:\"rpc\",end:/[{;]/,excludeEnd:!0,keywords:\"rpc returns\"},{begin:/^\\s*[A-Z_]+(?=\\s*=[^\\n]+;$)/}]}}Jo0.exports=No9});var Wo0=U((XS7,Io0)=>{function Lo9(A){let Q={keyword:\"and case default else elsif false if in import enherits node or true undef unless main settings $str",
+    "keywords": [
+      "class",
+      "function",
+      "variable",
+      "string",
+      "Puppet",
+      "define",
+      "section",
+      "keyword",
+      "attr",
+      "number",
+      "symbol",
+      "PureBASIC",
+      "type",
+      "assert",
+      "async",
+      "await",
+      "break",
+      "continue",
+      "elif",
+      "else"
+    ],
+    "category": "streaming",
+    "startIndex": 931385,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Lo9",
+    "signature": "function Lo9(A)",
+    "body": "{let Q={keyword:\"and case default else elsif false if in import enherits node or true undef unless main settings $string \",literal:\"alias audit before loglevel noop require subscribe tag owner ensure group mode name|0 changes context force incl lens load_path onlyif provider returns root show_diff type_check en_address ip_address realname command environment hour monute month monthday special target weekday creates cwd ogoutput refresh refreshonly tries try_sleep umask backup checksum content ctime force ignore links mtime purge recurse recurselimit replace selinux_ignore_defaults selrange selrole seltype seluser source souirce_permissions sourceselect validate_cmd validate_replacement allowdupe attribute_membership auth_membership forcelocal gid ia_load_module members system host_aliases ",
+    "keywords": [
+      "variable",
+      "string",
+      "Puppet",
+      "class",
+      "define",
+      "section",
+      "keyword",
+      "attr",
+      "number",
+      "symbol",
+      "PureBASIC",
+      "function",
+      "type",
+      "assert",
+      "async",
+      "await",
+      "break",
+      "continue",
+      "elif",
+      "else"
+    ],
+    "category": "streaming",
+    "startIndex": 932068,
+    "estimatedLines": 1
+  },
+  {
+    "name": "fo9",
+    "signature": "function fo9(A)",
+    "body": "{function Q(R){return R.map(function(j){return j.split(\"\").map(function(P){return\"\\\\\"+P}).join(\"\")}).join(\"|\")}let B=\"~?[a-z$_][0-9a-zA-Z$_]*\",G=\"`?[A-Z$_][0-9a-zA-Z$_]*\",Z=\"'?[a-z$_][0-9a-z$_]*\",Y=\"\\\\s*:\\\\s*[a-z$_][0-9a-z$_]*(\\\\(\\\\s*(\"+Z+\"\\\\s*(,\"+Z+\"\\\\s*)*)?\\\\))?\",J=B+\"(\"+Y+\"){0,2}\",X=\"(\"+Q([\"||\",\"++\",\"**\",\"+.\",\"*\",\"/\",\"*.\",\"/.\",\"...\"])+\"|\\\\|>|&&|==|===)\",I=\"\\\\s+\"+X+\"\\\\s+\",W={keyword:\"and as asr assert begin class constraint do done downto else end exception external for fun function functor if in include inherit initializer land lazy let lor lsl lsr lxor match method mod module mutable new nonrec object of open or private rec sig struct then to try type val virtual when while with\",built_in:\"array bool bytes char exn|5 float int int32 int64 list lazy_t|5 nativeint|5 ref string unit \",lit",
+    "keywords": [
+      "number",
+      "operator",
+      "identifier",
+      "module",
+      "typing",
+      "function",
+      "params",
+      "constructor",
+      "ReasonML",
+      "character",
+      "literal",
+      "pattern",
+      "sse"
+    ],
+    "category": "streaming",
+    "startIndex": 948848,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Wr9",
+    "signature": "function Wr9(A)",
+    "body": "{let Q=[\"functions\",\"model\",\"data\",\"parameters\",\"quantities\",\"transformed\",\"generated\"],B=[\"for\",\"in\",\"if\",\"else\",\"while\",\"break\",\"continue\",\"return\"],G=[\"print\",\"reject\",\"increment_log_prob|10\",\"integrate_ode|10\",\"integrate_ode_rk45|10\",\"integrate_ode_bdf|10\",\"algebra_solver\"],Z=[\"int\",\"real\",\"vector\",\"ordered\",\"positive_ordered\",\"simplex\",\"unit_vector\",\"row_vector\",\"matrix\",\"cholesky_factor_corr|10\",\"cholesky_factor_cov|10\",\"corr_matrix|10\",\"cov_matrix|10\",\"void\"],Y=[\"Phi\",\"Phi_approx\",\"abs\",\"acos\",\"acosh\",\"algebra_solver\",\"append_array\",\"append_col\",\"append_row\",\"asin\",\"asinh\",\"atan\",\"atan2\",\"atanh\",\"bernoulli_cdf\",\"bernoulli_lccdf\",\"bernoulli_lcdf\",\"bernoulli_logit_lpmf\",\"bernoulli_logit_rng\",\"bernoulli_lpmf\",\"bernoulli_rng\",\"bessel_first_kind\",\"bessel_second_kind\",\"beta_binomial_cdf\",",
+    "keywords": [
+      "functions",
+      "model",
+      "data",
+      "parameters",
+      "quantities",
+      "transformed",
+      "generated",
+      "else",
+      "while",
+      "break",
+      "continue",
+      "return",
+      "print",
+      "reject",
+      "algebra_solver",
+      "real",
+      "vector",
+      "ordered",
+      "positive_ordered",
+      "simplex"
+    ],
+    "category": "streaming",
+    "startIndex": 1035811,
+    "estimatedLines": 1
+  },
+  {
+    "name": "As9",
+    "signature": "function As9(A)",
+    "body": "{let Q={className:\"string\",contains:[A.BACKSLASH_ESCAPE],variants:[A.inherit(A.APOS_STRING_MODE,{illegal:null}),A.inherit(A.QUOTE_STRING_MODE,{illegal:null})]},B=A.UNDERSCORE_TITLE_MODE,G={variants:[A.BINARY_NUMBER_MODE,A.C_NUMBER_MODE]},Z=\"namespace class interface use extends function return abstract final public protected private static deprecated throw try catch Exception echo empty isset instanceof unset let var new const self require if else elseif switch case default do while loop for continue break likely unlikely __LINE__ __FILE__ __DIR__ __FUNCTION__ __CLASS__ __TRAIT__ __METHOD__ __NAMESPACE__ array boolean float double integer object resource string char long unsigned bool int uint ulong uchar true false null undefined\";return{name:\"Zephir\",aliases:[\"zep\"],keywords:Z,contains:[",
+    "keywords": [
+      "string",
+      "Zephir",
+      "doctag",
+      "function",
+      "params",
+      "self",
+      "class",
+      "namespace",
+      "abnf",
+      "accesslog",
+      "actionscript",
+      "angelscript",
+      "apache",
+      "applescript",
+      "arcade",
+      "arduino",
+      "armasm",
+      "asciidoc",
+      "aspectj",
+      "autohotkey"
+    ],
+    "category": "streaming",
+    "startIndex": 1136969,
+    "estimatedLines": 3
+  },
+  {
+    "name": "ne9",
+    "signature": "function ne9(A)",
+    "body": "{let{instance:Q,allowStale:B,timeout:G,skipCache:Z}=A,Y=FzA(Q),J=yU1(Q),X=new Date,I=new Date(X.getTime()-qE.maxAge+qE.staleTTL);await ae9();let W=!qE.disableCache&&!Z?tf.get(J):void 0;if(W&&(B||W.staleAt>X)&&W.staleAt>I){if(W.sse)f3A.add(Y);if(W.staleAt<X)xU1(Q);else vU1(Q);return{data:W.data,success:!0,source:\"cache\"}}else return await puA(xU1(Q),G)||{data:null,success:!1,source:\"timeout\",error:Error(\"Timeout\")}}",
+    "keywords": [
+      "cache",
+      "timeout",
+      "Timeout",
+      "sse",
+      "allow"
+    ],
+    "category": "streaming",
+    "startIndex": 1162400,
+    "estimatedLines": 1
+  },
+  {
+    "name": "ae9",
+    "signature": "function ae9()",
+    "body": "{if(me0)return;me0=!0;try{if(vx.localStorage){let A=await vx.localStorage.getItem(qE.cacheKey);if(!qE.disableCache&&A){let Q=JSON.parse(A);if(Q&&Array.isArray(Q))Q.forEach((B)=>{let[G,Z]=B;tf.set(G,{...Z,staleAt:new Date(Z.staleAt)})});ie0()}}}catch(A){}if(!qE.disableIdleStreams){let A=v3A.startIdleListener();if(A)v3A.stopIdleListener=A}}",
+    "keywords": [
+      "stream"
+    ],
+    "category": "streaming",
+    "startIndex": 1163191,
+    "estimatedLines": 1
+  },
+  {
+    "name": "ne0",
+    "signature": "function ne0(A,Q,B)",
+    "body": "{let G=B.dateUpdated||\"\",Z=new Date(Date.now()+qE.staleTTL),Y=!qE.disableCache?tf.get(Q):void 0;if(Y&&G&&Y.version===G){Y.staleAt=Z,de0();return}if(!qE.disableCache)tf.set(Q,{data:B,version:G,staleAt:Z,sse:f3A.has(A)}),ie0();de0();let J=k3A.get(A);J&&J.forEach((X)=>oe9(X,B))}",
+    "keywords": [
+      "sse"
+    ],
+    "category": "streaming",
+    "startIndex": 1163783,
+    "estimatedLines": 1
+  },
+  {
+    "name": "luA",
+    "signature": "function luA(A,Q)",
+    "body": "{if(Q.streaming){if(!A.getClientKey())throw Error(\"Must specify clientKey to enable streaming\");if(Q.payload)vU1(A,!0);ce9(A)}}",
+    "keywords": [
+      "stream"
+    ],
+    "category": "streaming",
+    "startIndex": 1166209,
+    "estimatedLines": 1
+  },
+  {
+    "name": "BAQ",
+    "signature": "function BAQ(A)",
+    "body": "{var Q=ruA(A);return Q.classes||(Q.classes=suA(A,\"class\",XA4,JA4,ee9)),Q.classes}",
+    "keywords": [
+      "class",
+      "sse"
+    ],
+    "category": "streaming",
+    "startIndex": 1170240,
+    "estimatedLines": 1
+  },
+  {
+    "name": "nuA",
+    "signature": "function nuA(A,Q,B)",
+    "body": "{if(B.isDirty){B.isDirty=!1;var G=B.virtualValue;B.mutations.length||function(Z,Y){var J,X,I=ouA.get(Z);if(I)if(Y===\"html\")(J=I.html)==null||(X=J.observer)==null||X.disconnect(),delete I.html;else if(Y===\"class\"){var W,K;(W=I.classes)==null||(K=W.observer)==null||K.disconnect(),delete I.classes}else if(Y===\"position\"){var V,H;(V=I.position)==null||(H=V.observer)==null||H.disconnect(),delete I.position}else{var D,F,E;(D=I.attributes)==null||(F=D[Y])==null||(E=F.observer)==null||E.disconnect(),delete I.attributes[Y]}}(A,Q),B.setValue(A,G)}}",
+    "keywords": [
+      "html",
+      "class",
+      "position",
+      "sse"
+    ],
+    "category": "streaming",
+    "startIndex": 1170601,
+    "estimatedLines": 1
+  },
+  {
+    "name": "IA4",
+    "signature": "function IA4(A,Q)",
+    "body": "{A.html&&nuA(Q,\"html\",A.html),A.classes&&nuA(Q,\"class\",A.classes),A.position&&nuA(Q,\"position\",A.position),Object.keys(A.attributes).forEach(function(B){nuA(Q,B,A.attributes[B])})}",
+    "keywords": [
+      "html",
+      "class",
+      "position",
+      "sse"
+    ],
+    "category": "streaming",
+    "startIndex": 1171164,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Vj",
+    "signature": "function Vj()",
+    "body": "{this.source=null,this.dataSize=0,this.maxDataSize=1048576,this.pauseStream=!0,this._maxDataSizeExceeded=!1,this._released=!1,this._bufferedEvents=[]}",
+    "keywords": [
+      "stream"
+    ],
+    "category": "streaming",
+    "startIndex": 1209845,
+    "estimatedLines": 1
+  },
+  {
+    "name": "N14",
+    "signature": "function N14(A,Q)",
+    "body": "{var B=[\"nginx\",\"apache\",void 0,\"iana\"];Object.keys(WmA).forEach(function(Z){var Y=WmA[Z],J=Y.extensions;if(!J||!J.length)return;A[Z]=J;for(var X=0;X<J.length;X++){var I=J[X];if(Q[I]){var W=B.indexOf(WmA[Q[I]].source),K=B.indexOf(Y.source);if(Q[I]!==\"application/octet-stream\"&&(W>K||W===K&&Q[I].substr(0,12)===\"application/\"))continue}Q[I]=Z}})}",
+    "keywords": [
+      "nginx",
+      "apache",
+      "iana",
+      "stream"
+    ],
+    "category": "streaming",
+    "startIndex": 1352235,
+    "estimatedLines": 1
+  },
+  {
+    "name": "I24",
+    "signature": "function I24(A)",
+    "body": "{return{ReadStream:Q,WriteStream:B};function Q(G,Z){if(!(this instanceof Q))return new Q(G,Z);oBQ.call(this);var Y=this;this.path=G,this.fd=null,this.readable=!0,this.paused=!1,this.flags=\"r\",this.mode=438,this.bufferSize=65536,Z=Z||{};var J=Object.keys(Z);for(var X=0,I=J.length;X<I;X++){var W=J[X];this[W]=Z[W]}if(this.encoding)this.setEncoding(this.encoding);if(this.start!==void 0){if(typeof this.start!==\"number\")throw TypeError(\"start must be a Number\");if(this.end===void 0)this.end=1/0;else if(typeof this.end!==\"number\")throw TypeError(\"end must be a Number\");if(this.start>this.end)throw Error(\"start must be <= end\");this.pos=this.start}if(this.fd!==null){process.nextTick(function(){Y._read()});return}A.open(this.path,this.flags,this.mode,function(K,V){if(K){Y.emit(\"error\",K),Y.readable",
+    "keywords": [
+      "number",
+      "error",
+      "open",
+      "binary",
+      "stream"
+    ],
+    "category": "streaming",
+    "startIndex": 1465443,
+    "estimatedLines": 1
+  },
+  {
+    "name": "R",
+    "signature": "function R(S,u)",
+    "body": "{return new A.ReadStream(S,u)}",
+    "keywords": [
+      "stream"
+    ],
+    "category": "streaming",
+    "startIndex": 1471573,
+    "estimatedLines": 1
+  },
+  {
+    "name": "j",
+    "signature": "function j(S,u)",
+    "body": "{return new A.WriteStream(S,u)}",
+    "keywords": [
+      "stream"
+    ],
+    "category": "streaming",
+    "startIndex": 1471618,
+    "estimatedLines": 1
+  },
+  {
+    "name": "dXQ",
+    "signature": "function dXQ(A,Q={})",
+    "body": "{let B=US4(A,{streamIsTTY:A&&A.isTTY,...Q});return $S4(B)}",
+    "keywords": [
+      "stream"
+    ],
+    "category": "streaming",
+    "startIndex": 2016586,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Sk4",
+    "signature": "function Sk4(A,Q)",
+    "body": "{let B=(0,aKQ._typedJsonParse)(Q,\"checksum\",\"DeltasEvaluationResponse\");if(!B)return{hadBadDeltaChecksum:!0};let G=xk4(A,B),Z=yk4(G),Y=(0,aKQ._DJB2Object)({feature_gates:Z.feature_gates,dynamic_configs:Z.dynamic_configs,layer_configs:Z.layer_configs},Pk4);if(Y!==B.checksumV2)return{hadBadDeltaChecksum:!0,badChecksum:Y,badMergedConfigs:Z,badFullResponse:B.deltas_full_response};return JSON.stringify(Z)}",
+    "keywords": [
+      "checksum",
+      "DeltasEvaluationResponse",
+      "delta",
+      "config"
+    ],
+    "category": "streaming",
+    "startIndex": 2091898,
+    "estimatedLines": 1
+  },
+  {
+    "name": "qg4",
+    "signature": "function qg4(A)",
+    "body": "{if(typeof ReadableStream===\"function\"&&(0,$g4.isReadableStream)(A.source))return(0,wg4.createChecksumStream)(A);return new Ug4.ChecksumStream(A)}",
+    "keywords": [
+      "function",
+      "stream"
+    ],
+    "category": "streaming",
+    "startIndex": 2142553,
+    "estimatedLines": 1
+  },
+  {
+    "name": "LHQ",
+    "signature": "function LHQ(A,Q,B)",
+    "body": "{let G=A.getReader(),Z=!1,Y=0,J=[\"\",new Lg4.ByteArrayCollector((W)=>new Uint8Array(W))],X=-1,I=async(W)=>{let{value:K,done:V}=await G.read(),H=K;if(V){if(X!==-1){let D=tcA(J,X);if(E7A(D)>0)W.enqueue(D)}W.close()}else{let D=MHQ(H,!1);if(X!==D){if(X>=0)W.enqueue(tcA(J,X));X=D}if(X===-1){W.enqueue(H);return}let F=E7A(H);Y+=F;let E=E7A(J[X]);if(F>=Q&&E===0)W.enqueue(H);else{let z=OHQ(J,X,H);if(!Z&&Y>Q*2)Z=!0,B?.warn(`@smithy/util-stream - stream chunk size ${F} is below threshold of ${Q}, automatically buffering.`);if(z>=Q)W.enqueue(tcA(J,X));else await I(W)}}};return new ReadableStream({pull:I})}",
+    "keywords": [
+      "stream",
+      "chunk"
+    ],
+    "category": "streaming",
+    "startIndex": 2143503,
+    "estimatedLines": 1
+  },
+  {
+    "name": "tcA",
+    "signature": "function tcA(A,Q)",
+    "body": "{switch(Q){case 0:let B=A[0];return A[0]=\"\",B;case 1:case 2:return A[Q].flush()}throw Error(`@smithy/util-stream - invalid index ${Q} given to flush()`)}",
+    "keywords": [
+      "stream"
+    ],
+    "category": "streaming",
+    "startIndex": 2144260,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Sg4",
+    "signature": "function Sg4(A,Q,B)",
+    "body": "{if((0,Pg4.isReadableStream)(A))return(0,Lh.createBufferedReadableStream)(A,Q,B);let G=new Tg4.Readable({read(){}}),Z=!1,Y=0,J=[\"\",new THQ.ByteArrayCollector((I)=>new Uint8Array(I)),new THQ.ByteArrayCollector((I)=>Buffer.from(new Uint8Array(I)))],X=-1;return A.on(\"data\",(I)=>{let W=(0,Lh.modeOf)(I,!0);if(X!==W){if(X>=0)G.push((0,Lh.flush)(J,X));X=W}if(X===-1){G.push(I);return}let K=(0,Lh.sizeOf)(I);Y+=K;let V=(0,Lh.sizeOf)(J[X]);if(K>=Q&&V===0)G.push(I);else{let H=(0,Lh.merge)(J,X,I);if(!Z&&Y>Q*2)Z=!0,B?.warn(`@smithy/util-stream - stream chunk size ${K} is below threshold of ${Q}, automatically buffering.`);if(H>=Q)G.push((0,Lh.flush)(J,X))}}),A.on(\"end\",()=>{if(X!==-1){let I=(0,Lh.flush)(J,X);if((0,Lh.sizeOf)(I)>0)G.push(I)}G.push(null)}),G}",
+    "keywords": [
+      "data",
+      "stream",
+      "chunk"
+    ],
+    "category": "streaming",
+    "startIndex": 2144790,
+    "estimatedLines": 1
+  },
+  {
+    "name": "vm4",
+    "signature": "function vm4(A)",
+    "body": "{if(typeof A.stream===\"function\")A=A.stream();return A.tee()}",
+    "keywords": [
+      "function",
+      "stream"
+    ],
+    "category": "streaming",
+    "startIndex": 2174577,
+    "estimatedLines": 1
+  },
+  {
+    "name": "fm4",
+    "signature": "function fm4(A)",
+    "body": "{if((0,xDQ.isReadableStream)(A)||(0,xDQ.isBlob)(A))return(0,bm4.splitStream)(A);let Q=new SDQ.PassThrough,B=new SDQ.PassThrough;return A.pipe(Q),A.pipe(B),[Q,B]}",
+    "keywords": [
+      "stream"
+    ],
+    "category": "streaming",
+    "startIndex": 2174791,
+    "estimatedLines": 1
+  },
+  {
+    "name": "J",
+    "signature": "function J(K)",
+    "body": "{Y.error=Y.hasError?new Z(K,Y.error,\"An error was suppressed during disposal.\"):K,Y.hasError=!0}",
+    "keywords": [
+      "sse"
+    ],
+    "category": "streaming",
+    "startIndex": 2196507,
+    "estimatedLines": 1
+  },
+  {
+    "name": "AQ",
+    "signature": "function AQ(FA,OA,X1,O1)",
+    "body": "{let C1=\"\",z1=!1;for(let Y0=0;Y0<FA.length;Y0++){let Z0=FA[Y0],J0=l0(Z0);if(J0===void 0)continue;let $Q=\"\";if($Q=X1.length===0?J0:`${X1}.${J0}`,J0===OA.textNodeName){let B2=Z0[J0];k1($Q,OA)||(B2=OA.tagValueProcessor(J0,B2),B2=MQ(B2,OA)),z1&&(C1+=O1),C1+=B2,z1=!1;continue}if(J0===OA.cdataPropName){z1&&(C1+=O1),C1+=`<![CDATA[${Z0[J0][0][OA.textNodeName]}]]>`,z1=!1;continue}if(J0===OA.commentPropName){C1+=O1+`<!--${Z0[J0][0][OA.textNodeName]}-->`,z1=!0;continue}if(J0[0]===\"?\"){let B2=XQ(Z0[\":@\"],OA),L0=J0===\"?xml\"?\"\":O1,S0=Z0[J0][0][OA.textNodeName];S0=S0.length!==0?\" \"+S0:\"\",C1+=L0+`<${J0}${S0}${B2}?>`,z1=!0;continue}let yB=O1;yB!==\"\"&&(yB+=OA.indentBy);let QB=O1+`<${J0}${XQ(Z0[\":@\"],OA)}`,R2=AQ(Z0[J0],OA,$Q,yB);OA.unpairedTags.indexOf(J0)!==-1?OA.suppressUnpairedNode?C1+=QB+\">\":C1+=QB+\"/>\":",
+    "keywords": [
+      "sse"
+    ],
+    "category": "streaming",
+    "startIndex": 2327633,
+    "estimatedLines": 1
+  },
+  {
+    "name": "MQ",
+    "signature": "function MQ(FA,OA)",
+    "body": "{if(FA&&FA.length>0&&OA.processEntities)for(let X1=0;X1<OA.entities.length;X1++){let O1=OA.entities[X1];FA=FA.replace(O1.regex,O1.val)}return FA}",
+    "keywords": [
+      "sse"
+    ],
+    "category": "streaming",
+    "startIndex": 2329353,
+    "estimatedLines": 1
+  },
+  {
+    "name": "sbQ",
+    "signature": "function sbQ(A)",
+    "body": "{if(A===null)return!1;else if(A instanceof A38)return!0;else if(typeof A!==\"object\")return!1;else{let Q=A[Symbol.toStringTag];return(Q===\"Blob\"||Q===\"File\")&&((\"stream\"in A)&&typeof A.stream===\"function\"||(\"arrayBuffer\"in A)&&typeof A.arrayBuffer===\"function\")}}",
+    "keywords": [
+      "object",
+      "Blob",
+      "File",
+      "stream",
+      "function",
+      "arrayBuffer"
+    ],
+    "category": "streaming",
+    "startIndex": 2899170,
+    "estimatedLines": 1
+  },
+  {
+    "name": "jfQ",
+    "signature": "function jfQ(A,Q)",
+    "body": "{if(A==null)return;let B=\"Connect Timeout Error\";if(Array.isArray(A.autoSelectFamilyAttemptedAddresses))B+=` (attempted addresses: ${A.autoSelectFamilyAttemptedAddresses.join(\", \")},`;else B+=` (attempted address: ${Q.hostname}:${Q.port},`;B+=` timeout: ${Q.timeout}ms)`,TfQ.destroy(A,new Y58(B))}",
+    "keywords": [
+      "sse"
+    ],
+    "category": "streaming",
+    "startIndex": 2923913,
+    "estimatedLines": 1
+  },
+  {
+    "name": "$f1",
+    "signature": "function $f1(A)",
+    "body": "{A=faA(A,!0,!0);let Q={position:0},B=TGA(\"/\",A,Q);if(B.length===0||!EwA.test(B))return\"failure\";if(Q.position>A.length)return\"failure\";Q.position++;let G=TGA(\";\",A,Q);if(G=faA(G,!1,!0),G.length===0||!EwA.test(G))return\"failure\";let Z=B.toLowerCase(),Y=G.toLowerCase(),J={type:Z,subtype:Y,parameters:new Map,essence:`${Z}/${Y}`};while(Q.position<A.length){Q.position++,gaA((W)=>p58.test(W),A,Q);let X=gaA((W)=>W!==\";\"&&W!==\"=\",A,Q);if(X=X.toLowerCase(),Q.position<A.length){if(A[Q.position]===\";\")continue;Q.position++}if(Q.position>A.length)break;let I=null;if(A[Q.position]==='\"')I=DhQ(A,Q,!0),TGA(\";\",A,Q);else if(I=TGA(\";\",A,Q),I=faA(I,!1,!0),I.length===0)continue;if(X.length!==0&&EwA.test(X)&&(I.length===0||l58.test(I))&&!J.parameters.has(X))J.parameters.set(X,I)}return J}",
+    "keywords": [
+      "failure",
+      "sse"
+    ],
+    "category": "streaming",
+    "startIndex": 3064265,
+    "estimatedLines": 1
+  },
+  {
+    "name": "o58",
+    "signature": "function o58(A)",
+    "body": "{haA(A!==\"failure\");let{parameters:Q,essence:B}=A,G=B;for(let[Z,Y]of Q.entries()){if(G+=\";\",G+=Z,G+=\"=\",!EwA.test(Y))Y=Y.replace(/(\\\\|\")/g,\"\\\\$1\"),Y='\"'+Y,Y+='\"';G+=Y}return G}",
+    "keywords": [
+      "failure",
+      "sse"
+    ],
+    "category": "streaming",
+    "startIndex": 3065711,
+    "estimatedLines": 1
+  },
+  {
+    "name": "e58",
+    "signature": "function e58(A)",
+    "body": "{switch(A.essence){case\"application/ecmascript\":case\"application/javascript\":case\"application/x-ecmascript\":case\"application/x-javascript\":case\"text/ecmascript\":case\"text/javascript\":case\"text/javascript1.0\":case\"text/javascript1.1\":case\"text/javascript1.2\":case\"text/javascript1.3\":case\"text/javascript1.4\":case\"text/javascript1.5\":case\"text/jscript\":case\"text/livescript\":case\"text/x-ecmascript\":case\"text/x-javascript\":return\"text/javascript\";case\"application/json\":case\"text/json\":return\"application/json\";case\"image/svg+xml\":return\"image/svg+xml\";case\"text/xml\":case\"application/xml\":return\"application/xml\"}if(A.subtype.endsWith(\"+json\"))return\"application/json\";if(A.subtype.endsWith(\"+xml\"))return\"application/xml\";return\"\"}",
+    "keywords": [
+      "sse"
+    ],
+    "category": "streaming",
+    "startIndex": 3066479,
+    "estimatedLines": 1
+  },
+  {
+    "name": "l78",
+    "signature": "function l78(A,Q,B)",
+    "body": "{let G=Q,Z=B,Y;try{Y=A.stream.getReader()}catch(J){Z(J);return}try{G(await _hQ(Y))}catch(J){Z(J)}}",
+    "keywords": [
+      "stream"
+    ],
+    "category": "streaming",
+    "startIndex": 3083945,
+    "estimatedLines": 1
+  },
+  {
+    "name": "i78",
+    "signature": "function i78(A)",
+    "body": "{return A instanceof ReadableStream||A[Symbol.toStringTag]===\"ReadableStream\"&&typeof A.tee===\"function\"}",
+    "keywords": [
+      "ReadableStream",
+      "function",
+      "stream"
+    ],
+    "category": "streaming",
+    "startIndex": 3084062,
+    "estimatedLines": 1
+  },
+  {
+    "name": "_hQ",
+    "signature": "function _hQ(A)",
+    "body": "{let Q=[],B=0;while(!0){let{done:G,value:Z}=await A.read();if(G)return Buffer.concat(Q,B);if(!F78(Z))throw TypeError(\"Received non-Uint8Array chunk\");Q.push(Z),B+=Z.length}}",
+    "keywords": [
+      "chunk"
+    ],
+    "category": "streaming",
+    "startIndex": 3084440,
+    "estimatedLines": 1
+  },
+  {
+    "name": "e78",
+    "signature": "function e78(A)",
+    "body": "{let Q=null,B=null,G=null,Z=PhQ(\"content-type\",A);if(Z===null)return\"failure\";for(let Y of Z){let J=W78(Y);if(J===\"failure\"||J.essence===\"*/*\")continue;if(G=J,G.essence!==B){if(Q=null,G.parameters.has(\"charset\"))Q=G.parameters.get(\"charset\");B=G.essence}else if(!G.parameters.has(\"charset\")&&Q!==null)G.parameters.set(\"charset\",Q)}if(G==null)return\"failure\";return G}",
+    "keywords": [
+      "failure",
+      "charset",
+      "sse"
+    ],
+    "category": "streaming",
+    "startIndex": 3086266,
+    "estimatedLines": 1
+  }
+]

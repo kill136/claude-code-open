@@ -1,0 +1,655 @@
+[
+  {
+    "name": "V$9",
+    "signature": "function V$9(A,Q,B,G,Z,Y,J)",
+    "body": "{switch(B){case K$9:if(A.byteLength!=Q.byteLength||A.byteOffset!=Q.byteOffset)return!1;A=A.buffer,Q=Q.buffer;case W$9:if(A.byteLength!=Q.byteLength||!Y(new J8A(A),new J8A(Q)))return!1;return!0;case A$9:case Q$9:case Z$9:return Fx(+A,+Q);case B$9:return A.name==Q.name&&A.message==Q.message;case Y$9:case X$9:return A==Q+\"\";case G$9:var X=Qj0;case J$9:var I=G&tC9;if(X||(X=X8A),A.size!=Q.size&&!I)return!1;var W=J.get(A);if(W)return W==Q;G|=eC9,J.set(A,Q);var K=efA(X(A),X(Q),G,Z,Y,J);return J.delete(A),K;case I$9:if(_F1)return _F1.call(A)==_F1.call(Q)}return!1}",
+    "keywords": [
+      "message"
+    ],
+    "category": "session",
+    "startIndex": 15393,
+    "estimatedLines": 1
+  },
+  {
+    "name": "h0",
+    "signature": "function h0()",
+    "body": "{return r0.sessionId}",
+    "keywords": [
+      "session"
+    ],
+    "category": "session",
+    "startIndex": 30046,
+    "estimatedLines": 1
+  },
+  {
+    "name": "qT0",
+    "signature": "function qT0()",
+    "body": "{return r0.sessionId=wT0(),r0.sessionId}",
+    "keywords": [
+      "session"
+    ],
+    "category": "session",
+    "startIndex": 30080,
+    "estimatedLines": 1
+  },
+  {
+    "name": "kT0",
+    "signature": "function kT0()",
+    "body": "{return r0.sessionCounter}",
+    "keywords": [
+      "session"
+    ],
+    "category": "session",
+    "startIndex": 33763,
+    "estimatedLines": 1
+  },
+  {
+    "name": "pT0",
+    "signature": "function pT0()",
+    "body": "{return r0.sessionIngressToken}",
+    "keywords": [
+      "session",
+      "token"
+    ],
+    "category": "session",
+    "startIndex": 34679,
+    "estimatedLines": 1
+  },
+  {
+    "name": "j8A",
+    "signature": "function j8A(A)",
+    "body": "{r0.sessionIngressToken=A}",
+    "keywords": [
+      "session",
+      "token"
+    ],
+    "category": "session",
+    "startIndex": 34724,
+    "estimatedLines": 1
+  },
+  {
+    "name": "QP0",
+    "signature": "function QP0(A)",
+    "body": "{r0.sessionBypassPermissionsMode=A}",
+    "keywords": [
+      "session",
+      "permission"
+    ],
+    "category": "session",
+    "startIndex": 35412,
+    "estimatedLines": 1
+  },
+  {
+    "name": "BP0",
+    "signature": "function BP0(A)",
+    "body": "{r0.sessionPersistenceDisabled=A}",
+    "keywords": [
+      "session",
+      "persist"
+    ],
+    "category": "session",
+    "startIndex": 35462,
+    "estimatedLines": 1
+  },
+  {
+    "name": "mt",
+    "signature": "function mt()",
+    "body": "{return r0.sessionPersistenceDisabled}",
+    "keywords": [
+      "session",
+      "persist"
+    ],
+    "category": "session",
+    "startIndex": 35510,
+    "estimatedLines": 1
+  },
+  {
+    "name": "XP0",
+    "signature": "function XP0()",
+    "body": "{return r0.lspRecommendationShownThisSession}",
+    "keywords": [
+      "session",
+      "sse"
+    ],
+    "category": "session",
+    "startIndex": 36033,
+    "estimatedLines": 1
+  },
+  {
+    "name": "IP0",
+    "signature": "function IP0(A)",
+    "body": "{r0.lspRecommendationShownThisSession=A}",
+    "keywords": [
+      "session",
+      "sse"
+    ],
+    "category": "session",
+    "startIndex": 36092,
+    "estimatedLines": 1
+  },
+  {
+    "name": "nhA",
+    "signature": "function nhA(A)",
+    "body": "{r0.teleportedSessionInfo={isTeleported:!0,hasLoggedFirstMessage:!1,sessionId:A.sessionId}}",
+    "keywords": [
+      "session",
+      "message"
+    ],
+    "category": "session",
+    "startIndex": 36491,
+    "estimatedLines": 1
+  },
+  {
+    "name": "AE1",
+    "signature": "function AE1()",
+    "body": "{return r0.teleportedSessionInfo}",
+    "keywords": [
+      "session"
+    ],
+    "category": "session",
+    "startIndex": 36597,
+    "estimatedLines": 1
+  },
+  {
+    "name": "QE1",
+    "signature": "function QE1()",
+    "body": "{if(r0.teleportedSessionInfo)r0.teleportedSessionInfo.hasLoggedFirstMessage=!0}",
+    "keywords": [
+      "session",
+      "message"
+    ],
+    "category": "session",
+    "startIndex": 36644,
+    "estimatedLines": 1
+  },
+  {
+    "name": "pY",
+    "signature": "function pY(A,Q)",
+    "body": "{if(k(`MCP server \"${A}\" ${Q}`,{level:\"error\"}),(zQ()||{}).cleanupPeriodDays===0)return;try{let G=CE1(Mx.mcpLogs(A),$E1+\".jsonl\"),Y={error:Q instanceof Error?Q.stack||Q.message:String(Q),timestamp:new Date().toISOString(),sessionId:h0(),cwd:jA().cwd()};UE1(G).write(Y)}catch{}}",
+    "keywords": [
+      "error",
+      "mcp",
+      "session",
+      "message"
+    ],
+    "category": "session",
+    "startIndex": 48463,
+    "estimatedLines": 1
+  },
+  {
+    "name": "dh0",
+    "signature": "function dh0()",
+    "body": "{var A=[];for(var Q=0;Q<arguments.length;Q++)A[Q]=arguments[Q];var B=rx9.argsOrArgArray(A);return function(G){return sx9.onErrorResumeNext.apply(void 0,ox9([G],ax9(B)))}}",
+    "keywords": [
+      "resume"
+    ],
+    "category": "session",
+    "startIndex": 156395,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Sm9",
+    "signature": "function Sm9(A)",
+    "body": "{B.debug=B,B.default=B,B.coerce=I,B.disable=J,B.enable=Z,B.enabled=X,B.humanize=rC1(),B.destroy=W,Object.keys(A).forEach((K)=>{B[K]=A[K]}),B.names=[],B.skips=[],B.formatters={};function Q(K){let V=0;for(let H=0;H<K.length;H++)V=(V<<5)-V+K.charCodeAt(H),V|=0;return B.colors[Math.abs(V)%B.colors.length]}B.selectColor=Q;function B(K){let V,H=null,D,F;function E(...z){if(!E.enabled)return;let $=E,L=Number(new Date),N=L-(V||L);if($.diff=N,$.prev=V,$.curr=L,V=L,z[0]=B.coerce(z[0]),typeof z[0]!==\"string\")z.unshift(\"%O\");let M=0;z[0]=z[0].replace(/%([a-zA-Z%])/g,(j,P)=>{if(j===\"%%\")return\"%\";M++;let b=B.formatters[P];if(typeof b===\"function\"){let S=z[M];j=b.call($,S),z.splice(M,1),M--}return j}),B.formatArgs.call($,z),($.log||B.log).apply($,z)}if(E.namespace=K,E.useColors=B.useColors(),E.color=B.s",
+    "keywords": [
+      "string",
+      "function",
+      "enabled",
+      "debug",
+      "message",
+      "config"
+    ],
+    "category": "session",
+    "startIndex": 216566,
+    "estimatedLines": 1
+  },
+  {
+    "name": "I",
+    "signature": "function I(K)",
+    "body": "{if(K instanceof Error)return K.stack||K.message;return K}",
+    "keywords": [
+      "message"
+    ],
+    "category": "session",
+    "startIndex": 218375,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Wm0",
+    "signature": "function Wm0(A)",
+    "body": "{return new Promise(function(Q,B){var G=\"\";A.subscribe({next:function(Z){return G+=Z},error:function(Z){var Y=Error(\"\".concat(G,`\n`).concat(Z.message));if(\"exitCode\"in Z)Y.exitCode=Z.exitCode,Y.code=Z.exitCode;B(Y)},complete:function(){return Q(G)}})})}",
+    "keywords": [
+      "exitCode",
+      "message"
+    ],
+    "category": "session",
+    "startIndex": 230185,
+    "estimatedLines": 2
+  },
+  {
+    "name": "Km0",
+    "signature": "function Km0(A)",
+    "body": "{return new Promise(function(Q,B){var G=\"\",Z=\"\";A.subscribe({next:function(Y){return Y.source===\"stdout\"?G+=Y.text:Z+=Y.text},error:function(Y){var J=Error(\"\".concat(G,`\n`).concat(Y.message));if(\"exitCode\"in Y)J.exitCode=Y.exitCode,J.code=Y.exitCode,J.stdout=G,J.stderr=Z;B(J)},complete:function(){return Q([G,Z])}})})}",
+    "keywords": [
+      "stdout",
+      "exitCode",
+      "message"
+    ],
+    "category": "session",
+    "startIndex": 230453,
+    "estimatedLines": 2
+  },
+  {
+    "name": "Ji9",
+    "signature": "function Ji9(A)",
+    "body": "{let B=\"[a-zA-Z_\\\\-!.?+*=<>&#'][a-zA-Z_\\\\-!.?+*=<>&#'0-9/;:]*\",G=\"def defonce defprotocol defstruct defmulti defmethod defn- defn defmacro deftype defrecord\",Z={$pattern:B,\"builtin-name\":\"def defonce defprotocol defstruct defmulti defmethod defn- defn defmacro deftype defrecord cond apply if-not if-let if not not= =|0 <|0 >|0 <=|0 >=|0 ==|0 +|0 /|0 *|0 -|0 rem quot neg? pos? delay? symbol? keyword? true? false? integer? empty? coll? list? set? ifn? fn? associative? sequential? sorted? counted? reversible? number? decimal? class? distinct? isa? float? rational? reduced? ratio? odd? even? char? seq? vector? string? map? nil? contains? zero? instance? not-every? not-any? libspec? -> ->> .. . inc compare do dotimes mapcat take remove take-while drop letfn drop-last take-last drop-while while i",
+    "keywords": [
+      "number",
+      "literal",
+      "comment",
+      "symbol",
+      "name",
+      "title",
+      "Clojure",
+      "pattern",
+      "agent",
+      "pending",
+      "protocol",
+      "ink",
+      "persist",
+      "history",
+      "sse",
+      "chunk"
+    ],
+    "category": "session",
+    "startIndex": 388751,
+    "estimatedLines": 1
+  },
+  {
+    "name": "mi9",
+    "signature": "function mi9(A)",
+    "body": "{let Q=\"exports register file shl array record property for mod while set ally label uses raise not stored class safecall var interface or private static exit index inherited to else stdcall override shr asm far resourcestring finalization packed virtual out and protected library do xorwrite goto near function end div overload object unit begin string on inline repeat until destructor write message program with read initialization except default nil if case cdecl in downto threadvar of try pascal const external constructor type public then implementation finally published procedure absolute reintroduce operator as is abstract alias assembler bitpacked break continue cppdecl cvar enumerator experimental platform deprecated unimplemented dynamic export far16 forward generic helper implements",
+    "keywords": [
+      "meta",
+      "string",
+      "number",
+      "function",
+      "params",
+      "Delphi",
+      "pascal",
+      "freepascal",
+      "lazarus",
+      "ink",
+      "message",
+      "sse"
+    ],
+    "category": "session",
+    "startIndex": 431517,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Yo9",
+    "signature": "function Yo9(A)",
+    "body": "{let Q={className:\"variable\",begin:/\\$(ADMINTOOLS|APPDATA|CDBURN_AREA|CMDLINE|COMMONFILES32|COMMONFILES64|COMMONFILES|COOKIES|DESKTOP|DOCUMENTS|EXEDIR|EXEFILE|EXEPATH|FAVORITES|FONTS|HISTORY|HWNDPARENT|INSTDIR|INTERNET_CACHE|LANGUAGE|LOCALAPPDATA|MUSIC|NETHOOD|OUTDIR|PICTURES|PLUGINSDIR|PRINTHOOD|PROFILE|PROGRAMFILES32|PROGRAMFILES64|PROGRAMFILES|QUICKLAUNCH|RECENT|RESOURCES_LOCALIZED|RESOURCES|SENDTO|SMPROGRAMS|SMSTARTUP|STARTMENU|SYSDIR|TEMP|TEMPLATES|VIDEOS|WINDIR)/},B={className:\"variable\",begin:/\\$+\\{[\\w.:-]+\\}/},G={className:\"variable\",begin:/\\$+\\w+/,illegal:/\\(\\)\\{\\}/},Z={className:\"variable\",begin:/\\$+\\([\\w^.:-]+\\)/},Y={className:\"params\",begin:\"(ARCHIVE|FILE_ATTRIBUTE_ARCHIVE|FILE_ATTRIBUTE_NORMAL|FILE_ATTRIBUTE_OFFLINE|FILE_ATTRIBUTE_READONLY|FILE_ATTRIBUTE_SYSTEM|FILE_ATTRIBUTE_",
+    "keywords": [
+      "variable",
+      "params",
+      "keyword",
+      "meta",
+      "class",
+      "string",
+      "NSIS",
+      "function",
+      "exec",
+      "shell",
+      "search",
+      "request",
+      "completed",
+      "ink",
+      "component",
+      "history",
+      "message",
+      "sse",
+      "allow",
+      "config"
+    ],
+    "category": "session",
+    "startIndex": 883309,
+    "estimatedLines": 1
+  },
+  {
+    "name": "do9",
+    "signature": "function do9(A)",
+    "body": "{return{name:\"Oracle Rules Language\",keywords:{keyword:\"BILL_PERIOD BILL_START BILL_STOP RS_EFFECTIVE_START RS_EFFECTIVE_STOP RS_JURIS_CODE RS_OPCO_CODE INTDADDATTRIBUTE|5 INTDADDVMSG|5 INTDBLOCKOP|5 INTDBLOCKOPNA|5 INTDCLOSE|5 INTDCOUNT|5 INTDCOUNTSTATUSCODE|5 INTDCREATEMASK|5 INTDCREATEDAYMASK|5 INTDCREATEFACTORMASK|5 INTDCREATEHANDLE|5 INTDCREATEOVERRIDEDAYMASK|5 INTDCREATEOVERRIDEMASK|5 INTDCREATESTATUSCODEMASK|5 INTDCREATETOUPERIOD|5 INTDDELETE|5 INTDDIPTEST|5 INTDEXPORT|5 INTDGETERRORCODE|5 INTDGETERRORMESSAGE|5 INTDISEQUAL|5 INTDJOIN|5 INTDLOAD|5 INTDLOADACTUALCUT|5 INTDLOADDATES|5 INTDLOADHIST|5 INTDLOADLIST|5 INTDLOADLISTDATES|5 INTDLOADLISTENERGY|5 INTDLOADLISTHIST|5 INTDLOADRELATEDCHANNEL|5 INTDLOADSP|5 INTDLOADSTAGING|5 INTDLOADUOM|5 INTDLOADUOMDATES|5 INTDLOADUOMHIST|5 INTDLOA",
+    "keywords": [
+      "literal",
+      "message",
+      "config"
+    ],
+    "category": "session",
+    "startIndex": 957812,
+    "estimatedLines": 1
+  },
+  {
+    "name": "yr9",
+    "signature": "function yr9(A)",
+    "body": "{let Q={className:\"number\",begin:\"[1-9][0-9]*\",relevance:0},B={className:\"symbol\",begin:\":[^\\\\]]+\"},G={className:\"built_in\",begin:\"(AR|P|PAYLOAD|PR|R|SR|RSR|LBL|VR|UALM|MESSAGE|UTOOL|UFRAME|TIMER|TIMER_OVERFLOW|JOINT_MAX_SPEED|RESUME_PROG|DIAG_REC)\\\\[\",end:\"\\\\]\",contains:[\"self\",Q,B]},Z={className:\"built_in\",begin:\"(AI|AO|DI|DO|F|RI|RO|UI|UO|GI|GO|SI|SO)\\\\[\",end:\"\\\\]\",contains:[\"self\",Q,A.QUOTE_STRING_MODE,B]};return{name:\"TP\",keywords:{keyword:\"ABORT ACC ADJUST AND AP_LD BREAK CALL CNT COL CONDITION CONFIG DA DB DIV DETECT ELSE END ENDFOR ERR_NUM ERROR_PROG FINE FOR GP GUARD INC IF JMP LINEAR_MAX_SPEED LOCK MOD MONITOR OFFSET Offset OR OVERRIDE PAUSE PREG PTH RT_LD RUN SELECT SKIP Skip TA TB TO TOOL_OFFSET Tool_Offset UF UT UFRAME_NUM UTOOL_NUM UNLOCK WAIT X Y Z W P R STRLEN SUBSTR FINDST",
+    "keywords": [
+      "number",
+      "symbol",
+      "built_in",
+      "self",
+      "keyword",
+      "string",
+      "variable",
+      "resume",
+      "message",
+      "config"
+    ],
+    "category": "session",
+    "startIndex": 1080972,
+    "estimatedLines": 1
+  },
+  {
+    "name": "yzA",
+    "signature": "function yzA(A,Q,B)",
+    "body": "{function G(Z){if(Ee(Error.captureStackTrace))Error.captureStackTrace(this,this.constructor);Object.assign(this,Z||{}),this.code=A,this.message=this.cause?Q+\": \"+this.cause.message:Q}return G.prototype=new(B||Error),Object.defineProperties(G.prototype,{constructor:{value:G,enumerable:!1},name:{value:\"Error [\"+A+\"]\",enumerable:!1}}),G}",
+    "keywords": [
+      "message"
+    ],
+    "category": "session",
+    "startIndex": 1395364,
+    "estimatedLines": 1
+  },
+  {
+    "name": "G",
+    "signature": "function G(Z)",
+    "body": "{if(Ee(Error.captureStackTrace))Error.captureStackTrace(this,this.constructor);Object.assign(this,Z||{}),this.code=A,this.message=this.cause?Q+\": \"+this.cause.message:Q}",
+    "keywords": [
+      "message"
+    ],
+    "category": "session",
+    "startIndex": 1395384,
+    "estimatedLines": 1
+  },
+  {
+    "name": "sI",
+    "signature": "function sI(A,Q)",
+    "body": "{try{return{success:!0,tokens:typeof Q===\"function\"?G5A.parse(A,Q):G5A.parse(A,Q)}}catch(B){if(B instanceof Error)t(B);return{success:!1,error:B instanceof Error?B.message:\"Unknown parse error\"}}}",
+    "keywords": [
+      "function",
+      "message",
+      "token"
+    ],
+    "category": "session",
+    "startIndex": 1456697,
+    "estimatedLines": 1
+  },
+  {
+    "name": "eB4",
+    "signature": "function eB4(A)",
+    "body": "{try{let Q=A.map((G,Z)=>{if(G===null||G===void 0)return String(G);let Y=typeof G;if(Y===\"string\")return G;if(Y===\"number\"||Y===\"boolean\")return String(G);if(Y===\"object\")throw Error(`Cannot quote argument at index ${Z}: object values are not supported`);if(Y===\"symbol\")throw Error(`Cannot quote argument at index ${Z}: symbol values are not supported`);if(Y===\"function\")throw Error(`Cannot quote argument at index ${Z}: function values are not supported`);throw Error(`Cannot quote argument at index ${Z}: unsupported type ${Y}`)});return{success:!0,quoted:G5A.quote(Q)}}catch(Q){if(Q instanceof Error)t(Q);return{success:!1,error:Q instanceof Error?Q.message:\"Unknown quote error\"}}}",
+    "keywords": [
+      "string",
+      "number",
+      "boolean",
+      "object",
+      "symbol",
+      "function",
+      "message"
+    ],
+    "category": "session",
+    "startIndex": 1456909,
+    "estimatedLines": 1
+  },
+  {
+    "name": "lzA",
+    "signature": "function lzA(A,Q)",
+    "body": "{return A instanceof Error&&A.message===Q}",
+    "keywords": [
+      "message"
+    ],
+    "category": "session",
+    "startIndex": 1460607,
+    "estimatedLines": 1
+  },
+  {
+    "name": "p2Q",
+    "signature": "function p2Q(A)",
+    "body": "{if(D5A.isError(A))return{message:A.message,name:A.name,stack:A.stack,...u2Q(A)};else if(D5A.isEvent(A)){let Q={type:A.type,target:g2Q(A.target),currentTarget:g2Q(A.currentTarget),...u2Q(A)};if(typeof CustomEvent<\"u\"&&D5A.isInstanceOf(A,CustomEvent))Q.detail=A.detail;return Q}else return A}",
+    "keywords": [
+      "message"
+    ],
+    "category": "session",
+    "startIndex": 1492928,
+    "estimatedLines": 1
+  },
+  {
+    "name": "H64",
+    "signature": "function H64(A)",
+    "body": "{let{message:Q,event_id:B}=A;if(Q)return Q;let G=G9Q(A);if(G){if(G.type&&G.value)return`${G.type}: ${G.value}`;return G.type||G.value||B||\"<unknown>\"}return B||\"<unknown>\"}",
+    "keywords": [
+      "message"
+    ],
+    "category": "session",
+    "startIndex": 1498723,
+    "estimatedLines": 1
+  },
+  {
+    "name": "D84",
+    "signature": "function D84()",
+    "body": "{let A=IdA.chrome,Q=A&&A.app&&A.app.runtime,B=\"history\"in IdA&&!!IdA.history.pushState&&!!IdA.history.replaceState;return!Q&&B}",
+    "keywords": [
+      "history"
+    ],
+    "category": "session",
+    "startIndex": 1506121,
+    "estimatedLines": 1
+  },
+  {
+    "name": "C84",
+    "signature": "function C84(A)",
+    "body": "{KdA.addHandler(\"history\",A),KdA.maybeInstrument(\"history\",$84)}",
+    "keywords": [
+      "history"
+    ],
+    "category": "session",
+    "startIndex": 1506435,
+    "estimatedLines": 1
+  },
+  {
+    "name": "$84",
+    "signature": "function $84()",
+    "body": "{if(!z84.supportsHistory())return;let A=QCA.onpopstate;QCA.onpopstate=function(...B){let G=QCA.location.href,Z=WdA;WdA=G;let Y={from:Z,to:G};if(KdA.triggerHandlers(\"history\",Y),A)try{return A.apply(this,B)}catch(J){}};function Q(B){return function(...G){let Z=G.length>2?G[2]:void 0;if(Z){let Y=WdA,J=String(Z);WdA=J;let X={from:Y,to:J};KdA.triggerHandlers(\"history\",X)}return B.apply(this,G)}}C9Q.fill(QCA.history,\"pushState\",Q),C9Q.fill(QCA.history,\"replaceState\",Q)}",
+    "keywords": [
+      "history",
+      "pushState",
+      "replaceState"
+    ],
+    "category": "session",
+    "startIndex": 1506514,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Q",
+    "signature": "function Q(B)",
+    "body": "{return function(...G){let Z=G.length>2?G[2]:void 0;if(Z){let Y=WdA,J=String(Z);WdA=J;let X={from:Y,to:J};KdA.triggerHandlers(\"history\",X)}return B.apply(this,G)}}",
+    "keywords": [
+      "history"
+    ],
+    "category": "session",
+    "startIndex": 1506746,
+    "estimatedLines": 1
+  },
+  {
+    "name": "f4Q",
+    "signature": "function f4Q(A,Q)",
+    "body": "{let B={type:Q.name||Q.constructor.name,value:Q.message},G=RN1(A,Q);if(G.length)B.stacktrace={frames:G};return B}",
+    "keywords": [
+      "message"
+    ],
+    "category": "session",
+    "startIndex": 1530847,
+    "estimatedLines": 1
+  },
+  {
+    "name": "j74",
+    "signature": "function j74(A)",
+    "body": "{if(\"name\"in A&&typeof A.name===\"string\"){let Q=`'${A.name}' captured as exception`;if(\"message\"in A&&typeof A.message===\"string\")Q+=` with message '${A.message}'`;return Q}else if(\"message\"in A&&typeof A.message===\"string\")return A.message;else return`Object captured as exception with keys: ${_74.extractExceptionKeysForMessage(A)}`}",
+    "keywords": [
+      "name",
+      "string",
+      "message"
+    ],
+    "category": "session",
+    "startIndex": 1530977,
+    "estimatedLines": 1
+  },
+  {
+    "name": "T74",
+    "signature": "function T74(A,Q,B,G)",
+    "body": "{let Z=typeof A===\"function\"?A().getClient():A,Y=B,X=G&&G.data&&G.data.mechanism||{handled:!0,type:\"generic\"},I;if(!MN1.isError(B)){if(MN1.isPlainObject(B)){let K=Z&&Z.getOptions().normalizeDepth;I={[\"__serialized__\"]:R74.normalizeToSize(B,K)};let V=j74(B);Y=G&&G.syntheticException||Error(V),Y.message=V}else Y=G&&G.syntheticException||Error(B),Y.message=B;X.synthetic=!0}let W={exception:{values:[f4Q(Q,Y)]}};if(I)W.extra=I;return b4Q.addExceptionTypeValue(W,void 0,void 0),b4Q.addExceptionMechanism(W,X),{...W,event_id:G&&G.event_id}}",
+    "keywords": [
+      "function",
+      "generic",
+      "__serialized__",
+      "message"
+    ],
+    "category": "session",
+    "startIndex": 1531327,
+    "estimatedLines": 1
+  },
+  {
+    "name": "P74",
+    "signature": "function P74(A,Q,B=\"info\",G,Z)",
+    "body": "{let Y={event_id:G&&G.event_id,level:B};if(Z&&G&&G.syntheticException){let J=RN1(A,G.syntheticException);if(J.length)Y.exception={values:[{value:Q,stacktrace:{frames:J}}]}}if(MN1.isParameterizedString(Q)){let{__sentry_template_string__:J,__sentry_template_values__:X}=Q;return Y.logentry={message:J,params:X},Y}return Y.message=Q,Y}",
+    "keywords": [
+      "message"
+    ],
+    "category": "session",
+    "startIndex": 1531885,
+    "estimatedLines": 1
+  },
+  {
+    "name": "NX4",
+    "signature": "function NX4(A,Q)",
+    "body": "{let B=typeof Q===\"string\"?Q:void 0,G=typeof Q!==\"string\"?{captureContext:Q}:void 0;return tI.getCurrentHub().captureMessage(A,B,G)}",
+    "keywords": [
+      "string",
+      "message"
+    ],
+    "category": "session",
+    "startIndex": 1550820,
+    "estimatedLines": 1
+  },
+  {
+    "name": "pN1",
+    "signature": "function pN1()",
+    "body": "{let A=tI.getIsolationScope(),Q=HCA(),B=Q.getSession()||A.getSession();if(B)mN1.closeSession(B);q6Q(),A.setSession(),Q.setSession()}",
+    "keywords": [
+      "session"
+    ],
+    "category": "session",
+    "startIndex": 1553391,
+    "estimatedLines": 1
+  },
+  {
+    "name": "q6Q",
+    "signature": "function q6Q()",
+    "body": "{let A=tI.getIsolationScope(),Q=HCA(),B=Re(),G=Q.getSession()||A.getSession();if(G&&B&&B.captureSession)B.captureSession(G)}",
+    "keywords": [
+      "session"
+    ],
+    "category": "session",
+    "startIndex": 1553537,
+    "estimatedLines": 1
+  },
+  {
+    "name": "lK4",
+    "signature": "function lK4(A,Q,B,G)",
+    "body": "{let Z=j5A.getSdkMetadataForEnvelopeHeader(B),Y={sent_at:new Date().toISOString(),...Z&&{sdk:Z},...!!G&&Q&&{dsn:j5A.dsnToString(Q)}},J=\"aggregates\"in A?[{type:\"sessions\"},A]:[{type:\"session\"},A.toJSON()];return j5A.createEnvelope(Y,[J])}",
+    "keywords": [
+      "aggregates",
+      "sessions",
+      "session",
+      "env"
+    ],
+    "category": "session",
+    "startIndex": 1594857,
+    "estimatedLines": 1
+  },
+  {
+    "name": "iD4",
+    "signature": "function iD4(A)",
+    "body": "{let Q=[];if(A.message)Q.push(A.message);let B;try{B=A.exception.values[A.exception.values.length-1]}catch(G){}if(B){if(B.value){if(Q.push(B.value),B.type)Q.push(`${B.type}: ${B.value}`)}}if(Se.DEBUG_BUILD&&Q.length===0)UH.logger.error(`Could not extract message for event ${UH.getEventDescription(A)}`);return Q}",
+    "keywords": [
+      "message"
+    ],
+    "category": "session",
+    "startIndex": 1627810,
+    "estimatedLines": 1
+  },
+  {
+    "name": "BN4",
+    "signature": "function BN4(A)",
+    "body": "{A.resume()}",
+    "keywords": [
+      "resume"
+    ],
+    "category": "session",
+    "startIndex": 1703418,
+    "estimatedLines": 1
+  },
+  {
+    "name": "XM4",
+    "signature": "function XM4(A={})",
+    "body": "{if(nO4.setNodeAsyncContextStrategy(),A.defaultIntegrations===void 0)A.defaultIntegrations=CYQ();if(A.dsn===void 0&&process.env.SENTRY_DSN)A.dsn=process.env.SENTRY_DSN;let Q=process.env.SENTRY_TRACES_SAMPLE_RATE;if(A.tracesSampleRate===void 0&&Q){let G=parseFloat(Q);if(isFinite(G))A.tracesSampleRate=G}if(A.release===void 0){let G=$YQ();if(G!==void 0)A.release=G;else A.autoSessionTracking=!1}if(A.environment===void 0&&process.env.SENTRY_ENVIRONMENT)A.environment=process.env.SENTRY_ENVIRONMENT;if(A.autoSessionTracking===void 0&&A.dsn!==void 0)A.autoSessionTracking=!0;if(A.instrumenter===void 0)A.instrumenter=\"sentry\";let B={...A,stackParser:pe.stackParserFromStackParserOptions(A.stackParser||UYQ),integrations:fO.getIntegrationsToSetup(A),transport:A.transport||JM4.makeNodeTransport};if(fO.in",
+    "keywords": [
+      "sentry",
+      "string",
+      "url",
+      "session",
+      "env"
+    ],
+    "category": "session",
+    "startIndex": 1737711,
+    "estimatedLines": 1
+  },
+  {
+    "name": "IM4",
+    "signature": "function IM4(A)",
+    "body": "{if(A===void 0)return!1;let Q=A&&A.getOptions();if(Q&&Q.autoSessionTracking!==void 0)return Q.autoSessionTracking;return!1}",
+    "keywords": [
+      "session"
+    ],
+    "category": "session",
+    "startIndex": 1738844,
+    "estimatedLines": 1
+  },
+  {
+    "name": "WM4",
+    "signature": "function WM4()",
+    "body": "{fO.startSession(),process.on(\"beforeExit\",()=>{let A=fO.getIsolationScope().getSession();if(A&&![\"exited\",\"crashed\"].includes(A.status))fO.endSession()})}",
+    "keywords": [
+      "beforeExit",
+      "exited",
+      "crashed",
+      "session"
+    ],
+    "category": "session",
+    "startIndex": 1739607,
+    "estimatedLines": 1
+  },
+  {
+    "name": "TM4",
+    "signature": "function TM4(A)",
+    "body": "{let Q={message:\"ANR\"},B={};for(let G of A.getEventProcessors()){if(Q===null)break;Q=await G(Q,B)}return qM4([Q,\"optionalAccess\",(G)=>G.contexts])||{}}",
+    "keywords": [
+      "optionalAccess",
+      "message"
+    ],
+    "category": "session",
+    "startIndex": 1930505,
+    "estimatedLines": 1
+  }
+]

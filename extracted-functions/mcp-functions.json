@@ -1,0 +1,659 @@
+[
+  {
+    "name": "RC9",
+    "signature": "function RC9(A)",
+    "body": "{let Q=[],B=A.match(/^MCP server [\"']([^\"']+)[\"']/);if(B&&B[1])Q.push(\"mcp\"),Q.push(B[1].toLowerCase());else{let Y=A.match(/^([^:[]+):/);if(Y&&Y[1])Q.push(Y[1].trim().toLowerCase())}let G=A.match(/^\\[([^\\]]+)]/);if(G&&G[1])Q.push(G[1].trim().toLowerCase());if(A.toLowerCase().includes(\"statsig event:\"))Q.push(\"statsig\");let Z=A.match(/:\\s*([^:]+?)(?:\\s+(?:type|mode|status|event))?:/);if(Z&&Z[1]){let Y=Z[1].trim().toLowerCase();if(Y.length<30&&!Y.includes(\" \"))Q.push(Y)}return Array.from(new Set(Q))}",
+    "keywords": [
+      "statsig",
+      "mcp"
+    ],
+    "category": "mcp",
+    "startIndex": 7168,
+    "estimatedLines": 1
+  },
+  {
+    "name": "QQ",
+    "signature": "function QQ(A,Q)",
+    "body": "{k(`MCP server \"${A}\": ${Q}`);try{let B=CE1(Mx.mcpLogs(A),$E1+\".jsonl\"),G={debug:Q,timestamp:new Date().toISOString(),sessionId:h0(),cwd:jA().cwd()};UE1(B).write(G)}catch{}}",
+    "keywords": [
+      "mcp",
+      "session"
+    ],
+    "category": "mcp",
+    "startIndex": 48756,
+    "estimatedLines": 1
+  },
+  {
+    "name": "jr9",
+    "signature": "function jr9(A)",
+    "body": "{return{name:\"Test Anything Protocol\",case_insensitive:!0,contains:[A.HASH_COMMENT_MODE,{className:\"meta\",variants:[{begin:\"^TAP version (\\\\d+)$\"},{begin:\"^1\\\\.\\\\.(\\\\d+)$\"}]},{begin:/---$/,end:\"\\\\.\\\\.\\\\.$\",subLanguage:\"yaml\",relevance:0},{className:\"number\",begin:\" (\\\\d+) \"},{className:\"symbol\",variants:[{begin:\"^ok\"},{begin:\"^not ok\"}]}]}}",
+    "keywords": [
+      "meta",
+      "yaml",
+      "number",
+      "symbol",
+      "protocol"
+    ],
+    "category": "mcp",
+    "startIndex": 1078103,
+    "estimatedLines": 1
+  },
+  {
+    "name": "LQ4",
+    "signature": "function LQ4(A)",
+    "body": "{var Q=typeof A===\"string\"?wQ4(A):A||{},B=Q.protocol,G=Q.host,Z=Q.port;if(typeof G!==\"string\"||!G||typeof B!==\"string\")return\"\";if(B=B.split(\":\",1)[0],G=G.replace(/:\\d*$/,\"\"),Z=parseInt(Z)||qQ4[B]||0,!OQ4(G,Z))return\"\";var Y=a3A(\"npm_config_\"+B+\"_proxy\")||a3A(B+\"_proxy\")||a3A(\"npm_config_proxy\")||a3A(\"all_proxy\");if(Y&&Y.indexOf(\"://\")===-1)Y=B+\"://\"+Y;return Y}",
+    "keywords": [
+      "string",
+      "npm_config_",
+      "_proxy",
+      "npm_config_proxy",
+      "all_proxy",
+      "protocol",
+      "config"
+    ],
+    "category": "mcp",
+    "startIndex": 1386898,
+    "estimatedLines": 1
+  },
+  {
+    "name": "X",
+    "signature": "function X(W,K,V)",
+    "body": "{if(fQ4(W))W=Sw1(W);else if(Fe(W))W=Sw1(fw1(W));else V=K,K=DQQ(W),W={protocol:Z};if(Ee(K))V=K,K=null;if(K=Object.assign({maxRedirects:Q.maxRedirects,maxBodyLength:Q.maxBodyLength},W,K),K.nativeProtocols=B,!Fe(K.host)&&!Fe(K.hostname))K.hostname=\"::1\";return yw1.equal(K.protocol,Z,\"protocol mismatch\"),KQQ(\"options\",K),new VU(K,V)}",
+    "keywords": [
+      "options",
+      "protocol"
+    ],
+    "category": "mcp",
+    "startIndex": 1394050,
+    "estimatedLines": 1
+  },
+  {
+    "name": "fw1",
+    "signature": "function fw1(A)",
+    "body": "{var Q;if(vw1)Q=new SzA(A);else if(Q=DQQ(xzA.parse(A)),!Fe(Q.protocol))throw new Tw1({input:A});return Q}",
+    "keywords": [
+      "protocol"
+    ],
+    "category": "mcp",
+    "startIndex": 1394621,
+    "estimatedLines": 1
+  },
+  {
+    "name": "K44",
+    "signature": "function K44(A,Q=!1)",
+    "body": "{let{host:B,path:G,pass:Z,port:Y,projectId:J,protocol:X,publicKey:I}=A;return`${X}://${I}${Q&&Z?`:${Z}`:\"\"}@${B}${Y?`:${Y}`:\"\"}/${G?`${G}/`:G}${J}`}",
+    "keywords": [
+      "protocol"
+    ],
+    "category": "mcp",
+    "startIndex": 1490650,
+    "estimatedLines": 1
+  },
+  {
+    "name": "v2Q",
+    "signature": "function v2Q(A)",
+    "body": "{return{protocol:A.protocol,publicKey:A.publicKey||\"\",pass:A.pass||\"\",host:A.host,port:A.port||\"\",path:A.path||\"\",projectId:A.projectId}}",
+    "keywords": [
+      "protocol"
+    ],
+    "category": "mcp",
+    "startIndex": 1491159,
+    "estimatedLines": 1
+  },
+  {
+    "name": "V44",
+    "signature": "function V44(A)",
+    "body": "{if(!X44.DEBUG_BUILD)return!0;let{port:Q,projectId:B,protocol:G}=A;if([\"protocol\",\"publicKey\",\"host\",\"projectId\"].find((J)=>{if(!A[J])return tzA.logger.error(`Invalid Sentry Dsn: ${J} missing`),!0;return!1}))return!1;if(!B.match(/^\\d+$/))return tzA.logger.error(`Invalid Sentry Dsn: Invalid projectId ${B}`),!1;if(!W44(G))return tzA.logger.error(`Invalid Sentry Dsn: Invalid protocol ${G}`),!1;if(Q&&isNaN(parseInt(Q,10)))return tzA.logger.error(`Invalid Sentry Dsn: Invalid port ${Q}`),!1;return!0}",
+    "keywords": [
+      "protocol",
+      "publicKey",
+      "host",
+      "projectId"
+    ],
+    "category": "mcp",
+    "startIndex": 1491311,
+    "estimatedLines": 1
+  },
+  {
+    "name": "g34",
+    "signature": "function g34(A)",
+    "body": "{let{protocol:Q,host:B,path:G}=A,Z=B&&B.replace(/^.*@/,\"[filtered]:[filtered]@\").replace(/(:80)$/,\"\").replace(/(:443)$/,\"\")||\"\";return`${Q?`${Q}://`:\"\"}${Z}${G}`}",
+    "keywords": [
+      "protocol"
+    ],
+    "category": "mcp",
+    "startIndex": 1518508,
+    "estimatedLines": 1
+  },
+  {
+    "name": "U8Q",
+    "signature": "function U8Q(A)",
+    "body": "{let Q=A.protocol?`${A.protocol}:`:\"\",B=A.port?`:${A.port}`:\"\";return`${Q}//${A.host}${B}${A.path?`/${A.path}`:\"\"}/api/`}",
+    "keywords": [
+      "protocol"
+    ],
+    "category": "mcp",
+    "startIndex": 1596878,
+    "estimatedLines": 1
+  },
+  {
+    "name": "CL4",
+    "signature": "function CL4(A)",
+    "body": "{let{protocol:Q,hostname:B,port:G}=_ZQ(A),Z=A.path?A.path:\"/\";return`${Q}//${B}${G}${Z}`}",
+    "keywords": [
+      "protocol"
+    ],
+    "category": "mcp",
+    "startIndex": 1714618,
+    "estimatedLines": 1
+  },
+  {
+    "name": "RZQ",
+    "signature": "function RZQ(A)",
+    "body": "{let{protocol:Q,hostname:B,port:G}=_ZQ(A),Z=A.pathname||\"/\",Y=A.auth?$L4(A.auth):\"\";return`${Q}//${Y}${B}${G}${Z}`}",
+    "keywords": [
+      "protocol",
+      "auth"
+    ],
+    "category": "mcp",
+    "startIndex": 1714722,
+    "estimatedLines": 1
+  },
+  {
+    "name": "_ZQ",
+    "signature": "function _ZQ(A)",
+    "body": "{let Q=A.protocol||\"\",B=A.hostname||A.host||\"\",G=!A.port||A.port===80||A.port===443||/^(.*):(\\d+)$/.test(B)?\"\":`:${A.port}`;return{protocol:Q,hostname:B,port:G}}",
+    "keywords": [
+      "protocol"
+    ],
+    "category": "mcp",
+    "startIndex": 1716401,
+    "estimatedLines": 1
+  },
+  {
+    "name": "pm4",
+    "signature": "function pm4(A)",
+    "body": "{return{applyToStack:(Q)=>{Q.add(dm4(A),nDQ),Q.add(mm4(A),iDQ),A.protocol.setSerdeContext(A)}}}",
+    "keywords": [
+      "protocol"
+    ],
+    "category": "mcp",
+    "startIndex": 2178768,
+    "estimatedLines": 1
+  },
+  {
+    "name": "xa6",
+    "signature": "function xa6(A)",
+    "body": "{let{port:Q,query:B}=A,{protocol:G,path:Z,hostname:Y}=A;if(G&&G.slice(-1)!==\":\")G+=\":\";if(Q)Y+=`:${Q}`;if(Z&&Z.charAt(0)!==\"/\")Z=`/${Z}`;let J=B?Sa6.buildQueryString(B):\"\";if(J&&J[0]!==\"?\")J=`?${J}`;let X=\"\";if(A.username!=null||A.password!=null){let W=A.username??\"\",K=A.password??\"\";X=`${W}:${K}@`}let I=\"\";if(A.fragment)I=`#${A.fragment}`;return`${G}//${X}${Y}${Z}${J}${I}`}",
+    "keywords": [
+      "protocol"
+    ],
+    "category": "mcp",
+    "startIndex": 2799242,
+    "estimatedLines": 1
+  },
+  {
+    "name": "i58",
+    "signature": "function i58(A)",
+    "body": "{haA(A.protocol===\"data:\");let Q=VhQ(A,!0);Q=Q.slice(5);let B={position:0},G=TGA(\",\",Q,B),Z=G.length;if(G=t58(G,!0,!0),B.position>=Q.length)return\"failure\";B.position++;let Y=Q.slice(Z+1),J=HhQ(Y);if(/;(\\u0020){0,}base64$/i.test(G)){let I=FhQ(J);if(J=a58(I),J===\"failure\")return\"failure\";G=G.slice(0,-6),G=G.replace(/(\\u0020)+$/,\"\"),G=G.slice(0,-1)}if(G.startsWith(\";\"))G=\"text/plain\"+G;let X=$f1(G);if(X===\"failure\")X=$f1(\"text/plain;charset=US-ASCII\");return{mimeType:X,body:J}}",
+    "keywords": [
+      "failure",
+      "protocol"
+    ],
+    "category": "mcp",
+    "startIndex": 3062944,
+    "estimatedLines": 1
+  },
+  {
+    "name": "_78",
+    "signature": "function _78(A,Q,B)",
+    "body": "{if(!A?.startTime||A.startTime<Q)return{domainLookupStartTime:Q,domainLookupEndTime:Q,connectionStartTime:Q,connectionEndTime:Q,secureConnectionStartTime:Q,ALPNNegotiatedProtocol:A?.ALPNNegotiatedProtocol};return{domainLookupStartTime:PGA(A.domainLookupStartTime,B),domainLookupEndTime:PGA(A.domainLookupEndTime,B),connectionStartTime:PGA(A.connectionStartTime,B),connectionEndTime:PGA(A.connectionEndTime,B),secureConnectionStartTime:PGA(A.secureConnectionStartTime,B),ALPNNegotiatedProtocol:A.ALPNNegotiatedProtocol}}",
+    "keywords": [
+      "protocol"
+    ],
+    "category": "mcp",
+    "startIndex": 3078063,
+    "estimatedLines": 1
+  },
+  {
+    "name": "daA",
+    "signature": "function daA(A,Q)",
+    "body": "{if(A.origin===Q.origin&&A.origin===\"null\")return!0;if(A.protocol===Q.protocol&&A.hostname===Q.hostname&&A.port===Q.port)return!0;return!1}",
+    "keywords": [
+      "null",
+      "protocol"
+    ],
+    "category": "mcp",
+    "startIndex": 3081661,
+    "estimatedLines": 1
+  },
+  {
+    "name": "o78",
+    "signature": "function o78(A)",
+    "body": "{pAA(\"protocol\"in A);let Q=A.protocol;return Q===\"about:\"||Q===\"blob:\"||Q===\"data:\"}",
+    "keywords": [
+      "protocol"
+    ],
+    "category": "mcp",
+    "startIndex": 3084628,
+    "estimatedLines": 1
+  },
+  {
+    "name": "kgQ",
+    "signature": "function kgQ(A)",
+    "body": "{eh(!A[mGA]),eh(!A[GW]);let{host:Q,hostname:B,protocol:G,port:Z}=A[gy];if(B[0]===\"[\"){let Y=B.indexOf(\"]\");eh(Y!==-1);let J=B.substring(1,Y);eh(SgQ.isIP(J)),B=J}if(A[mGA]=!0,uGA.beforeConnect.hasSubscribers)uGA.beforeConnect.publish({connectParams:{host:Q,hostname:B,protocol:G,port:Z,version:A[GW]?.version,servername:A[dl],localAddress:A[_wA]},connector:A[RwA]});try{let Y=await new Promise((J,X)=>{A[RwA]({host:Q,hostname:B,protocol:G,port:Z,servername:A[dl],localAddress:A[_wA]},(I,W)=>{if(I)X(I);else J(W)})});if(A.destroyed){lAA.destroy(Y.on(\"error\",TgQ),new oZ8);return}eh(Y);try{A[GW]=Y.alpnProtocol===\"h2\"?await $Y8(A,Y):await CY8(A,Y)}catch(J){throw Y.destroy().on(\"error\",TgQ),J}if(A[mGA]=!1,Y[KY8]=0,Y[lf1]=A[lf1],Y[sZ8]=A,Y[QY8]=null,uGA.connected.hasSubscribers)uGA.connected.publish({c",
+    "keywords": [
+      "error",
+      "connect",
+      "ERR_TLS_CERT_ALTNAME_INVALID",
+      "connectionError",
+      "request",
+      "protocol"
+    ],
+    "category": "mcp",
+    "startIndex": 3133867,
+    "estimatedLines": 1
+  },
+  {
+    "name": "qs8",
+    "signature": "function qs8(A)",
+    "body": "{let Q=new Set,B=-1,G=-1,Z=0;for(Z;Z<A.length;Z++){let J=A.charCodeAt(Z);if(G===-1&&ws8[J]===1){if(B===-1)B=Z}else if(Z!==0&&(J===32||J===9)){if(G===-1&&B!==-1)G=Z}else if(J===44){if(B===-1)throw SyntaxError(`Unexpected character at index ${Z}`);if(G===-1)G=Z;let X=A.slice(B,G);if(Q.has(X))throw SyntaxError(`The \"${X}\" subprotocol is duplicated`);Q.add(X),B=G=-1}else throw SyntaxError(`Unexpected character at index ${Z}`)}if(B===-1||G!==-1)throw SyntaxError(\"Unexpected end of input\");let Y=A.slice(B,Z);if(Q.has(Y))throw SyntaxError(`The \"${Y}\" subprotocol is duplicated`);return Q.add(Y),Q}",
+    "keywords": [
+      "protocol"
+    ],
+    "category": "mcp",
+    "startIndex": 4009794,
+    "estimatedLines": 1
+  },
+  {
+    "name": "xzB",
+    "signature": "function xzB(A)",
+    "body": "{return A.type===\"tool_use\"||A.type===\"server_tool_use\"||A.type===\"mcp_tool_use\"}",
+    "keywords": [
+      "tool_use",
+      "server_tool_use",
+      "mcp_tool_use",
+      "mcp"
+    ],
+    "category": "mcp",
+    "startIndex": 4667857,
+    "estimatedLines": 1
+  },
+  {
+    "name": "MB1",
+    "signature": "function MB1(A)",
+    "body": "{return A.authOptions.authority.options.protocolMode===Bz.OIDC}",
+    "keywords": [
+      "protocol",
+      "auth"
+    ],
+    "category": "mcp",
+    "startIndex": 5496054,
+    "estimatedLines": 1
+  },
+  {
+    "name": "VA2",
+    "signature": "function VA2(A,Q,B=fetch)",
+    "body": "{return await p30(A,{\"MCP-Protocol-Version\":Q},B)}",
+    "keywords": [
+      "mcp",
+      "protocol"
+    ],
+    "category": "mcp",
+    "startIndex": 6320540,
+    "estimatedLines": 1
+  },
+  {
+    "name": "u81",
+    "signature": "function u81()",
+    "body": "{return parseInt(process.env.MAX_MCP_OUTPUT_TOKENS??\"25000\",10)}",
+    "keywords": [
+      "mcp",
+      "token",
+      "env"
+    ],
+    "category": "mcp",
+    "startIndex": 6358038,
+    "estimatedLines": 1
+  },
+  {
+    "name": "zs3",
+    "signature": "function zs3()",
+    "body": "{return`\n\n[OUTPUT TRUNCATED - exceeded ${u81()} token limit]\n\nThe tool output was truncated. If this MCP server provides pagination or filtering tools, use them to retrieve specific portions of the data. If pagination is not available, inform the user that you are working with truncated output and results may be incomplete.`}",
+    "keywords": [
+      "mcp",
+      "token"
+    ],
+    "category": "mcp",
+    "startIndex": 6358387,
+    "estimatedLines": 5
+  },
+  {
+    "name": "B31",
+    "signature": "function B31(A,Q,{verbose:B})",
+    "body": "{let G=A,Z=Z50(G),J=Z>es3?`${G1.warning} Large MCP response (~${L3(Z)} tokens), this can fill up context quickly`:null,X;if(Array.isArray(G)){let I=G.map((W,K)=>{if(W.type===\"image\")return aG.createElement(T,{key:K,justifyContent:\"space-between\",overflowX:\"hidden\",width:\"100%\"},aG.createElement(k0,{height:1},aG.createElement(C,null,\"[Image]\")));let V=W.type===\"text\"&&\"text\"in W&&W.text!==null&&W.text!==void 0?String(W.text):\"\";return aG.createElement(Yz,{key:K,content:V,verbose:B})});X=aG.createElement(T,{flexDirection:\"column\",width:\"100%\"},I)}else if(!G)X=aG.createElement(T,{justifyContent:\"space-between\",overflowX:\"hidden\",width:\"100%\"},aG.createElement(k0,{height:1},aG.createElement(C,{dimColor:!0},\"(No content)\")));else X=aG.createElement(Yz,{content:G,verbose:B});if(J)return aG.creat",
+    "keywords": [
+      "image",
+      "hidden",
+      "text",
+      "column",
+      "warning",
+      "mcp",
+      "token"
+    ],
+    "category": "mcp",
+    "startIndex": 6393717,
+    "estimatedLines": 1
+  },
+  {
+    "name": "u12",
+    "signature": "function u12(A)",
+    "body": "{return A.server?`List MCP resources from server \"${A.server}\"`:\"List all MCP resources\"}",
+    "keywords": [
+      "mcp"
+    ],
+    "category": "mcp",
+    "startIndex": 6396182,
+    "estimatedLines": 1
+  },
+  {
+    "name": "o12",
+    "signature": "function o12()",
+    "body": "{return\"readMcpResource\"}",
+    "keywords": [
+      "readMcpResource",
+      "mcp"
+    ],
+    "category": "mcp",
+    "startIndex": 6399051,
+    "estimatedLines": 1
+  },
+  {
+    "name": "uR",
+    "signature": "function uR(A)",
+    "body": "{return A.endsWith(\".mcpb\")||A.endsWith(\".dxt\")}",
+    "keywords": [
+      "mcp"
+    ],
+    "category": "mcp",
+    "startIndex": 6844219,
+    "estimatedLines": 1
+  },
+  {
+    "name": "b62",
+    "signature": "function b62(A)",
+    "body": "{return Wo(A,\".mcpb-cache\")}",
+    "keywords": [
+      "mcp"
+    ],
+    "category": "mcp",
+    "startIndex": 6844431,
+    "estimatedLines": 1
+  },
+  {
+    "name": "P62",
+    "signature": "function P62(A,Q)",
+    "body": "{try{let G=zQ().pluginConfigs?.[A]?.mcpServers?.[Q];if(!G)return null;return k(`Loaded user config for ${A}/${Q} from settings`),G}catch(B){let G=B instanceof Error?B:Error(String(B));return t(G),k(`Failed to load user config for ${A}/${Q}: ${B}`,{level:\"error\"}),null}}",
+    "keywords": [
+      "error",
+      "mcp",
+      "McpServer",
+      "config",
+      "setting"
+    ],
+    "category": "mcp",
+    "startIndex": 6844582,
+    "estimatedLines": 1
+  },
+  {
+    "name": "S62",
+    "signature": "function S62(A,Q,B)",
+    "body": "{try{let G=zQ();if(!G.pluginConfigs)G.pluginConfigs={};if(!G.pluginConfigs[A])G.pluginConfigs[A]={};if(!G.pluginConfigs[A].mcpServers)G.pluginConfigs[A].mcpServers={};G.pluginConfigs[A].mcpServers[Q]=B;let Z=nB(\"userSettings\",G);if(Z.error)throw Z.error;k(`Saved user config for ${A}/${Q} to user settings`)}catch(G){let Z=G instanceof Error?G:Error(String(G));throw t(Z),Error(`Failed to save user configuration for ${A}/${Q}: ${Z.message}`)}}",
+    "keywords": [
+      "userSettings",
+      "mcp",
+      "McpServer",
+      "message",
+      "config",
+      "setting"
+    ],
+    "category": "mcp",
+    "startIndex": 6844869,
+    "estimatedLines": 1
+  },
+  {
+    "name": "y62",
+    "signature": "function y62(A,Q)",
+    "body": "{let B=await AKA({manifest:A,extensionPath:Q,systemDirs:Io(),userConfig:{},pathSeparator:\"/\"});if(!B){let G=Error(`Failed to generate MCP server configuration from manifest \"${A.name}\"`);throw t(G),G}return B}",
+    "keywords": [
+      "mcp",
+      "config"
+    ],
+    "category": "mcp",
+    "startIndex": 6846344,
+    "estimatedLines": 1
+  },
+  {
+    "name": "K65",
+    "signature": "function K65(A,Q,B)",
+    "body": "{if(k(`Downloading MCPB from ${A}`),B)B(`Downloading ${A}...`);try{let G=await SQ.get(A,{timeout:120000,responseType:\"arraybuffer\",maxRedirects:5,onDownloadProgress:(Y)=>{if(Y.total&&B){let J=Math.round(Y.loaded/Y.total*100);B(`Downloading... ${J}%`)}}}),Z=new Uint8Array(G.data);if(v62(Q,Buffer.from(Z)),k(`Downloaded ${Z.length} bytes to ${Q}`),B)B(\"Download complete\");return Z}catch(G){let Z=G instanceof Error?G.message:String(G),Y=Error(`Failed to download MCPB file from ${A}: ${Z}`);throw t(Y),Y}}",
+    "keywords": [
+      "arraybuffer",
+      "mcp",
+      "message"
+    ],
+    "category": "mcp",
+    "startIndex": 6846990,
+    "estimatedLines": 1
+  },
+  {
+    "name": "H65",
+    "signature": "function H65(A,Q)",
+    "body": "{let B=jA(),G=b62(Q),Z=await h62(G,A);if(!Z)return!0;if(!B.existsSync(Z.extractedPath))return k(`MCPB extraction path missing: ${Z.extractedPath}`),!0;if(!k62(A)){let Y=Wo(Q,A);if(!B.existsSync(Y))return k(`MCPB source file missing: ${Y}`),!0;let J=B.statSync(Y),X=new Date(Z.cachedAt).getTime(),I=J.mtimeMs;if(I>X)return k(`MCPB file modified: ${new Date(I)} > ${new Date(X)}`),!0}return!1}",
+    "keywords": [
+      "mcp"
+    ],
+    "category": "mcp",
+    "startIndex": 6848112,
+    "estimatedLines": 1
+  },
+  {
+    "name": "F65",
+    "signature": "function F65(A,Q=[])",
+    "body": "{let B={},G=aG0(A.path,\".mcp.json\");if(G)B={...B,...G};if(A.manifest.mcpServers){let Z=A.manifest.mcpServers;if(typeof Z===\"string\")if(uR(Z)){let Y=await g62(A,Z,Q);if(Y)B={...B,...Y}}else{let Y=aG0(A.path,Z);if(Y)B={...B,...Y}}else if(Array.isArray(Z))for(let Y of Z)if(typeof Y===\"string\")if(uR(Y)){let J=await g62(A,Y,Q);if(J)B={...B,...J}}else{let J=aG0(A.path,Y);if(J)B={...B,...J}}else B={...B,...Y};else B={...B,...Z}}return Object.keys(B).length>0?B:void 0}",
+    "keywords": [
+      "string",
+      "mcp",
+      "McpServer"
+    ],
+    "category": "mcp",
+    "startIndex": 6852648,
+    "estimatedLines": 1
+  },
+  {
+    "name": "aG0",
+    "signature": "function aG0(A,Q)",
+    "body": "{let B=jA(),G=D65(A,Q);if(!B.existsSync(G))return null;try{let Z=B.readFileSync(G,{encoding:\"utf-8\"}),Y=JSON.parse(Z),J=Y.mcpServers||Y,X={};for(let[I,W]of Object.entries(J)){let K=ba.safeParse(W);if(K.success)X[I]=K.data;else k(`Invalid MCP server config for ${I} in ${G}: ${K.error.message}`,{level:\"error\"})}return X}catch(Z){return k(`Failed to load MCP servers from ${G}: ${Z}`,{level:\"error\"}),null}}",
+    "keywords": [
+      "error",
+      "readFile",
+      "mcp",
+      "McpServer",
+      "message",
+      "config"
+    ],
+    "category": "mcp",
+    "startIndex": 6853133,
+    "estimatedLines": 1
+  },
+  {
+    "name": "u62",
+    "signature": "function u62(A,Q=[])",
+    "body": "{if(!A.enabled)return;let B=A.mcpServers||await F65(A,Q);if(!B)return;let G={};for(let[Z,Y]of Object.entries(B))G[Z]=C65(Y,A.path,void 0,Q);return E65(G,A.name)}",
+    "keywords": [
+      "mcp",
+      "McpServer"
+    ],
+    "category": "mcp",
+    "startIndex": 6854637,
+    "estimatedLines": 1
+  },
+  {
+    "name": "H82",
+    "signature": "function H82()",
+    "body": "{return`claude-mcp-browser-bridge-${Y85()}`}",
+    "keywords": [
+      "mcp"
+    ],
+    "category": "mcp",
+    "startIndex": 6895312,
+    "estimatedLines": 1
+  },
+  {
+    "name": "d51",
+    "signature": "function d51()",
+    "body": "{return m51(BL(),\"managed-mcp.json\")}",
+    "keywords": [
+      "mcp"
+    ],
+    "category": "mcp",
+    "startIndex": 6895617,
+    "estimatedLines": 1
+  },
+  {
+    "name": "C82",
+    "signature": "function C82(A)",
+    "body": "{let Q=m51(t1(),\".mcp.json\");dR(Q,JSON.stringify(A,null,2),{encoding:\"utf8\"})}",
+    "keywords": [
+      "utf8",
+      "mcp"
+    ],
+    "category": "mcp",
+    "startIndex": 6895772,
+    "estimatedLines": 1
+  },
+  {
+    "name": "N82",
+    "signature": "function N82(A,Q)",
+    "body": "{let B=zQ();if(!B.deniedMcpServers)return!1;for(let G of B.deniedMcpServers)if(NWA(G)&&G.serverName===A)return!0;if(Q){let G=$82(Q);if(G){for(let Y of B.deniedMcpServers)if(w31(Y)&&U82(Y.serverCommand,G))return!0}let Z=w82(Q);if(Z){for(let Y of B.deniedMcpServers)if(q31(Y)&&q82(Z,Y.serverUrl))return!0}}return!1}",
+    "keywords": [
+      "command",
+      "url",
+      "mcp",
+      "McpServer"
+    ],
+    "category": "mcp",
+    "startIndex": 6896240,
+    "estimatedLines": 1
+  },
+  {
+    "name": "XZ0",
+    "signature": "function XZ0(A,Q)",
+    "body": "{if(N82(A,Q))return!1;let B=zQ();if(!B.allowedMcpServers)return!0;if(B.allowedMcpServers.length===0)return!1;let G=B.allowedMcpServers.some(w31),Z=B.allowedMcpServers.some(q31);if(Q){let Y=$82(Q),J=w82(Q);if(Y)if(G){for(let X of B.allowedMcpServers)if(w31(X)&&U82(X.serverCommand,Y))return!0;return!1}else{for(let X of B.allowedMcpServers)if(NWA(X)&&X.serverName===A)return!0;return!1}else if(J)if(Z){for(let X of B.allowedMcpServers)if(q31(X)&&q82(J,X.serverUrl))return!0;return!1}else{for(let X of B.allowedMcpServers)if(NWA(X)&&X.serverName===A)return!0;return!1}else{for(let X of B.allowedMcpServers)if(NWA(X)&&X.serverName===A)return!0;return!1}}for(let Y of B.allowedMcpServers)if(NWA(Y)&&Y.serverName===A)return!0;return!1}",
+    "keywords": [
+      "command",
+      "url",
+      "mcp",
+      "McpServer",
+      "allow"
+    ],
+    "category": "mcp",
+    "startIndex": 6896570,
+    "estimatedLines": 1
+  },
+  {
+    "name": "$2A",
+    "signature": "function $2A(A,Q,B)",
+    "body": "{if(A.match(/[^a-zA-Z0-9_-]/))throw Error(`Invalid name ${A}. Names can only contain letters, numbers, hyphens, and underscores.`);if(GKA(A))throw Error(`Cannot add MCP server \"${A}\": this name is reserved.`);let G=ba.safeParse(Q);if(!G.success){let Y=G.error.errors.map((J)=>`${J.path.join(\".\")}: ${J.message}`).join(\", \");throw Error(`Invalid configuration: ${Y}`)}let Z=G.data;if(N82(A,Z))throw Error(`Cannot add MCP server \"${A}\": server is explicitly blocked by enterprise policy`);if(!XZ0(A,Z))throw Error(`Cannot add MCP server \"${A}\": not allowed by enterprise policy`);switch(B){case\"project\":{let{servers:Y}=IZ0();if(Y[A])throw Error(`MCP server ${A} already exists in .mcp.json`);break}case\"user\":{if(b1().mcpServers?.[A])throw Error(`MCP server ${A} already exists in user config`);break}",
+    "keywords": [
+      "project",
+      "user",
+      "local",
+      "dynamic",
+      "enterprise",
+      "claudeai",
+      "mcp",
+      "McpServer",
+      "message",
+      "allow",
+      "config"
+    ],
+    "category": "mcp",
+    "startIndex": 6897796,
+    "estimatedLines": 1
+  },
+  {
+    "name": "WZ0",
+    "signature": "function WZ0(A,Q)",
+    "body": "{switch(Q){case\"project\":{let{servers:B}=IZ0();if(!B[A])throw Error(`No MCP server found with name: ${A} in .mcp.json`);let G={};for(let[Y,J]of Object.entries(B))if(Y!==A){let{scope:X,...I}=J;G[Y]=I}let Z={mcpServers:G};try{C82(Z)}catch(Y){throw Error(`Failed to remove from .mcp.json: ${Y}`)}break}case\"user\":{if(!b1().mcpServers?.[A])throw Error(`No user-scoped MCP server found with name: ${A}`);d0((G)=>{let{[A]:Z,...Y}=G.mcpServers??{};return{...G,mcpServers:Y}});break}case\"local\":{if(!dG().mcpServers?.[A])throw Error(`No project-local MCP server found with name: ${A}`);hZ((G)=>{let{[A]:Z,...Y}=G.mcpServers??{};return{...G,mcpServers:Y}});break}default:throw Error(`Cannot remove MCP server from scope: ${Q}`)}}",
+    "keywords": [
+      "project",
+      "user",
+      "local",
+      "mcp",
+      "McpServer"
+    ],
+    "category": "mcp",
+    "startIndex": 6899355,
+    "estimatedLines": 1
+  },
+  {
+    "name": "IZ0",
+    "signature": "function IZ0()",
+    "body": "{if(!UV(\"projectSettings\"))return{servers:{},errors:[]};let A=jA(),Q=m51(t1(),\".mcp.json\");if(!A.existsSync(Q))return{servers:{},errors:[]};let{config:B,errors:G}=ZKA({filePath:Q,expandVars:!0,scope:\"project\"});return{servers:B?.mcpServers?LPA(B.mcpServers,\"project\"):{},errors:G||[]}}",
+    "keywords": [
+      "projectSettings",
+      "project",
+      "mcp",
+      "McpServer",
+      "config",
+      "setting"
+    ],
+    "category": "mcp",
+    "startIndex": 6900092,
+    "estimatedLines": 1
+  },
+  {
+    "name": "$W",
+    "signature": "function $W(A)",
+    "body": "{let Q={project:\"projectSettings\",user:\"userSettings\",local:\"localSettings\"};if(A in Q&&!UV(Q[A]))return{servers:{},errors:[]};switch(A){case\"project\":{let B=jA(),G={},Z=[],Y=[],J=t1();while(J!==X85(J).root)Y.push(J),J=J85(J);for(let X of Y.reverse()){let I=m51(X,\".mcp.json\");if(!B.existsSync(I))continue;let{config:W,errors:K}=ZKA({filePath:I,expandVars:!0,scope:\"project\"});if(W?.mcpServers)Object.assign(G,LPA(W.mcpServers,A));if(K.length>0)Z.push(...K)}return{servers:G,errors:Z}}case\"user\":{let B=b1().mcpServers;if(!B)return{servers:{},errors:[]};let{config:G,errors:Z}=OPA({configObject:{mcpServers:B},expandVars:!0,scope:\"user\"});return{servers:LPA(G?.mcpServers,A),errors:Z}}case\"local\":{let B=dG().mcpServers;if(!B)return{servers:{},errors:[]};let{config:G,errors:Z}=OPA({configObject:{mcp",
+    "keywords": [
+      "projectSettings",
+      "userSettings",
+      "localSettings",
+      "project",
+      "user",
+      "local",
+      "enterprise",
+      "mcp",
+      "McpServer",
+      "config",
+      "setting"
+    ],
+    "category": "mcp",
+    "startIndex": 6900391,
+    "estimatedLines": 1
+  },
+  {
+    "name": "OPA",
+    "signature": "function OPA(A)",
+    "body": "{let{configObject:Q,expandVars:B,scope:G,filePath:Z}=A,Y=h02.safeParse(Q);if(!Y.success)return{config:null,errors:Y.error.issues.map((I)=>({...Z&&{file:Z},path:I.path.join(\".\"),message:\"Does not adhere to MCP server configuration schema\",mcpErrorMetadata:{scope:G,severity:\"fatal\"}}))};let J=[],X={};for(let[I,W]of Object.entries(Y.data.mcpServers)){let K=W;if(B){let{expanded:V,missingVars:H}=W85(W);if(H.length>0)J.push({...Z&&{file:Z},path:`mcpServers.${I}`,message:`Missing environment variables: ${H.join(\", \")}`,suggestion:`Set the following environment variables: ${H.join(\", \")}`,mcpErrorMetadata:{scope:G,serverName:I,severity:\"warning\"}});K=V}if(kQ()===\"windows\"&&(!K.type||K.type===\"stdio\")&&(K.command===\"npx\"||K.command.endsWith(\"\\\\npx\")||K.command.endsWith(\"/npx\")))J.push({...Z&&{file:",
+    "keywords": [
+      "fatal",
+      "warning",
+      "windows",
+      "stdio",
+      "exec",
+      "command",
+      "http",
+      "mcp",
+      "McpServer",
+      "message",
+      "config",
+      "env"
+    ],
+    "category": "mcp",
+    "startIndex": 6903118,
+    "estimatedLines": 1
+  }
+]

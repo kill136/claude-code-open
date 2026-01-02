@@ -1,0 +1,1172 @@
+{
+  "totalFunctions": 13971,
+  "byCategory": {
+    "unknown": 9140,
+    "mcp": 159,
+    "file": 249,
+    "ui": 454,
+    "config": 468,
+    "session": 718,
+    "auth": 398,
+    "web": 770,
+    "agent": 237,
+    "permission": 176,
+    "plan": 35,
+    "hook": 47,
+    "todo": 139,
+    "streaming": 175,
+    "bash": 478,
+    "search": 328
+  },
+  "topFunctions": [
+    {
+      "name": "un1",
+      "category": "search",
+      "lines": 330,
+      "keywords": [
+        "rust",
+        "content",
+        "files_with_matches",
+        "count",
+        "Grep"
+      ]
+    },
+    {
+      "name": "aY0",
+      "category": "todo",
+      "lines": 194,
+      "keywords": [
+        "edit",
+        "pattern",
+        "request",
+        "task",
+        "pending"
+      ]
+    },
+    {
+      "name": "zb",
+      "category": "bash",
+      "lines": 139,
+      "keywords": [
+        "hooks",
+        "improvements",
+        "exec",
+        "shell",
+        "command"
+      ]
+    },
+    {
+      "name": "zb",
+      "category": "bash",
+      "lines": 139,
+      "keywords": [
+        "hooks",
+        "improvements",
+        "exec",
+        "shell",
+        "command"
+      ]
+    },
+    {
+      "name": "jW9",
+      "category": "search",
+      "lines": 113,
+      "keywords": [
+        "query",
+        "max_results",
+        "weather",
+        "table",
+        "users"
+      ]
+    },
+    {
+      "name": "hq0",
+      "category": "search",
+      "lines": 101,
+      "keywords": [
+        "slack",
+        "pattern",
+        "search",
+        "mcp",
+        "message"
+      ]
+    },
+    {
+      "name": "T_",
+      "category": "search",
+      "lines": 91,
+      "keywords": [
+        "string",
+        "object",
+        "glob",
+        "pattern",
+        "__SINGLE_QUOTE__"
+      ]
+    },
+    {
+      "name": "xj2",
+      "category": "todo",
+      "lines": 88,
+      "keywords": [
+        "killed",
+        "completed",
+        "async",
+        "SessionStart",
+        "path"
+      ]
+    },
+    {
+      "name": "ZJ7",
+      "category": "search",
+      "lines": 88,
+      "keywords": [
+        "string",
+        "glob",
+        "comment",
+        "object",
+        "pattern"
+      ]
+    },
+    {
+      "name": "xj2",
+      "category": "todo",
+      "lines": 88,
+      "keywords": [
+        "killed",
+        "completed",
+        "async",
+        "SessionStart",
+        "path"
+      ]
+    },
+    {
+      "name": "jB7",
+      "category": "web",
+      "lines": 84,
+      "keywords": [
+        "update",
+        "what",
+        "command",
+        "url",
+        "request"
+      ]
+    },
+    {
+      "name": "sD9",
+      "category": "web",
+      "lines": 69,
+      "keywords": [
+        "tengu_update_check",
+        "latest",
+        "unknown",
+        "local",
+        "native"
+      ]
+    },
+    {
+      "name": "sD9",
+      "category": "web",
+      "lines": 69,
+      "keywords": [
+        "tengu_update_check",
+        "latest",
+        "unknown",
+        "local",
+        "native"
+      ]
+    },
+    {
+      "name": "AY2",
+      "category": "agent",
+      "lines": 67,
+      "keywords": [
+        "Hello",
+        "search",
+        "fetch",
+        "subagent",
+        "agent"
+      ]
+    },
+    {
+      "name": "AY2",
+      "category": "agent",
+      "lines": 67,
+      "keywords": [
+        "Hello",
+        "search",
+        "fetch",
+        "subagent",
+        "agent"
+      ]
+    },
+    {
+      "name": "Y97",
+      "category": "agent",
+      "lines": 66,
+      "keywords": [
+        "exec",
+        "edit",
+        "pattern",
+        "search",
+        "request"
+      ]
+    },
+    {
+      "name": "X97",
+      "category": "file",
+      "lines": 65,
+      "keywords": [
+        "directory",
+        "edited_text_file",
+        "file",
+        "image",
+        "text"
+      ]
+    },
+    {
+      "name": "QV7",
+      "category": "bash",
+      "lines": 65,
+      "keywords": [
+        "run_function_start",
+        "run_commander_initialized",
+        "preAction",
+        "preAction_start",
+        "preAction_after_init"
+      ]
+    },
+    {
+      "name": "QV7",
+      "category": "bash",
+      "lines": 65,
+      "keywords": [
+        "run_function_start",
+        "run_commander_initialized",
+        "preAction",
+        "preAction_start",
+        "preAction_after_init"
+      ]
+    },
+    {
+      "name": "sW9",
+      "category": "agent",
+      "lines": 56,
+      "keywords": [
+        "dark",
+        "prompt",
+        "user",
+        "string",
+        "text"
+      ]
+    },
+    {
+      "name": "sW9",
+      "category": "agent",
+      "lines": 56,
+      "keywords": [
+        "dark",
+        "prompt",
+        "user",
+        "string",
+        "text"
+      ]
+    },
+    {
+      "name": "JW7",
+      "category": "file",
+      "lines": 50,
+      "keywords": [
+        "file_path",
+        "edit",
+        "pattern",
+        "task",
+        "plan"
+      ]
+    },
+    {
+      "name": "f99",
+      "category": "bash",
+      "lines": 48,
+      "keywords": [
+        "message",
+        "exec",
+        "shell",
+        "command",
+        "edit"
+      ]
+    },
+    {
+      "name": "ZK9",
+      "category": "permission",
+      "lines": 47,
+      "keywords": [
+        "approve",
+        "block",
+        "allow",
+        "deny",
+        "PreToolUse"
+      ]
+    },
+    {
+      "name": "dr5",
+      "category": "search",
+      "lines": 42,
+      "keywords": [
+        "msys",
+        "cygwin",
+        "shell",
+        "grep"
+      ]
+    },
+    {
+      "name": "G89",
+      "category": "bash",
+      "lines": 38,
+      "keywords": [
+        "command",
+        "task",
+        "ink",
+        "message"
+      ]
+    },
+    {
+      "name": "N47",
+      "category": "agent",
+      "lines": 38,
+      "keywords": [
+        "projectSettings",
+        "Project",
+        "userSettings",
+        "User",
+        "localSettings"
+      ]
+    },
+    {
+      "name": "Ey5",
+      "category": "session",
+      "lines": 37,
+      "keywords": [
+        "command",
+        "file_path",
+        "edit",
+        "request",
+        "task"
+      ]
+    },
+    {
+      "name": "_B7",
+      "category": "permission",
+      "lines": 35,
+      "keywords": [
+        "command",
+        "description",
+        "dangerouslyDisableSandbox",
+        "sandbox",
+        "pattern"
+      ]
+    },
+    {
+      "name": "nmB",
+      "category": "session",
+      "lines": 31,
+      "keywords": [
+        "isNewTopic",
+        "title",
+        "terminal_update_title",
+        "text",
+        "object"
+      ]
+    },
+    {
+      "name": "NX7",
+      "category": "search",
+      "lines": 31,
+      "keywords": [
+        "windows",
+        "utf8",
+        "CRLF",
+        "utf16le",
+        "tengu_atomic_write_error"
+      ]
+    },
+    {
+      "name": "nmB",
+      "category": "session",
+      "lines": 31,
+      "keywords": [
+        "isNewTopic",
+        "title",
+        "terminal_update_title",
+        "text",
+        "object"
+      ]
+    },
+    {
+      "name": "kzB",
+      "category": "web",
+      "lines": 27,
+      "keywords": [
+        "search",
+        "http",
+        "url",
+        "ink",
+        "react"
+      ]
+    },
+    {
+      "name": "P35",
+      "category": "web",
+      "lines": 27,
+      "keywords": [
+        "object",
+        "function",
+        "inspect",
+        "request",
+        "pending"
+      ]
+    },
+    {
+      "name": "mX9",
+      "category": "bash",
+      "lines": 27,
+      "keywords": [
+        "column",
+        "command",
+        "useEffect",
+        "message",
+        "sse"
+      ]
+    },
+    {
+      "name": "B",
+      "category": "bash",
+      "lines": 27,
+      "keywords": [
+        "command",
+        "message",
+        "sse"
+      ]
+    },
+    {
+      "name": "B",
+      "category": "bash",
+      "lines": 27,
+      "keywords": [
+        "command",
+        "message",
+        "sse"
+      ]
+    },
+    {
+      "name": "Q89",
+      "category": "bash",
+      "lines": 23,
+      "keywords": [
+        "find",
+        "bash_extract_command_paths",
+        "text",
+        "filepaths",
+        "exec"
+      ]
+    },
+    {
+      "name": "Q89",
+      "category": "bash",
+      "lines": 23,
+      "keywords": [
+        "find",
+        "bash_extract_command_paths",
+        "text",
+        "filepaths",
+        "exec"
+      ]
+    },
+    {
+      "name": "lr5",
+      "category": "bash",
+      "lines": 22,
+      "keywords": [
+        "frozen",
+        "command",
+        "config"
+      ]
+    },
+    {
+      "name": "UB3",
+      "category": "file",
+      "lines": 20,
+      "keywords": [
+        "SHIFT",
+        "Enter",
+        "warning",
+        "wezterm",
+        "readFile"
+      ]
+    },
+    {
+      "name": "U4",
+      "category": "web",
+      "lines": 20,
+      "keywords": [
+        "number",
+        "symbol",
+        "string",
+        "boolean",
+        "__proto__"
+      ]
+    },
+    {
+      "name": "UB3",
+      "category": "file",
+      "lines": 20,
+      "keywords": [
+        "SHIFT",
+        "Enter",
+        "warning",
+        "wezterm",
+        "readFile"
+      ]
+    },
+    {
+      "name": "cr5",
+      "category": "bash",
+      "lines": 18,
+      "keywords": [
+        "windows",
+        "utf8",
+        "command",
+        "rg ",
+        "mcp"
+      ]
+    },
+    {
+      "name": "CE9",
+      "category": "web",
+      "lines": 18,
+      "keywords": [
+        "sourceURL",
+        "variable",
+        "url",
+        "setting"
+      ]
+    },
+    {
+      "name": "TW9",
+      "category": "config",
+      "lines": 17,
+      "keywords": [
+        "background",
+        "env",
+        "CLAUDE_"
+      ]
+    },
+    {
+      "name": "mY7",
+      "category": "web",
+      "lines": 17,
+      "keywords": [
+        "request",
+        "task",
+        "session",
+        "permission",
+        "config"
+      ]
+    },
+    {
+      "name": "TW9",
+      "category": "config",
+      "lines": 17,
+      "keywords": [
+        "background",
+        "env",
+        "CLAUDE_"
+      ]
+    },
+    {
+      "name": "ds",
+      "category": "config",
+      "lines": 15,
+      "keywords": [
+        "error",
+        "tengu_config_parse_error",
+        "readFile",
+        "message",
+        "sse"
+      ]
+    },
+    {
+      "name": "nD9",
+      "category": "bash",
+      "lines": 15,
+      "keywords": [
+        "other",
+        "user",
+        "string",
+        "stdio",
+        "control_response"
+      ]
+    },
+    {
+      "name": "nD9",
+      "category": "bash",
+      "lines": 15,
+      "keywords": [
+        "other",
+        "user",
+        "string",
+        "stdio",
+        "control_response"
+      ]
+    },
+    {
+      "name": "B47",
+      "category": "web",
+      "lines": 14,
+      "keywords": [
+        "unknown",
+        "http",
+        "url",
+        "component",
+        "env"
+      ]
+    },
+    {
+      "name": "nS",
+      "category": "ui",
+      "lines": 13,
+      "keywords": [
+        "yellow",
+        "function",
+        "symbol",
+        "props",
+        "undefined"
+      ]
+    },
+    {
+      "name": "uFB",
+      "category": "web",
+      "lines": 13,
+      "keywords": [
+        "connect",
+        "error",
+        "request",
+        "search",
+        "http"
+      ]
+    },
+    {
+      "name": "qB3",
+      "category": "search",
+      "lines": 12,
+      "keywords": [
+        "defaults",
+        "write",
+        "GlobalKeyMap",
+        "export",
+        "success"
+      ]
+    },
+    {
+      "name": "qB3",
+      "category": "search",
+      "lines": 12,
+      "keywords": [
+        "defaults",
+        "write",
+        "GlobalKeyMap",
+        "export",
+        "success"
+      ]
+    },
+    {
+      "name": "J0",
+      "category": "agent",
+      "lines": 11,
+      "keywords": [
+        "canvas",
+        "background"
+      ]
+    },
+    {
+      "name": "ky2",
+      "category": "config",
+      "lines": 11,
+      "keywords": [
+        "prompt",
+        "localSettings",
+        "project",
+        "userSettings",
+        "user"
+      ]
+    },
+    {
+      "name": "MI1",
+      "category": "ui",
+      "lines": 11,
+      "keywords": [
+        "setext",
+        "indented",
+        "inlined",
+        "full",
+        "ink"
+      ]
+    },
+    {
+      "name": "TI9",
+      "category": "session",
+      "lines": 11,
+      "keywords": [
+        "system",
+        "command",
+        "search",
+        "useEffect",
+        "session"
+      ]
+    },
+    {
+      "name": "IDA",
+      "category": "web",
+      "lines": 11,
+      "keywords": [
+        "tengu_auto_updater_lock_contention",
+        "in_progress",
+        "tengu_auto_updater_windows_npm_in_wsl",
+        "install_failed",
+        "no_permissions"
+      ]
+    },
+    {
+      "name": "IDA",
+      "category": "web",
+      "lines": 11,
+      "keywords": [
+        "tengu_auto_updater_lock_contention",
+        "in_progress",
+        "tengu_auto_updater_windows_npm_in_wsl",
+        "install_failed",
+        "no_permissions"
+      ]
+    },
+    {
+      "name": "m_",
+      "category": "todo",
+      "lines": 10,
+      "keywords": [
+        "function",
+        "fastRefreshScheduled",
+        "error",
+        "onErrorOrWarning",
+        "null"
+      ]
+    },
+    {
+      "name": "Uz3",
+      "category": "auth",
+      "lines": 10,
+      "keywords": [
+        "request",
+        "token",
+        "auth",
+        "credential"
+      ]
+    },
+    {
+      "name": "p81",
+      "category": "search",
+      "lines": 10,
+      "keywords": [
+        "search",
+        "token",
+        "chunk",
+        "allow"
+      ]
+    },
+    {
+      "name": "R65",
+      "category": "bash",
+      "lines": 10,
+      "keywords": [
+        "callback",
+        "SessionStart",
+        "data",
+        "error",
+        "close"
+      ]
+    },
+    {
+      "name": "rO2",
+      "category": "web",
+      "lines": 10,
+      "keywords": [
+        "telemetry_init_start",
+        "beforeExit",
+        "exit",
+        "timeout",
+        "error"
+      ]
+    },
+    {
+      "name": "hY7",
+      "category": "mcp",
+      "lines": 10,
+      "keywords": [
+        "connected",
+        "mcp"
+      ]
+    },
+    {
+      "name": "AK9",
+      "category": "agent",
+      "lines": 10,
+      "keywords": [
+        "dark",
+        "prompt",
+        "user",
+        "string",
+        "text"
+      ]
+    },
+    {
+      "name": "Uz3",
+      "category": "auth",
+      "lines": 10,
+      "keywords": [
+        "request",
+        "token",
+        "auth",
+        "credential"
+      ]
+    },
+    {
+      "name": "AK9",
+      "category": "agent",
+      "lines": 10,
+      "keywords": [
+        "dark",
+        "prompt",
+        "user",
+        "string",
+        "text"
+      ]
+    },
+    {
+      "name": "thQ",
+      "category": "web",
+      "lines": 9,
+      "keywords": [
+        "string",
+        "bytes",
+        "number",
+        "function",
+        "keepalive"
+      ]
+    },
+    {
+      "name": "HZ8",
+      "category": "web",
+      "lines": 9,
+      "keywords": [
+        "POST",
+        "PATCH",
+        "QUERY",
+        "PROPFIND",
+        "PROPPATCH"
+      ]
+    },
+    {
+      "name": "u51",
+      "category": "file",
+      "lines": 9,
+      "keywords": [
+        "error",
+        "readFile",
+        "message"
+      ]
+    },
+    {
+      "name": "_O2",
+      "category": "session",
+      "lines": 9,
+      "keywords": [
+        "system_prompt_hash",
+        "system_prompt_preview",
+        "system_prompt_length",
+        "system_prompt",
+        "true"
+      ]
+    },
+    {
+      "name": "v9A",
+      "category": "agent",
+      "lines": 9,
+      "keywords": [
+        "task"
+      ]
+    },
+    {
+      "name": "f17",
+      "category": "session",
+      "lines": 9,
+      "keywords": [
+        "win32",
+        "config",
+        "example_commands_frequently_modified",
+        "text",
+        "command"
+      ]
+    },
+    {
+      "name": "lt2",
+      "category": "session",
+      "lines": 9,
+      "keywords": [
+        "tengu_input_background",
+        "text",
+        "column",
+        "background",
+        "cancel"
+      ]
+    },
+    {
+      "name": "se2",
+      "category": "bash",
+      "lines": 9,
+      "keywords": [
+        "chrome",
+        "windows",
+        "exec",
+        "edit"
+      ]
+    },
+    {
+      "name": "Z89",
+      "category": "bash",
+      "lines": 9,
+      "keywords": [
+        "exec",
+        "command"
+      ]
+    },
+    {
+      "name": "IK9",
+      "category": "web",
+      "lines": 9,
+      "keywords": [
+        "tengu_version_config",
+        "http",
+        "url",
+        "config"
+      ]
+    },
+    {
+      "name": "RkB",
+      "category": "web",
+      "lines": 9,
+      "keywords": [
+        "CONNECT",
+        "timeout",
+        "connect",
+        "Unknown",
+        "data"
+      ]
+    },
+    {
+      "name": "f17",
+      "category": "session",
+      "lines": 9,
+      "keywords": [
+        "win32",
+        "config",
+        "example_commands_frequently_modified",
+        "text",
+        "command"
+      ]
+    },
+    {
+      "name": "lt2",
+      "category": "session",
+      "lines": 9,
+      "keywords": [
+        "tengu_input_background",
+        "text",
+        "column",
+        "background",
+        "cancel"
+      ]
+    },
+    {
+      "name": "se2",
+      "category": "bash",
+      "lines": 9,
+      "keywords": [
+        "chrome",
+        "windows",
+        "exec",
+        "edit"
+      ]
+    },
+    {
+      "name": "IK9",
+      "category": "web",
+      "lines": 9,
+      "keywords": [
+        "tengu_version_config",
+        "http",
+        "url",
+        "config"
+      ]
+    },
+    {
+      "name": "mD4",
+      "category": "permission",
+      "lines": 8,
+      "keywords": [
+        "url",
+        "allow",
+        "deny"
+      ]
+    },
+    {
+      "name": "YC",
+      "category": "ui",
+      "lines": 8,
+      "keywords": [
+        "hooks",
+        "ReactDebugToolsRenderError",
+        "error",
+        "user",
+        "ReactDebugToolsUnsupportedHookError"
+      ]
+    },
+    {
+      "name": "OB3",
+      "category": "config",
+      "lines": 8,
+      "keywords": [
+        "alacritty",
+        "win32",
+        "Shift",
+        "Return",
+        "warning"
+      ]
+    },
+    {
+      "name": "qv2",
+      "category": "agent",
+      "lines": 8,
+      "keywords": [
+        "tool_use",
+        "prompt",
+        "error",
+        "sub_agent_entered",
+        "tool_result"
+      ]
+    },
+    {
+      "name": "Vl2",
+      "category": "ui",
+      "lines": 8,
+      "keywords": [
+        "INSERT",
+        "change",
+        "delete",
+        "move",
+        "NORMAL"
+      ]
+    },
+    {
+      "name": "IW9",
+      "category": "web",
+      "lines": 8,
+      "keywords": [
+        "preserve",
+        "http",
+        "background"
+      ]
+    },
+    {
+      "name": "cV9",
+      "category": "auth",
+      "lines": 8,
+      "keywords": [
+        "auth"
+      ]
+    },
+    {
+      "name": "NK7",
+      "category": "session",
+      "lines": 8,
+      "keywords": [
+        "tengu_continue_print",
+        "tengu_teleport_print",
+        "string",
+        "tengu_resume_print",
+        "startup"
+      ]
+    },
+    {
+      "name": "OB3",
+      "category": "config",
+      "lines": 8,
+      "keywords": [
+        "alacritty",
+        "win32",
+        "Shift",
+        "Return",
+        "warning"
+      ]
+    },
+    {
+      "name": "cV9",
+      "category": "auth",
+      "lines": 8,
+      "keywords": [
+        "auth"
+      ]
+    },
+    {
+      "name": "NK7",
+      "category": "session",
+      "lines": 8,
+      "keywords": [
+        "tengu_continue_print",
+        "tengu_teleport_print",
+        "string",
+        "tengu_resume_print",
+        "startup"
+      ]
+    },
+    {
+      "name": "jA5",
+      "category": "web",
+      "lines": 7,
+      "keywords": [
+        "clone",
+        "ignore",
+        "timeout",
+        "command",
+        "http"
+      ]
+    },
+    {
+      "name": "JQ2",
+      "category": "web",
+      "lines": 7,
+      "keywords": [
+        "ECONNREFUSED",
+        "ENOTFOUND",
+        "ETIMEDOUT",
+        "writeFile",
+        "http"
+      ]
+    },
+    {
+      "name": "kA",
+      "category": "web",
+      "lines": 7,
+      "keywords": [
+        "request"
+      ]
+    }
+  ]
+}
