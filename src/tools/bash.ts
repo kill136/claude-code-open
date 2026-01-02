@@ -503,6 +503,10 @@ Important:
           type: 'boolean',
           description: 'Disable sandbox mode (dangerous)',
         },
+        echoOutput: {
+          type: 'boolean',
+          description: 'Echo output to terminal in real-time (only with run_in_background)',
+        },
       },
       required: ['command'],
     };
@@ -514,6 +518,7 @@ Important:
       timeout = DEFAULT_TIMEOUT,
       run_in_background = false,
       dangerouslyDisableSandbox = false,
+      echoOutput = false,
     } = input;
 
     const startTime = Date.now();
@@ -564,7 +569,7 @@ Important:
 
     // 后台执行
     if (run_in_background) {
-      return this.executeBackground(command, maxTimeout);
+      return this.executeBackground(command, maxTimeout, echoOutput);
     }
 
     // 使用沙箱执行（与官方实现对齐）
@@ -658,7 +663,7 @@ Important:
     }
   }
 
-  private executeBackground(command: string, maxRuntime: number): BashResult {
+  private executeBackground(command: string, maxRuntime: number, echoOutput: boolean = false): BashResult {
     // 检查后台任务数量限制
     if (backgroundTasks.size >= MAX_BACKGROUND_SHELLS) {
       // 尝试清理已完成的任务
@@ -724,6 +729,11 @@ Important:
       const dataStr = data.toString();
       taskState.outputSize += dataStr.length;
 
+      // 实时输出到终端（如果启用）
+      if (echoOutput) {
+        process.stdout.write(dataStr);
+      }
+
       // 写入文件
       taskState.outputStream?.write(dataStr);
 
@@ -739,6 +749,11 @@ Important:
       const dataStr = data.toString();
       const stderrStr = `STDERR: ${dataStr}`;
       taskState.outputSize += dataStr.length;
+
+      // 实时输出到终端（如果启用）
+      if (echoOutput) {
+        process.stderr.write(dataStr);
+      }
 
       // 写入文件
       taskState.outputStream?.write(stderrStr);
