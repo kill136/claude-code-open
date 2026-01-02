@@ -2,7 +2,7 @@
  * AskUserQuestion 工具增强功能测试
  */
 
-import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AskUserQuestionTool } from '../../src/tools/ask.js';
 
 describe('AskUserQuestion Enhanced Features', () => {
