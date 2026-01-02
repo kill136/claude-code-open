@@ -32,7 +32,25 @@ export type ClientMessage =
   | { type: 'ping' }
   | { type: 'get_history' }
   | { type: 'clear_history' }
-  | { type: 'set_model'; payload: { model: string } };
+  | { type: 'set_model'; payload: { model: string } }
+  | { type: 'slash_command'; payload: { command: string } }
+  | { type: 'permission_response'; payload: PermissionResponsePayload }
+  | { type: 'permission_config'; payload: PermissionConfigPayload }
+  | { type: 'user_answer'; payload: UserAnswerPayload }
+  | { type: 'session_list'; payload?: SessionListRequestPayload }
+  | { type: 'session_create'; payload: SessionCreatePayload }
+  | { type: 'session_switch'; payload: { sessionId: string } }
+  | { type: 'session_delete'; payload: { sessionId: string } }
+  | { type: 'session_rename'; payload: { sessionId: string; name: string } }
+  | { type: 'session_export'; payload: { sessionId: string; format?: 'json' | 'md' } }
+  | { type: 'session_resume'; payload: { sessionId: string } }
+  | { type: 'tool_filter_update'; payload: ToolFilterUpdatePayload }
+  | { type: 'tool_list_get' }
+  | { type: 'system_prompt_update'; payload: SystemPromptUpdatePayload }
+  | { type: 'system_prompt_get' }
+  | { type: 'task_list'; payload?: TaskListRequestPayload }
+  | { type: 'task_cancel'; payload: { taskId: string } }
+  | { type: 'task_output'; payload: { taskId: string } };
 
 /**
  * 服务端发送的消息类型
@@ -51,7 +69,23 @@ export type ServerMessage =
   | { type: 'thinking_start'; payload: { messageId: string } }
   | { type: 'thinking_delta'; payload: { messageId: string; text: string } }
   | { type: 'thinking_complete'; payload: { messageId: string } }
-  | { type: 'status'; payload: StatusPayload };
+  | { type: 'permission_request'; payload: PermissionRequestPayload }
+  | { type: 'status'; payload: StatusPayload }
+  | { type: 'user_question'; payload: UserQuestionPayload }
+  | { type: 'slash_command_result'; payload: SlashCommandResultPayload }
+  | { type: 'session_list_response'; payload: SessionListResponsePayload }
+  | { type: 'session_created'; payload: SessionCreatedPayload }
+  | { type: 'session_switched'; payload: { sessionId: string } }
+  | { type: 'session_deleted'; payload: { sessionId: string; success: boolean } }
+  | { type: 'session_renamed'; payload: { sessionId: string; name: string; success: boolean } }
+  | { type: 'session_exported'; payload: { sessionId: string; content: string; format: 'json' | 'md' } }
+  | { type: 'tool_list_response'; payload: ToolListPayload }
+  | { type: 'tool_filter_updated'; payload: { success: boolean; config: ToolFilterConfig } }
+  | { type: 'system_prompt_response'; payload: SystemPromptGetPayload }
+  | { type: 'task_list_response'; payload: TaskListPayload }
+  | { type: 'task_status'; payload: TaskStatusPayload }
+  | { type: 'task_cancelled'; payload: { taskId: string; success: boolean } }
+  | { type: 'task_output_response'; payload: TaskOutputPayload };
 
 // ============ 消息负载类型 ============
 
@@ -83,6 +117,75 @@ export interface MessageCompletePayload {
 export interface StatusPayload {
   status: 'idle' | 'thinking' | 'tool_executing' | 'streaming';
   message?: string;
+}
+
+/**
+ * 权限请求负载（服务端发送给前端）
+ */
+export interface PermissionRequestPayload {
+  requestId: string;
+  tool: string;
+  args: Record<string, unknown>;
+  description: string;
+  riskLevel: 'low' | 'medium' | 'high';
+  timestamp: number;
+}
+
+/**
+ * 权限响应负载（前端发送给服务端）
+ */
+export interface PermissionResponsePayload {
+  requestId: string;
+  approved: boolean;
+  remember?: boolean;
+  scope?: 'once' | 'session' | 'always';
+}
+
+/**
+ * 权限配置负载（前端发送给服务端）
+ */
+export interface PermissionConfigPayload {
+  mode?: 'default' | 'bypassPermissions' | 'acceptEdits' | 'plan' | 'dontAsk';
+  timeout?: number;
+  bypassTools?: string[];
+  alwaysAllow?: string[];
+  alwaysDeny?: string[];
+}
+
+/**
+ * 用户问题负载（服务端发送给前端）
+ */
+export interface UserQuestionPayload {
+  requestId: string;
+  question: string;
+  header: string;
+  options?: QuestionOption[];
+  multiSelect?: boolean;
+  timeout?: number;
+}
+
+export interface QuestionOption {
+  label: string;
+  description: string;
+}
+
+/**
+ * 用户回答负载（前端发送给服务端）
+ */
+export interface UserAnswerPayload {
+  requestId: string;
+  answer: string;
+}
+
+/**
+ * 斜杠命令结果负载（服务端发送给前端）
+ */
+export interface SlashCommandResultPayload {
+  command: string;
+  success: boolean;
+  message?: string;
+  data?: any;
+  action?: 'clear' | 'reload' | 'none';
 }
 
 // ============ 聊天消息类型 ============
@@ -294,6 +397,128 @@ export interface SessionInfo {
   cwd: string;
 }
 
+// ============ 会话相关 Payload ============
+
+/**
+ * 会话列表请求负载
+ */
+export interface SessionListRequestPayload {
+  limit?: number;
+  offset?: number;
+  search?: string;
+  sortBy?: 'createdAt' | 'updatedAt' | 'messageCount' | 'cost';
+  sortOrder?: 'asc' | 'desc';
+}
+
+/**
+ * 会话列表响应负载
+ */
+export interface SessionListResponsePayload {
+  sessions: SessionSummary[];
+  total: number;
+  offset: number;
+  limit: number;
+  hasMore: boolean;
+}
+
+/**
+ * 会话摘要信息
+ */
+export interface SessionSummary {
+  id: string;
+  name?: string;
+  createdAt: number;
+  updatedAt: number;
+  messageCount: number;
+  model: string;
+  cost?: number;
+  tokenUsage: {
+    input: number;
+    output: number;
+    total: number;
+  };
+  tags?: string[];
+  workingDirectory: string;
+}
+
+/**
+ * 创建会话请求负载
+ */
+export interface SessionCreatePayload {
+  name?: string;
+  model: string;
+  tags?: string[];
+}
+
+/**
+ * 会话创建响应负载
+ */
+export interface SessionCreatedPayload {
+  sessionId: string;
+  name?: string;
+  model: string;
+  createdAt: number;
+}
+
+// ============ 任务相关 Payload ============
+
+/**
+ * 任务列表请求负载
+ */
+export interface TaskListRequestPayload {
+  statusFilter?: 'running' | 'completed' | 'failed' | 'cancelled';
+  includeCompleted?: boolean;
+}
+
+/**
+ * 任务列表响应负载
+ */
+export interface TaskListPayload {
+  tasks: TaskSummary[];
+}
+
+/**
+ * 任务摘要信息
+ */
+export interface TaskSummary {
+  id: string;
+  description: string;
+  agentType: string;
+  status: 'running' | 'completed' | 'failed' | 'cancelled';
+  startTime: number;
+  endTime?: number;
+  progress?: {
+    current: number;
+    total: number;
+    message?: string;
+  };
+}
+
+/**
+ * 任务状态更新负载
+ */
+export interface TaskStatusPayload {
+  taskId: string;
+  status: 'running' | 'completed' | 'failed' | 'cancelled';
+  result?: string;
+  error?: string;
+  progress?: {
+    current: number;
+    total: number;
+    message?: string;
+  };
+}
+
+/**
+ * 任务输出响应负载
+ */
+export interface TaskOutputPayload {
+  taskId: string;
+  output?: string;
+  status: 'running' | 'completed' | 'failed' | 'cancelled';
+  error?: string;
+}
+
 // ============ 工具名称映射 ============
 
 export const TOOL_DISPLAY_NAMES: Record<string, string> = {
@@ -357,3 +582,73 @@ export const TOOL_ICONS: Record<string, string> = {
   LSP: '🔤',
   Chrome: '🌐',
 };
+
+// ============ 工具过滤配置 ============
+
+/**
+ * 工具过滤配置
+ */
+export interface ToolFilterConfig {
+  /** 允许的工具列表（白名单） */
+  allowedTools?: string[];
+  /** 禁止的工具列表（黑名单） */
+  disallowedTools?: string[];
+  /** 过滤模式 */
+  mode: 'whitelist' | 'blacklist' | 'all';
+}
+
+/**
+ * 工具过滤更新负载
+ */
+export interface ToolFilterUpdatePayload {
+  config: ToolFilterConfig;
+}
+
+/**
+ * 工具列表负载
+ */
+export interface ToolListPayload {
+  tools: ToolInfo[];
+  config: ToolFilterConfig;
+}
+
+/**
+ * 工具信息
+ */
+export interface ToolInfo {
+  name: string;
+  description: string;
+  enabled: boolean;
+  category: string;
+}
+
+// ============ 系统提示配置 ============
+
+/**
+ * 系统提示配置
+ */
+export interface SystemPromptConfig {
+  /** 自定义系统提示（完全替换默认提示） */
+  customPrompt?: string;
+  /** 追加到默认提示后的内容 */
+  appendPrompt?: string;
+  /** 是否使用默认提示 */
+  useDefault: boolean;
+}
+
+/**
+ * 更新系统提示请求负载
+ */
+export interface SystemPromptUpdatePayload {
+  config: SystemPromptConfig;
+}
+
+/**
+ * 获取系统提示响应负载
+ */
+export interface SystemPromptGetPayload {
+  /** 当前完整的系统提示 */
+  current: string;
+  /** 当前配置 */
+  config: SystemPromptConfig;
+}

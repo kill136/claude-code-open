@@ -215,6 +215,10 @@ function getInlineCSS(): string {
       cursor: pointer;
       margin-bottom: 4px;
       transition: background 0.2s;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
     }
 
     .session-item:hover {
@@ -223,6 +227,85 @@ function getInlineCSS(): string {
 
     .session-item.active {
       background: var(--bg-tertiary);
+      border-left: 3px solid var(--accent-primary);
+    }
+
+    .session-title {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-primary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      padding-right: 50px;
+    }
+
+    .session-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .session-date {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .session-count {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .session-actions {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      display: none;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .session-item:hover .session-actions {
+      display: flex;
+    }
+
+    .session-action-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 4px;
+      font-size: 12px;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .session-action-btn:hover {
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+    }
+
+    .session-item input {
+      width: 100%;
+      padding: 4px 8px;
+      background: var(--bg-primary);
+      border: 1px solid var(--accent-primary);
+      border-radius: 4px;
+      color: var(--text-primary);
+      font-size: 14px;
+      outline: none;
+    }
+
+    .session-list-empty {
+      padding: 20px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 13px;
     }
 
     .sidebar-footer {
@@ -506,6 +589,62 @@ function getInlineCSS(): string {
     .input-wrapper {
       flex: 1;
       position: relative;
+    }
+
+    /* 斜杠命令面板 */
+    .slash-command-palette {
+      position: absolute;
+      bottom: 100%;
+      left: 0;
+      right: 0;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      max-height: 300px;
+      overflow-y: auto;
+      z-index: 100;
+      margin-bottom: 8px;
+      box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .slash-command-item {
+      padding: 10px 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid var(--border-color);
+      transition: background 0.15s;
+    }
+
+    .slash-command-item:last-child {
+      border-bottom: none;
+    }
+
+    .slash-command-item.selected,
+    .slash-command-item:hover {
+      background: var(--bg-tertiary);
+    }
+
+    .command-name {
+      font-weight: 600;
+      color: var(--accent-primary);
+      min-width: 80px;
+      font-family: 'Fira Code', monospace;
+      font-size: 13px;
+    }
+
+    .command-desc {
+      flex: 1;
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
+
+    .command-usage {
+      color: var(--text-muted);
+      font-size: 12px;
+      font-family: 'Fira Code', monospace;
+      font-style: italic;
     }
 
     .chat-input {
@@ -800,14 +939,372 @@ function getInlineCSS(): string {
       line-height: 1.6;
     }
 
+    /* 权限对话框样式 */
+    .permission-dialog-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      backdrop-filter: blur(4px);
+    }
+
+    .permission-dialog {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 600px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    }
+
+    .permission-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .permission-header h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin: 0;
+    }
+
+    .risk-badge {
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .risk-badge.risk-high {
+      background: rgba(247, 118, 142, 0.2);
+      color: var(--accent-error);
+      border: 1px solid var(--accent-error);
+    }
+
+    .risk-badge.risk-medium {
+      background: rgba(224, 175, 104, 0.2);
+      color: var(--accent-warning);
+      border: 1px solid var(--accent-warning);
+    }
+
+    .risk-badge.risk-low {
+      background: rgba(158, 206, 106, 0.2);
+      color: var(--accent-success);
+      border: 1px solid var(--accent-success);
+    }
+
+    .permission-content {
+      margin-bottom: 20px;
+    }
+
+    .permission-content .tool-name {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+      font-weight: 500;
+    }
+
+    .permission-content .tool-name strong {
+      color: var(--accent-primary);
+    }
+
+    .permission-content .description {
+      font-size: 14px;
+      color: var(--text-primary);
+      line-height: 1.6;
+      margin-bottom: 16px;
+    }
+
+    .permission-content .args {
+      background: var(--code-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 12px;
+      font-family: 'Fira Code', monospace;
+      overflow-x: auto;
+      max-height: 300px;
+      margin: 0;
+    }
+
+    .permission-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .permission-actions label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      flex: 1;
+    }
+
+    .permission-actions input[type="checkbox"] {
+      cursor: pointer;
+      width: 16px;
+      height: 16px;
+    }
+
+    .permission-actions button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .permission-actions button:first-of-type {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+    }
+
+    .permission-actions button:first-of-type:hover {
+      background: var(--border-color);
+    }
+
+    .permission-actions button:last-of-type {
+      background: var(--accent-primary);
+      color: var(--bg-primary);
+    }
+
+    .permission-actions button:last-of-type:hover {
+      opacity: 0.9;
+    }
+
+    /* 用户问答对话框样式 */
+    .question-dialog-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      backdrop-filter: blur(4px);
+    }
+
+    .question-dialog {
+      background: var(--bg-secondary);
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 600px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--border-color);
+    }
+
+    .question-header {
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .question-header h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .question-content {
+      margin-bottom: 24px;
+    }
+
+    .question-text {
+      font-size: 15px;
+      line-height: 1.6;
+      color: var(--text-primary);
+      margin-bottom: 16px;
+      white-space: pre-wrap;
+    }
+
+    .question-options {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .question-option {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px 16px;
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .question-option:hover {
+      background: var(--bg-tertiary);
+      border-color: var(--accent-primary);
+    }
+
+    .question-option.selected {
+      background: rgba(122, 162, 247, 0.15);
+      border-color: var(--accent-primary);
+    }
+
+    .question-option input[type="radio"],
+    .question-option input[type="checkbox"] {
+      margin-top: 3px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .question-option-content {
+      flex: 1;
+    }
+
+    .question-option-label {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .question-option-description {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .question-dialog textarea {
+      width: 100%;
+      min-height: 100px;
+      padding: 12px;
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-size: 14px;
+      font-family: inherit;
+      resize: vertical;
+      transition: border-color 0.2s;
+      line-height: 1.5;
+    }
+
+    .question-dialog textarea:focus {
+      outline: none;
+      border-color: var(--accent-primary);
+    }
+
+    .question-dialog textarea::placeholder {
+      color: var(--text-muted);
+    }
+
+    .question-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+    }
+
+    .question-actions button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .question-actions button:first-child {
+      background: transparent;
+      color: var(--text-muted);
+      border: 1px solid var(--border-color);
+    }
+
+    .question-actions button:first-child:hover {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+    }
+
+    .question-actions button:last-child {
+      background: var(--accent-primary);
+      color: var(--bg-primary);
+    }
+
+    .question-actions button:last-child:hover:not(:disabled) {
+      opacity: 0.9;
+    }
+
+    .question-actions button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .question-timeout-hint {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 12px;
+      text-align: center;
+    }
+
     /* 响应式 */
     @media (max-width: 768px) {
       .sidebar {
         display: none;
       }
 
-      .message.user {
+      .question-dialog {
+        width: 95%;
+        max-width: none;
+        padding: 20px;
         margin-left: 20px;
+      }
+
+      .permission-dialog {
+        width: 95%;
+        padding: 20px;
+      }
+
+      .permission-actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .permission-actions label {
+        order: -1;
+        margin-bottom: 8px;
+      }
+
+      .permission-actions button {
+        width: 100%;
       }
     }
   `;
@@ -819,6 +1316,25 @@ function getInlineCSS(): string {
 function getInlineReactApp(port: number): string {
   return `
     const { useState, useEffect, useRef, useCallback } = React;
+
+    // 斜杠命令列表
+    const SLASH_COMMANDS = [
+      { name: '/help', description: '显示所有可用命令', aliases: ['/?'] },
+      { name: '/clear', description: '清空当前对话', aliases: ['/reset', '/new'] },
+      { name: '/model', description: '查看或切换模型', usage: '/model [opus|sonnet|haiku]' },
+      { name: '/cost', description: '显示当前会话费用' },
+      { name: '/compact', description: '压缩对话历史' },
+      { name: '/undo', description: '撤销上一次操作' },
+      { name: '/diff', description: '显示未提交的git更改' },
+      { name: '/config', description: '显示当前配置' },
+      { name: '/sessions', description: '列出历史会话' },
+      { name: '/resume', description: '恢复指定会话', usage: '/resume [id]' },
+      { name: '/status', description: '显示系统状态' },
+      { name: '/version', description: '显示版本信息' },
+      { name: '/prompt', description: '管理系统提示', usage: '/prompt [set|append|reset]' },
+      { name: '/tools', description: '管理工具配置', usage: '/tools [enable|disable|reset]' },
+      { name: '/tasks', description: '管理后台任务', usage: '/tasks [cancel|output] [id]' },
+    ];
 
     // 工具名称映射
     const TOOL_DISPLAY_NAMES = {
@@ -970,6 +1486,68 @@ function getInlineReactApp(port: number): string {
       return React.createElement('div', { ref, className: 'message-content' });
     }
 
+    // 斜杠命令面板组件
+    function SlashCommandPalette({ input, onSelect, onClose }) {
+      const [selectedIndex, setSelectedIndex] = useState(0);
+      const paletteRef = useRef(null);
+
+      // 过滤匹配的命令
+      const query = input.slice(1).toLowerCase();
+      const filteredCommands = SLASH_COMMANDS.filter(cmd =>
+        cmd.name.slice(1).startsWith(query) ||
+        cmd.aliases?.some(a => a.slice(1).startsWith(query))
+      );
+
+      // 重置选中索引当过滤结果变化时
+      useEffect(() => {
+        setSelectedIndex(0);
+      }, [query]);
+
+      // 键盘导航
+      useEffect(() => {
+        const handleKeyDown = (e) => {
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setSelectedIndex(i => Math.min(i + 1, filteredCommands.length - 1));
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setSelectedIndex(i => Math.max(i - 1, 0));
+          } else if (e.key === 'Enter' || e.key === 'Tab') {
+            if (filteredCommands.length > 0) {
+              e.preventDefault();
+              onSelect(filteredCommands[selectedIndex]);
+            }
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            onClose();
+          }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+      }, [filteredCommands, selectedIndex, onSelect, onClose]);
+
+      if (filteredCommands.length === 0) return null;
+
+      return React.createElement('div', {
+        ref: paletteRef,
+        className: 'slash-command-palette'
+      },
+        filteredCommands.map((cmd, i) =>
+          React.createElement('div', {
+            key: cmd.name,
+            className: \`slash-command-item \${i === selectedIndex ? 'selected' : ''}\`,
+            onClick: () => onSelect(cmd),
+            onMouseEnter: () => setSelectedIndex(i)
+          },
+            React.createElement('span', { className: 'command-name' }, cmd.name),
+            React.createElement('span', { className: 'command-desc' }, cmd.description),
+            cmd.usage && React.createElement('span', { className: 'command-usage' }, cmd.usage)
+          )
+        )
+      );
+    }
+
     // 工具调用组件
     function ToolCall({ toolUse }) {
       const [expanded, setExpanded] = useState(true);
@@ -1069,12 +1647,268 @@ function getInlineReactApp(port: number): string {
       );
     }
 
+    // 用户问答对话框组件
+    function UserQuestionDialog({ question, onAnswer }) {
+      const [answer, setAnswer] = useState('');
+      const [selectedOptions, setSelectedOptions] = useState([]);
+
+      if (!question) return null;
+
+      const handleOptionChange = (optionLabel, isMultiSelect) => {
+        if (isMultiSelect) {
+          setSelectedOptions(prev =>
+            prev.includes(optionLabel)
+              ? prev.filter(o => o !== optionLabel)
+              : [...prev, optionLabel]
+          );
+        } else {
+          setSelectedOptions([optionLabel]);
+        }
+      };
+
+      const handleSubmit = () => {
+        let finalAnswer = '';
+        if (question.options) {
+          finalAnswer = question.multiSelect
+            ? selectedOptions.join(',')
+            : selectedOptions[0] || '';
+        } else {
+          finalAnswer = answer;
+        }
+        onAnswer(finalAnswer);
+      };
+
+      const handleSkip = () => {
+        onAnswer('');
+      };
+
+      const isValid = question.options
+        ? selectedOptions.length > 0
+        : answer.trim().length > 0;
+
+      return React.createElement('div', { className: 'question-dialog-overlay' },
+        React.createElement('div', { className: 'question-dialog' },
+          React.createElement('div', { className: 'question-header' },
+            React.createElement('h3', null, '❓ ', question.header || '请回答问题')
+          ),
+          React.createElement('div', { className: 'question-content' },
+            React.createElement('p', { className: 'question-text' }, question.question),
+            question.options && React.createElement('div', { className: 'question-options' },
+              question.options.map((opt, i) =>
+                React.createElement('label', {
+                  key: i,
+                  className: \`question-option \${selectedOptions.includes(opt.label) ? 'selected' : ''}\`,
+                  onClick: () => handleOptionChange(opt.label, question.multiSelect)
+                },
+                  React.createElement('input', {
+                    type: question.multiSelect ? 'checkbox' : 'radio',
+                    name: 'question-answer',
+                    value: opt.label,
+                    checked: selectedOptions.includes(opt.label),
+                    onChange: () => {},
+                    onClick: (e) => e.stopPropagation()
+                  }),
+                  React.createElement('div', { className: 'question-option-content' },
+                    React.createElement('div', { className: 'question-option-label' }, opt.label),
+                    opt.description && React.createElement('div', {
+                      className: 'question-option-description'
+                    }, opt.description)
+                  )
+                )
+              )
+            ),
+            !question.options && React.createElement('textarea', {
+              value: answer,
+              onChange: (e) => setAnswer(e.target.value),
+              placeholder: '请输入您的回答...',
+              autoFocus: true
+            })
+          ),
+          React.createElement('div', { className: 'question-actions' },
+            React.createElement('button', { onClick: handleSkip }, '跳过'),
+            React.createElement('button', { onClick: handleSubmit, disabled: !isValid }, '提交')
+          ),
+          question.timeout && React.createElement('div', { className: 'question-timeout-hint' },
+            \`超时时间: \${Math.round(question.timeout / 1000)}秒\`
+          )
+        )
+      );
+    }
+
+    // 权限对话框组件
+    function PermissionDialog({ request, onRespond }) {
+      const [remember, setRemember] = useState(false);
+      const { requestId, tool, args, description, riskLevel } = request;
+
+      const handleApprove = () => {
+        onRespond(true, remember);
+      };
+
+      const handleDeny = () => {
+        onRespond(false, remember);
+      };
+
+      // 获取工具的显示名称和图标
+      const toolDisplayName = TOOL_DISPLAY_NAMES[tool] || tool;
+      const toolIcon = TOOL_ICONS[tool] || '🔧';
+
+      return React.createElement('div', { className: 'permission-dialog-overlay' },
+        React.createElement('div', {
+          className: 'permission-dialog',
+          onClick: (e) => e.stopPropagation() // 防止点击对话框时关闭
+        },
+          // 头部
+          React.createElement('div', { className: 'permission-header' },
+            React.createElement('span', { className: \`risk-badge risk-\${riskLevel}\` },
+              riskLevel === 'high' ? '高风险' :
+              riskLevel === 'medium' ? '中风险' : '低风险'
+            ),
+            React.createElement('h3', null, '权限请求')
+          ),
+          // 内容
+          React.createElement('div', { className: 'permission-content' },
+            React.createElement('p', { className: 'tool-name' },
+              \`工具: \${toolIcon} \`,
+              React.createElement('strong', null, toolDisplayName)
+            ),
+            React.createElement('p', { className: 'description' }, description),
+            React.createElement('pre', { className: 'args' },
+              JSON.stringify(args, null, 2)
+            )
+          ),
+          // 操作按钮
+          React.createElement('div', { className: 'permission-actions' },
+            React.createElement('label', null,
+              React.createElement('input', {
+                type: 'checkbox',
+                checked: remember,
+                onChange: (e) => setRemember(e.target.checked)
+              }),
+              '记住此决定'
+            ),
+            React.createElement('button', { onClick: handleDeny }, '拒绝'),
+            React.createElement('button', { onClick: handleApprove }, '允许')
+          )
+        )
+      );
+    }
+
     // 主应用组件
+
+    // 格式化日期
+    function formatDate(timestamp) {
+      const date = new Date(timestamp);
+      const now = new Date();
+      const diffMs = now - date;
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays = Math.floor(diffMs / 86400000);
+
+      if (diffMins < 1) return '刚刚';
+      if (diffMins < 60) return \`\${diffMins}分钟前\`;
+      if (diffHours < 24) return \`\${diffHours}小时前\`;
+      if (diffDays < 7) return \`\${diffDays}天前\`;
+
+      return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+    }
+
+    // 会话列表组件
+    function SessionList({ sessions, currentSessionId, onSessionSelect, onSessionDelete, onSessionRename }) {
+      const [editingId, setEditingId] = useState(null);
+      const [newTitle, setNewTitle] = useState('');
+
+      const handleRenameStart = (session) => {
+        setEditingId(session.id);
+        setNewTitle(session.name || '未命名会话');
+      };
+
+      const handleRenameSubmit = (sessionId) => {
+        if (newTitle.trim()) {
+          onSessionRename(sessionId, newTitle.trim());
+        }
+        setEditingId(null);
+      };
+
+      const handleRenameCancel = () => {
+        setEditingId(null);
+        setNewTitle('');
+      };
+
+      if (sessions.length === 0) {
+        return React.createElement('div', { className: 'session-list-empty' },
+          '暂无会话历史'
+        );
+      }
+
+      return React.createElement('div', { className: 'session-list' },
+        sessions.map(session =>
+          React.createElement('div', {
+            key: session.id,
+            className: \`session-item \${session.id === currentSessionId ? 'active' : ''}\`,
+            onClick: () => editingId !== session.id && onSessionSelect(session.id)
+          },
+            editingId === session.id
+              ? React.createElement('input', {
+                  value: newTitle,
+                  onChange: (e) => setNewTitle(e.target.value),
+                  onBlur: () => handleRenameSubmit(session.id),
+                  onKeyDown: (e) => {
+                    if (e.key === 'Enter') {
+                      handleRenameSubmit(session.id);
+                    } else if (e.key === 'Escape') {
+                      handleRenameCancel();
+                    }
+                    e.stopPropagation();
+                  },
+                  onClick: (e) => e.stopPropagation(),
+                  autoFocus: true
+                })
+              : React.createElement(React.Fragment, null,
+                  React.createElement('div', { className: 'session-title' },
+                    session.name || '未命名会话'
+                  ),
+                  React.createElement('div', { className: 'session-meta' },
+                    React.createElement('span', { className: 'session-date' },
+                      formatDate(session.updatedAt)
+                    ),
+                    React.createElement('span', { className: 'session-count' },
+                      \`\${session.messageCount} 消息\`
+                    )
+                  ),
+                  React.createElement('div', { className: 'session-actions' },
+                    React.createElement('button', {
+                      className: 'session-action-btn',
+                      onClick: (e) => {
+                        e.stopPropagation();
+                        handleRenameStart(session);
+                      },
+                      title: '重命名'
+                    }, '✏️'),
+                    React.createElement('button', {
+                      className: 'session-action-btn',
+                      onClick: (e) => {
+                        e.stopPropagation();
+                        if (confirm(\`确定要删除会话 "\${session.name || '未命名会话'}" 吗？\`)) {
+                          onSessionDelete(session.id);
+                        }
+                      },
+                      title: '删除'
+                    }, '🗑️')
+                  )
+                )
+          )
+        )
+      );
+    }
     function App() {
       const [messages, setMessages] = useState([]);
       const [input, setInput] = useState('');
       const [status, setStatus] = useState('idle');
       const [attachments, setAttachments] = useState([]);
+      const [showCommandPalette, setShowCommandPalette] = useState(false);
+      const [permissionRequest, setPermissionRequest] = useState(null);
+      const [userQuestion, setUserQuestion] = useState(null);
+      const [sessions, setSessions] = useState([]);
       const chatContainerRef = useRef(null);
       const inputRef = useRef(null);
       const fileInputRef = useRef(null);
@@ -1195,6 +2029,48 @@ function getInlineReactApp(port: number): string {
             case 'status':
               setStatus(msg.payload.status);
               break;
+
+            case 'permission_request':
+              // 收到权限请求,显示对话框
+              setPermissionRequest(msg.payload);
+              break;
+
+            case 'user_question':
+              // 收到用户问答请求
+              setUserQuestion(msg.payload);
+              break;
+
+            case 'session_list_response':
+              // 收到会话列表
+              if (msg.payload && msg.payload.sessions) {
+                setSessions(msg.payload.sessions);
+              }
+              break;
+
+            case 'session_switched':
+              // 会话切换成功，重新加载消息
+              setMessages([]);
+              send({ type: 'get_history' });
+              // 刷新会话列表
+              send({ type: 'session_list', payload: { limit: 50, sortBy: 'updatedAt', sortOrder: 'desc' } });
+              break;
+
+            case 'session_deleted':
+              // 会话删除成功
+              if (msg.payload.success) {
+                setSessions(prev => prev.filter(s => s.id !== msg.payload.sessionId));
+              }
+              break;
+
+            case 'session_renamed':
+              // 会话重命名成功
+              if (msg.payload.success) {
+                setSessions(prev => prev.map(s =>
+                  s.id === msg.payload.sessionId ? { ...s, name: msg.payload.name } : s
+                ));
+              }
+              break;
+              break;
           }
         });
 
@@ -1209,6 +2085,35 @@ function getInlineReactApp(port: number): string {
       }, [messages]);
 
       // 处理文件选择
+
+      // 请求会话列表
+      useEffect(() => {
+        if (connected) {
+          send({ type: 'session_list', payload: { limit: 50, sortBy: 'updatedAt', sortOrder: 'desc' } });
+        }
+      }, [connected, send]);
+
+      // 会话操作处理函数
+      const handleSessionSelect = useCallback((sessionId) => {
+        send({ type: 'session_switch', payload: { sessionId } });
+      }, [send]);
+
+      const handleSessionDelete = useCallback((sessionId) => {
+        send({ type: 'session_delete', payload: { sessionId } });
+      }, [send]);
+
+      const handleSessionRename = useCallback((sessionId, name) => {
+        send({ type: 'session_rename', payload: { sessionId, name } });
+      }, [send]);
+
+      const handleNewSession = useCallback(() => {
+        setMessages([]);
+        send({ type: 'clear_history' });
+        // 刷新会话列表
+        setTimeout(() => {
+          send({ type: 'session_list', payload: { limit: 50, sortBy: 'updatedAt', sortOrder: 'desc' } });
+        }, 500);
+      }, [send]);
       const handleFileSelect = (e) => {
         const files = Array.from(e.target.files || []);
 
@@ -1364,7 +2269,65 @@ function getInlineReactApp(port: number): string {
         setStatus('thinking');
       };
 
+      // 处理命令选择
+      const handleCommandSelect = (command) => {
+        setInput(command.name + ' ');
+        setShowCommandPalette(false);
+        inputRef.current?.focus();
+      };
+
+      // 处理用户问答
+      const handleAnswerQuestion = (answer) => {
+        if (userQuestion) {
+          send({
+            type: 'user_answer',
+            payload: {
+              requestId: userQuestion.requestId,
+              answer: answer
+            }
+          });
+          setUserQuestion(null);
+        }
+      };
+
+      // 处理输入变化
+      const handleInputChange = (e) => {
+        const value = e.target.value;
+        setInput(value);
+
+        // 检测是否显示命令面板
+        if (value.startsWith('/') && !value.includes(' ')) {
+          setShowCommandPalette(true);
+        } else {
+          setShowCommandPalette(false);
+        }
+      };
+
+      // 处理权限响应
+      const handlePermissionResponse = (approved, remember) => {
+        if (!permissionRequest) return;
+
+        // 发送权限响应到服务器
+        send({
+          type: 'permission_response',
+          payload: {
+            requestId: permissionRequest.requestId,
+            approved,
+            remember,
+            scope: remember ? 'session' : 'once'
+          }
+        });
+
+        // 关闭权限对话框
+        setPermissionRequest(null);
+      };
+
       const handleKeyDown = (e) => {
+        // 如果命令面板显示，让面板处理键盘事件
+        if (showCommandPalette && ['ArrowDown', 'ArrowUp', 'Enter', 'Tab', 'Escape'].includes(e.key)) {
+          return; // 由 SlashCommandPalette 处理
+        }
+
         if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();
           handleSend();
@@ -1372,19 +2335,28 @@ function getInlineReactApp(port: number): string {
       };
 
       return React.createElement(React.Fragment, null,
+        // 用户问答对话框
+        userQuestion && React.createElement(UserQuestionDialog, {
+          question: userQuestion,
+          onAnswer: handleAnswerQuestion
+        }),
+
         // 侧边栏
         React.createElement('div', { className: 'sidebar' },
           React.createElement('div', { className: 'sidebar-header' },
             React.createElement('h1', null, '🤖 Claude Code'),
             React.createElement('button', {
               className: 'new-chat-btn',
-              onClick: () => {
-                setMessages([]);
-                send({ type: 'clear_history' });
-              }
+              onClick: handleNewSession
             }, '+ 新对话')
           ),
-          React.createElement('div', { className: 'session-list' }),
+          React.createElement(SessionList, {
+            sessions: sessions,
+            currentSessionId: sessionId,
+            onSessionSelect: handleSessionSelect,
+            onSessionDelete: handleSessionDelete,
+            onSessionRename: handleSessionRename
+          }),
           React.createElement('div', { className: 'sidebar-footer' },
             React.createElement('div', { className: 'status-indicator' },
               React.createElement('span', {
@@ -1452,14 +2424,20 @@ function getInlineReactApp(port: number): string {
                 })
               ),
               React.createElement('div', { className: 'input-wrapper' },
+                // 斜杠命令面板
+                showCommandPalette && React.createElement(SlashCommandPalette, {
+                  input: input,
+                  onSelect: handleCommandSelect,
+                  onClose: () => setShowCommandPalette(false)
+                }),
                 React.createElement('textarea', {
                   ref: inputRef,
                   className: 'chat-input',
                   value: input,
-                  onChange: (e) => setInput(e.target.value),
+                  onChange: handleInputChange,
                   onKeyDown: handleKeyDown,
                   onPaste: handlePaste,
-                  placeholder: status === 'idle' ? '输入消息，可粘贴图片或点击 📎 上传文件...' : '处理中...',
+                  placeholder: status === 'idle' ? '输入消息，可粘贴图片或点击 📎 上传文件 (输入 / 查看命令)...' : '处理中...',
                   disabled: status !== 'idle',
                   rows: 1
                 })
@@ -1480,6 +2458,12 @@ function getInlineReactApp(port: number): string {
             )
           )
         )
+        ),
+        // 权限对话框
+        permissionRequest && React.createElement(PermissionDialog, {
+          request: permissionRequest,
+          onRespond: handlePermissionResponse
+        })
       );
     }
 
