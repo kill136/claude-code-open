@@ -99,6 +99,13 @@ export interface BashInput {
    * without sandboxing.
    */
   dangerouslyDisableSandbox?: boolean;
+
+  /**
+   * Set to true to echo output to terminal in real-time.
+   * Only applies when run_in_background is true.
+   * Output will be streamed to stdout/stderr as the command runs.
+   */
+  echoOutput?: boolean;
 }
 
 /**

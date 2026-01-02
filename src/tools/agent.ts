@@ -27,9 +27,64 @@ export interface AgentTypeDefinition {
   tools?: string[];
   forkContext?: boolean;  // 是否访问父对话上下文
   permissionMode?: 'default' | 'plan' | 'acceptEdits' | 'bypassPermissions';
-  model?: string;
+  model?: string;         // 代理类型的默认模型
   description?: string;
   getSystemPrompt?: () => string;  // 系统提示词生成函数
+}
+
+// 模型别名类型（与官方 SDK 一致）
+export type ModelAlias = 'sonnet' | 'opus' | 'haiku' | 'inherit';
+
+// 全局父模型上下文（用于 inherit 继承）
+let parentModelContext: string | undefined;
+
+/**
+ * 设置父模型上下文
+ * 在主循环中设置，供子代理继承
+ */
+export function setParentModelContext(model: string | undefined): void {
+  parentModelContext = model;
+}
+
+/**
+ * 获取父模型上下文
+ */
+export function getParentModelContext(): string | undefined {
+  return parentModelContext;
+}
+
+/**
+ * 解析模型参数，处理 inherit 继承
+ * @param modelParam 模型参数 ('sonnet', 'opus', 'haiku', 'inherit', 或 undefined)
+ * @param agentDefaultModel 代理类型的默认模型（可选）
+ * @returns 解析后的模型名称
+ */
+export function resolveAgentModel(
+  modelParam: string | undefined,
+  agentDefaultModel?: string
+): string | undefined {
+  // 如果指定了 inherit，使用父模型
+  if (modelParam === 'inherit') {
+    return parentModelContext || agentDefaultModel || 'sonnet';
+  }
+
+  // 如果明确指定了模型，使用指定的
+  if (modelParam && modelParam !== 'inherit') {
+    return modelParam;
+  }
+
+  // 如果代理类型有默认模型，使用代理默认模型
+  if (agentDefaultModel) {
+    return agentDefaultModel;
+  }
+
+  // 否则，继承父模型（如果有）
+  if (parentModelContext) {
+    return parentModelContext;
+  }
+
+  // 最终默认使用 sonnet
+  return undefined; // 让 ConversationLoop 使用它自己的默认值
 }
 
 // 内置代理类型
@@ -374,8 +429,8 @@ assistant: "I'm going to use the Task tool to launch the greeting-responder agen
         },
         model: {
           type: 'string',
-          enum: ['sonnet', 'opus', 'haiku'],
-          description: 'Optional model to use for this agent. If not specified, inherits from parent. Prefer haiku for quick, straightforward tasks to minimize cost and latency.',
+          enum: ['sonnet', 'opus', 'haiku', 'inherit'],
+          description: 'Optional model to use for this agent. Use "inherit" to explicitly inherit from parent. If not specified, inherits from parent. Prefer haiku for quick, straightforward tasks to minimize cost and latency.',
         },
         resume: {
           type: 'string',
@@ -618,9 +673,12 @@ assistant: "I'm going to use the Task tool to launch the greeting-responder agen
         content: agent.prompt,
       });
 
+      // 解析模型参数，支持 inherit 继承
+      const resolvedModel = resolveAgentModel(agent.model, agentDef.model);
+
       // 构建 LoopOptions
       const loopOptions: LoopOptions = {
-        model: agent.model,
+        model: resolvedModel,
         maxTurns: 30,  // 限制最大轮次以避免无限循环
         verbose: process.env.CLAUDE_VERBOSE === 'true',
         permissionMode: agentDef.permissionMode || 'default',

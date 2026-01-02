@@ -15,6 +15,7 @@ import type {
   ToolDefinition,
 } from '../types/index.js';
 import type { MCPSearchToolResult } from '../types/results.js';
+import { MAX_MCP_OUTPUT_TOKENS, truncateMcpOutput } from '../utils/index.js';
 
 // MCP 服务器状态管理
 interface McpServerState {
@@ -554,16 +555,23 @@ export async function callMcpTool(
 
     // 解析结果
     const content = (result as { content?: Array<{ type: string; text?: string; image?: string }> }).content;
+    let output: string;
+
     if (content && Array.isArray(content)) {
       const textContent = content
         .filter((c) => c.type === 'text')
         .map((c) => c.text || '')
         .join('\n');
 
-      return { success: true, output: textContent || JSON.stringify(result) };
+      output = textContent || JSON.stringify(result);
+    } else {
+      output = JSON.stringify(result, null, 2);
     }
 
-    return { success: true, output: JSON.stringify(result, null, 2) };
+    // 应用 MCP 输出 Token 限制
+    output = truncateMcpOutput(output, MAX_MCP_OUTPUT_TOKENS());
+
+    return { success: true, output };
   } catch (err) {
     return {
       success: false,

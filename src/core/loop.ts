@@ -18,6 +18,7 @@ import { modelConfig, type ThinkingConfig } from '../models/index.js';
 import { initAuth, getAuth, ensureOAuthApiKey } from '../auth/index.js';
 import { runPermissionRequestHooks } from '../hooks/index.js';
 import * as readline from 'readline';
+import { setParentModelContext } from '../tools/agent.js';
 
 // ============================================================================
 // 持久化输出常量
@@ -333,6 +334,9 @@ export class ConversationLoop {
   constructor(options: LoopOptions = {}) {
     // 解析模型别名
     const resolvedModel = modelConfig.resolveAlias(options.model || 'sonnet');
+
+    // 设置父模型上下文，供子代理继承
+    setParentModelContext(resolvedModel);
 
     // 初始化认证并获取凭据
     initAuth();
