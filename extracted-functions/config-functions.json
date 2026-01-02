@@ -1,0 +1,611 @@
+[
+  {
+    "name": "vQ",
+    "signature": "function vQ()",
+    "body": "{return process.env.CLAUDE_CONFIG_DIR??yC9(vC9(),\".claude\")}",
+    "keywords": [
+      "config",
+      "env",
+      "CLAUDE_"
+    ],
+    "category": "config",
+    "startIndex": 11458,
+    "estimatedLines": 1
+  },
+  {
+    "name": "h_0",
+    "signature": "function h_0(A)",
+    "body": "{let Q={};if(A)for(let B of A){let[G,...Z]=B.split(\"=\");if(!G||Z.length===0)throw Error(`Invalid environment variable format: ${B}, environment variables should be added as: -e KEY1=value1 -e KEY2=value2`);Q[G]=Z.join(\"=\")}return Q}",
+    "keywords": [
+      "env"
+    ],
+    "category": "config",
+    "startIndex": 11823,
+    "estimatedLines": 1
+  },
+  {
+    "name": "bt",
+    "signature": "function bt()",
+    "body": "{return process.env.AWS_REGION||process.env.AWS_DEFAULT_REGION||\"us-east-1\"}",
+    "keywords": [
+      "env"
+    ],
+    "category": "config",
+    "startIndex": 12070,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Jj",
+    "signature": "function Jj()",
+    "body": "{return process.env.CLOUD_ML_REGION||\"us-east5\"}",
+    "keywords": [
+      "env"
+    ],
+    "category": "config",
+    "startIndex": 12159,
+    "estimatedLines": 1
+  },
+  {
+    "name": "NF1",
+    "signature": "function NF1()",
+    "body": "{return F0(process.env.CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR)}",
+    "keywords": [
+      "env",
+      "CLAUDE_"
+    ],
+    "category": "config",
+    "startIndex": 12220,
+    "estimatedLines": 1
+  },
+  {
+    "name": "ofA",
+    "signature": "function ofA(A)",
+    "body": "{if(A?.startsWith(\"claude-haiku-4-5\"))return process.env.VERTEX_REGION_CLAUDE_HAIKU_4_5||Jj();if(A?.startsWith(\"claude-3-5-haiku\"))return process.env.VERTEX_REGION_CLAUDE_3_5_HAIKU||Jj();if(A?.startsWith(\"claude-3-5-sonnet\"))return process.env.VERTEX_REGION_CLAUDE_3_5_SONNET||Jj();if(A?.startsWith(\"claude-3-7-sonnet\"))return process.env.VERTEX_REGION_CLAUDE_3_7_SONNET||Jj();if(A?.startsWith(\"claude-opus-4-1\"))return process.env.VERTEX_REGION_CLAUDE_4_1_OPUS||Jj();if(A?.startsWith(\"claude-opus-4\"))return process.env.VERTEX_REGION_CLAUDE_4_0_OPUS||Jj();if(A?.startsWith(\"claude-sonnet-4-5\"))return process.env.VERTEX_REGION_CLAUDE_4_5_SONNET||Jj();if(A?.startsWith(\"claude-sonnet-4\"))return process.env.VERTEX_REGION_CLAUDE_4_0_SONNET||Jj();return Jj()}",
+    "keywords": [
+      "env",
+      "CLAUDE_"
+    ],
+    "category": "config",
+    "startIndex": 12299,
+    "estimatedLines": 1
+  },
+  {
+    "name": "gq",
+    "signature": "function gq(A)",
+    "body": "{if(r0.sessionId=A,process.env.CLAUDE_CODE_SESSION_ID!==void 0)process.env.CLAUDE_CODE_SESSION_ID=A}",
+    "keywords": [
+      "session",
+      "env",
+      "CLAUDE_"
+    ],
+    "category": "config",
+    "startIndex": 30134,
+    "estimatedLines": 1
+  },
+  {
+    "name": "tF1",
+    "signature": "function tF1()",
+    "body": "{return r0.flagSettingsPath}",
+    "keywords": [
+      "setting"
+    ],
+    "category": "config",
+    "startIndex": 34599,
+    "estimatedLines": 1
+  },
+  {
+    "name": "dT0",
+    "signature": "function dT0(A)",
+    "body": "{r0.flagSettingsPath=A}",
+    "keywords": [
+      "setting"
+    ],
+    "category": "config",
+    "startIndex": 34641,
+    "estimatedLines": 1
+  },
+  {
+    "name": "iT0",
+    "signature": "function iT0()",
+    "body": "{return r0.envVarValidators}",
+    "keywords": [
+      "env"
+    ],
+    "category": "config",
+    "startIndex": 34917,
+    "estimatedLines": 1
+  },
+  {
+    "name": "dt",
+    "signature": "function dt()",
+    "body": "{return process.env.CLAUDE_CODE_DEBUG_LOGS_DIR??DP0(vQ(),\"debug\",`${h0()}.txt`)}",
+    "keywords": [
+      "debug",
+      "env",
+      "CLAUDE_"
+    ],
+    "category": "config",
+    "startIndex": 38065,
+    "estimatedLines": 1
+  },
+  {
+    "name": "gw9",
+    "signature": "function gw9(A,Q,B)",
+    "body": "{if(Q==\"__proto__\"&&x8A)x8A(A,Q,{configurable:!0,enumerable:!0,value:B,writable:!0});else A[Q]=B}",
+    "keywords": [
+      "__proto__",
+      "config"
+    ],
+    "category": "config",
+    "startIndex": 41467,
+    "estimatedLines": 1
+  },
+  {
+    "name": "t",
+    "signature": "function t(A)",
+    "body": "{try{if(F0(process.env.CLAUDE_CODE_USE_BEDROCK)||F0(process.env.CLAUDE_CODE_USE_VERTEX)||F0(process.env.CLAUDE_CODE_USE_FOUNDRY)||process.env.DISABLE_ERROR_REPORTING||process.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC)return;let Q=A.stack||A.message,B={error:Q,timestamp:new Date().toISOString()};k(`${A.name}: ${Q}`,{level:\"error\"}),oT0(B),yq9(Sq9(),{error:Q})}catch{}}",
+    "keywords": [
+      "error",
+      "message",
+      "sse",
+      "env",
+      "CLAUDE_"
+    ],
+    "category": "config",
+    "startIndex": 47673,
+    "estimatedLines": 1
+  },
+  {
+    "name": "nq9",
+    "signature": "function nq9(A)",
+    "body": "{iq9.timeoutProvider.setTimeout(function(){var Q=lq9.config.onUnhandledError;if(Q)Q(A);else throw A})}",
+    "keywords": [
+      "config"
+    ],
+    "category": "config",
+    "startIndex": 55751,
+    "estimatedLines": 1
+  },
+  {
+    "name": "AN9",
+    "signature": "function AN9(A)",
+    "body": "{if(fS0.config.useDeprecatedSynchronousErrorHandling){var Q=!lt;if(Q)lt={errorThrown:!1,error:null};if(A(),Q){var B=lt,G=B.errorThrown,Z=B.error;if(lt=null,G)throw Z}}else A()}",
+    "keywords": [
+      "config"
+    ],
+    "category": "config",
+    "startIndex": 56597,
+    "estimatedLines": 1
+  },
+  {
+    "name": "QN9",
+    "signature": "function QN9(A)",
+    "body": "{if(fS0.config.useDeprecatedSynchronousErrorHandling&&lt)lt.errorThrown=!0,lt.error=A}",
+    "keywords": [
+      "config"
+    ],
+    "category": "config",
+    "startIndex": 56809,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Q",
+    "signature": "function Q(B,G,Z)",
+    "body": "{var Y=A.call(this)||this,J;if(GN9.isFunction(B)||!B)J={next:B!==null&&B!==void 0?B:void 0,error:G!==null&&G!==void 0?G:void 0,complete:Z!==null&&Z!==void 0?Z:void 0};else{var X;if(Y&&xE1.config.useDeprecatedNextContext)X=Object.create(B),X.unsubscribe=function(){return Y.unsubscribe()},J={next:B.next&&PE1(B.next,X),error:B.error&&PE1(B.error,X),complete:B.complete&&PE1(B.complete,X)};else J=B}return Y.destination=new IN9(J),Y}",
+    "keywords": [
+      "config"
+    ],
+    "category": "config",
+    "startIndex": 59107,
+    "estimatedLines": 1
+  },
+  {
+    "name": "VgA",
+    "signature": "function VgA(A)",
+    "body": "{if(xE1.config.useDeprecatedSynchronousErrorHandling)JN9.captureError(A);else ZN9.reportUnhandledError(A)}",
+    "keywords": [
+      "config"
+    ],
+    "category": "config",
+    "startIndex": 59592,
+    "estimatedLines": 1
+  },
+  {
+    "name": "SE1",
+    "signature": "function SE1(A,Q)",
+    "body": "{var B=xE1.config.onStoppedNotification;B&&YN9.timeoutProvider.setTimeout(function(){return B(A,Q)})}",
+    "keywords": [
+      "config"
+    ],
+    "category": "config",
+    "startIndex": 59737,
+    "estimatedLines": 1
+  },
+  {
+    "name": "tS0",
+    "signature": "function tS0(A)",
+    "body": "{var Q;return(Q=A!==null&&A!==void 0?A:CN9.config.Promise)!==null&&Q!==void 0?Q:Promise}",
+    "keywords": [
+      "config"
+    ],
+    "category": "config",
+    "startIndex": 61979,
+    "estimatedLines": 1
+  },
+  {
+    "name": "B",
+    "signature": "function B(K)",
+    "body": "{let V,H=null,D,F;function E(...z){if(!E.enabled)return;let $=E,L=Number(new Date),N=L-(V||L);if($.diff=N,$.prev=V,$.curr=L,V=L,z[0]=B.coerce(z[0]),typeof z[0]!==\"string\")z.unshift(\"%O\");let M=0;z[0]=z[0].replace(/%([a-zA-Z%])/g,(j,P)=>{if(j===\"%%\")return\"%\";M++;let b=B.formatters[P];if(typeof b===\"function\"){let S=z[M];j=b.call($,S),z.splice(M,1),M--}return j}),B.formatArgs.call($,z),($.log||B.log).apply($,z)}if(E.namespace=K,E.useColors=B.useColors(),E.color=B.selectColor(K),E.extend=G,E.destroy=B.destroy,Object.defineProperty(E,\"enabled\",{enumerable:!0,configurable:!1,get:()=>{if(H!==null)return H;if(D!==B.namespaces)D=B.namespaces,F=B.enabled(K);return F},set:(z)=>{H=z}}),typeof B.init===\"function\")B.init(E);return E}",
+    "keywords": [
+      "string",
+      "function",
+      "enabled",
+      "config"
+    ],
+    "category": "config",
+    "startIndex": 216900,
+    "estimatedLines": 1
+  },
+  {
+    "name": "km9",
+    "signature": "function km9()",
+    "body": "{let A;try{A=ou0.storage.getItem(\"debug\")}catch(Q){}if(!A&&typeof process<\"u\"&&\"env\"in process)A=process.env.DEBUG;return A}",
+    "keywords": [
+      "debug",
+      "env"
+    ],
+    "category": "config",
+    "startIndex": 220952,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Ad9",
+    "signature": "function Ad9(A)",
+    "body": "{if(A)process.env.DEBUG=A;else delete process.env.DEBUG}",
+    "keywords": [
+      "env"
+    ],
+    "category": "config",
+    "startIndex": 224827,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Qd9",
+    "signature": "function Qd9()",
+    "body": "{return process.env.DEBUG}",
+    "keywords": [
+      "env"
+    ],
+    "category": "config",
+    "startIndex": 224898,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Cd9",
+    "signature": "function Cd9(A,Q)",
+    "body": "{var B=Q.pathExt!==void 0?Q.pathExt:process.env.PATHEXT;if(!B)return!0;if(B=B.split(\";\"),B.indexOf(\"\")!==-1)return!0;for(var G=0;G<B.length;G++){var Z=B[G].toLowerCase();if(Z&&A.substr(-Z.length).toLowerCase()===Z)return!0}return!1}",
+    "keywords": [
+      "env"
+    ],
+    "category": "config",
+    "startIndex": 231262,
+    "estimatedLines": 1
+  },
+  {
+    "name": "rgA",
+    "signature": "function rgA(A={})",
+    "body": "{let{env:Q=process.env,platform:B=process.platform}=A;if(B!==\"win32\")return\"PATH\";return Object.keys(Q).reverse().find((G)=>G.toUpperCase()===\"PATH\")||\"Path\"}",
+    "keywords": [
+      "win32",
+      "PATH",
+      "Path",
+      "env"
+    ],
+    "category": "config",
+    "startIndex": 237962,
+    "estimatedLines": 1
+  },
+  {
+    "name": "WQ",
+    "signature": "function WQ(A,Q,B={timeout:10*m$1*u$1,preserveOutputOnError:!0,useCwd:!0})",
+    "body": "{return g6(A,Q,{abortSignal:B.abortSignal,timeout:B.timeout,preserveOutputOnError:B.preserveOutputOnError,cwd:B.useCwd?t1():void 0,env:B.env,stdin:B.stdin})}",
+    "keywords": [
+      "env"
+    ],
+    "category": "config",
+    "startIndex": 264328,
+    "estimatedLines": 1
+  },
+  {
+    "name": "ni9",
+    "signature": "function ni9(A)",
+    "body": "{return{keywords:\"dsconfig\",contains:[{className:\"keyword\",begin:\"^dsconfig\",end:/\\s/,excludeEnd:!0,relevance:10},{className:\"built_in\",begin:/(list|create|get|set|delete)-(\\w+)/,end:/\\s/,excludeEnd:!0,illegal:\"!@#$%^&*()\",relevance:10},{className:\"built_in\",begin:/--(\\w+)/,end:/\\s/,excludeEnd:!0},{className:\"string\",begin:/\"/,end:/\"/},{className:\"string\",begin:/'/,end:/'/},{className:\"string\",begin:/[\\w\\-?]+:\\w+/,end:/\\W/,relevance:0},{className:\"string\",begin:/\\w+(\\-\\w+)*/,end:/(?=\\W)/,relevance:0},A.HASH_COMMENT_MODE]}}",
+    "keywords": [
+      "dsconfig",
+      "keyword",
+      "built_in",
+      "string",
+      "config"
+    ],
+    "category": "config",
+    "startIndex": 439176,
+    "estimatedLines": 1
+  },
+  {
+    "name": "oa9",
+    "signature": "function oa9(A)",
+    "body": "{return{name:\"Mizar\",keywords:\"environ vocabularies notations constructors definitions registrations theorems schemes requirements begin end definition registration cluster existence pred func defpred deffunc theorem proof let take assume then thus hence ex for st holds consider reconsider such that and in provided of as from be being by means equals implies iff redefine define now not or attr is mode suppose per cases set thesis contradiction scheme reserve struct correctness compatibility coherence symmetry assymetry reflexivity irreflexivity connectedness uniqueness commutativity idempotence involutiveness projectivity\",contains:[A.COMMENT(\"::\",\"$\")]}}",
+    "keywords": [
+      "Mizar",
+      "env"
+    ],
+    "category": "config",
+    "startIndex": 868132,
+    "estimatedLines": 1
+  },
+  {
+    "name": "uo9",
+    "signature": "function uo9(A)",
+    "body": "{let J={className:\"variable\",variants:[{begin:/\\$[\\w\\d#@][\\w\\d_]*/},{begin:/\\$\\{(.*?)\\}/}]},X={className:\"string\",begin:/\"/,end:/\"/,contains:[A.BACKSLASH_ESCAPE,J,{className:\"variable\",begin:/\\$\\(/,end:/\\)/,contains:[A.BACKSLASH_ESCAPE]}]},I={className:\"string\",begin:/'/,end:/'/};return{name:\"Microtik RouterOS script\",aliases:[\"mikrotik\"],case_insensitive:!0,keywords:{$pattern:/:?[\\w-]+/,literal:\"true false yes no nothing nil null\",keyword:\"foreach do while for if from to step else on-error and or not in :\"+\"foreach do while for if from to step else on-error and or not in\".split(\" \").join(\" :\")+\" :\"+\"global local beep delay put len typeof pick log time set find environment terminal error execute parse resolve toarray tobool toid toip toip6 tonum tostr totime\".split(\" \").join(\" :\")},contain",
+    "keywords": [
+      "variable",
+      "string",
+      "mikrotik",
+      "attribute",
+      "literal",
+      "number",
+      "built_in",
+      "exec",
+      "edit",
+      "glob",
+      "pattern",
+      "protocol",
+      "config",
+      "setting",
+      "env"
+    ],
+    "category": "config",
+    "startIndex": 954155,
+    "estimatedLines": 1
+  },
+  {
+    "name": "UQ4",
+    "signature": "function UQ4(A,Q)",
+    "body": "{let B=o1.toCamelCase(\" \"+Q);[\"get\",\"set\",\"has\"].forEach((G)=>{Object.defineProperty(A,G+B,{value:function(Z,Y,J){return this[G].call(this,Q,Z,Y,J)},configurable:!0})})}",
+    "keywords": [
+      "config"
+    ],
+    "category": "config",
+    "startIndex": 1383142,
+    "estimatedLines": 1
+  },
+  {
+    "name": "OQ4",
+    "signature": "function OQ4(A,Q)",
+    "body": "{var B=(a3A(\"npm_config_no_proxy\")||a3A(\"no_proxy\")).toLowerCase();if(!B)return!0;if(B===\"*\")return!1;return B.split(/[,\\s]/).every(function(G){if(!G)return!0;var Z=G.match(/^(.+):(\\d+)$/),Y=Z?Z[1]:G,J=Z?parseInt(Z[2]):0;if(J&&J!==Q)return!0;if(!/^[.*]/.test(Y))return A!==Y;if(Y.charAt(0)===\"*\")Y=Y.slice(1);return!NQ4.call(A,Y)})}",
+    "keywords": [
+      "npm_config_no_proxy",
+      "no_proxy",
+      "config"
+    ],
+    "category": "config",
+    "startIndex": 1387277,
+    "estimatedLines": 1
+  },
+  {
+    "name": "a3A",
+    "signature": "function a3A(A)",
+    "body": "{return process.env[A.toLowerCase()]||process.env[A.toUpperCase()]||\"\"}",
+    "keywords": [
+      "env"
+    ],
+    "category": "config",
+    "startIndex": 1387626,
+    "estimatedLines": 1
+  },
+  {
+    "name": "YB4",
+    "signature": "function YB4(A,Q)",
+    "body": "{if(A.beforeRedirects.proxy)A.beforeRedirects.proxy(A);if(A.beforeRedirects.config)A.beforeRedirects.config(A,Q)}",
+    "keywords": [
+      "config"
+    ],
+    "category": "config",
+    "startIndex": 1401752,
+    "estimatedLines": 1
+  },
+  {
+    "name": "lD",
+    "signature": "function lD()",
+    "body": "{if(jA().existsSync(Qq1(vQ(),\".config.json\")))return Qq1(vQ(),\".config.json\");let A=`.claude${zBQ()}.json`;return Qq1(process.env.CLAUDE_CONFIG_DIR||MB4(),A)}",
+    "keywords": [
+      "config",
+      "env",
+      "CLAUDE_"
+    ],
+    "category": "config",
+    "startIndex": 1429867,
+    "estimatedLines": 1
+  },
+  {
+    "name": "m2Q",
+    "signature": "function m2Q(A,Q,B)",
+    "body": "{try{Object.defineProperty(A,Q,{value:B,writable:!0,configurable:!0})}catch(G){$44.DEBUG_BUILD&&U44.logger.log(`Failed to add non-enumerable property \"${Q}\" to object`,A)}}",
+    "keywords": [
+      "config"
+    ],
+    "category": "config",
+    "startIndex": 1492467,
+    "estimatedLines": 1
+  },
+  {
+    "name": "r84",
+    "signature": "function r84()",
+    "body": "{return typeof window<\"u\"&&(!o84.isNodeEnv()||s84())}",
+    "keywords": [
+      "env"
+    ],
+    "category": "config",
+    "startIndex": 1510814,
+    "estimatedLines": 1
+  },
+  {
+    "name": "H74",
+    "signature": "function H74(A,Q,B)",
+    "body": "{let G=[{type:\"client_report\"},{timestamp:B||V74.dateTimestampInSeconds(),discarded_events:A}];return K74.createEnvelope(Q?{dsn:Q}:{},[G])}",
+    "keywords": [
+      "client_report",
+      "env"
+    ],
+    "category": "config",
+    "startIndex": 1528676,
+    "estimatedLines": 1
+  },
+  {
+    "name": "OX4",
+    "signature": "function OX4(A)",
+    "body": "{tI.getCurrentHub().configureScope(A)}",
+    "keywords": [
+      "config"
+    ],
+    "category": "config",
+    "startIndex": 1551031,
+    "estimatedLines": 1
+  },
+  {
+    "name": "M6Q",
+    "signature": "function M6Q(A,Q,B)",
+    "body": "{let G=Q.getOptions(),{publicKey:Z}=Q.getDsn()||{},{segment:Y}=B&&B.getUser()||{},J=zI4.dropUndefinedKeys({environment:G.environment||CI4.DEFAULT_ENVIRONMENT,release:G.release,user_segment:Y,public_key:Z,trace_id:A});return Q.emit&&Q.emit(\"createDsc\",J),J}",
+    "keywords": [
+      "createDsc",
+      "env"
+    ],
+    "category": "config",
+    "startIndex": 1554493,
+    "estimatedLines": 1
+  },
+  {
+    "name": "bK4",
+    "signature": "function bK4(A,Q)",
+    "body": "{let B=this.getClient(),G=B&&B.getOptions()||{},Z=G.instrumenter||\"sentry\",Y=A.instrumenter||\"sentry\";if(Z!==Y)TK4.DEBUG_BUILD&&jK4.logger.error(`A transaction was started with instrumenter=\\`${Y}\\`, but the SDK is configured with the \\`${Z}\\` instrumenter.\nThe transaction will not be sampled. Please use the ${Z} instrumentation to start transactions.`),A.sampled=!1;let J=new vK4.Transaction(A,this);if(J=H8Q.sampleTransaction(J,G,{name:A.name,parentSampled:A.parentSampled,transactionContext:A,attributes:{...A.data,...A.attributes},...Q}),J.isRecording())J.initSpanRecorder(G._experiments&&G._experiments.maxSpans);if(B&&B.emit)B.emit(\"startTransaction\",J);return J}",
+    "keywords": [
+      "sentry",
+      "startTransaction",
+      "config"
+    ],
+    "category": "config",
+    "startIndex": 1592873,
+    "estimatedLines": 2
+  },
+  {
+    "name": "iK4",
+    "signature": "function iK4(A,Q,B,G)",
+    "body": "{let Z=j5A.getSdkMetadataForEnvelopeHeader(B),Y=A.type&&A.type!==\"replay_event\"?A.type:\"event\";cK4(A,B&&B.sdk);let J=j5A.createEventEnvelopeHeaders(A,Z,G,Q);delete A.sdkProcessingMetadata;let X=[{type:Y},A];return j5A.createEnvelope(J,[X])}",
+    "keywords": [
+      "replay_event",
+      "event",
+      "env"
+    ],
+    "category": "config",
+    "startIndex": 1595115,
+    "estimatedLines": 1
+  },
+  {
+    "name": "eK4",
+    "signature": "function eK4(A)",
+    "body": "{return`${U8Q(A)}${A.projectId}/envelope/`}",
+    "keywords": [
+      "env"
+    ],
+    "category": "config",
+    "startIndex": 1597014,
+    "estimatedLines": 1
+  },
+  {
+    "name": "dV4",
+    "signature": "function dV4(A,Q,B,G)",
+    "body": "{let Z={sent_at:new Date().toISOString()};if(B&&B.sdk)Z.sdk={name:B.sdk.name,version:B.sdk.version};if(!!G&&Q)Z.dsn=O8Q.dsnToString(Q);let Y=pV4(A);return O8Q.createEnvelope(Z,[Y])}",
+    "keywords": [
+      "env"
+    ],
+    "category": "config",
+    "startIndex": 1601105,
+    "estimatedLines": 1
+  },
+  {
+    "name": "BH4",
+    "signature": "function BH4(A,Q,B,G,Z)",
+    "body": "{let Y={sent_at:new Date().toISOString()};if(B&&B.sdk)Y.sdk={name:B.sdk.name,version:B.sdk.version};if(!!G&&!!Z)Y.dsn=VL1.dsnToString(Z);if(Q)Y.trace=VL1.dropUndefinedKeys(Q);let J=GH4(A);return VL1.createEnvelope(Y,[J])}",
+    "keywords": [
+      "env"
+    ],
+    "category": "config",
+    "startIndex": 1610087,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Y",
+    "signature": "function Y(J)",
+    "body": "{let X=[];if(EU.forEachEnvelopeItem(J,(V,H)=>{let D=EU.envelopeItemTypeToDataCategory(H);if(EU.isRateLimited(G,D)){let F=r8Q(V,H);A.recordDroppedEvent(\"ratelimit_backoff\",D,F)}else X.push(V)}),X.length===0)return EU.resolvedSyncPromise();let I=EU.createEnvelope(J[0],X),W=(V)=>{EU.forEachEnvelopeItem(I,(H,D)=>{let F=r8Q(H,D);A.recordDroppedEvent(V,EU.envelopeItemTypeToDataCategory(D),F)})},K=()=>Q({body:EU.serializeEnvelope(I,A.textEncoder)}).then((V)=>{if(V.statusCode!==void 0&&(V.statusCode<200||V.statusCode>=300))o8Q.DEBUG_BUILD&&EU.logger.warn(`Sentry responded with status code ${V.statusCode} to sent event.`);return G=EU.updateRateLimits(G,V),V},(V)=>{throw W(\"network_error\"),V});return B.add(K).then((V)=>V,(V)=>{if(V instanceof EU.SentryError)return o8Q.DEBUG_BUILD&&EU.logger.error(\"S",
+    "keywords": [
+      "ratelimit_backoff",
+      "network_error",
+      "queue_overflow",
+      "env"
+    ],
+    "category": "config",
+    "startIndex": 1617526,
+    "estimatedLines": 1
+  },
+  {
+    "name": "rH4",
+    "signature": "function rH4(A)",
+    "body": "{return(Q)=>{let B=A(Q),G=Q.createStore?Q.createStore(Q):void 0,Z=wL1,Y;function J(K,V,H){if(UL1.envelopeContainsItemType(K,[\"replay_event\",\"replay_recording\",\"client_report\"]))return!1;if(Q.shouldStore)return Q.shouldStore(K,V,H);return!0}function X(K){if(!G)return;if(Y)clearTimeout(Y);if(Y=setTimeout(async()=>{Y=void 0;let V=await G.pop();if(V)$L1(\"Attempting to send previously queued event\"),W(V).catch((H)=>{$L1(\"Failed to retry sending\",H)})},K),typeof Y!==\"number\"&&Y.unref)Y.unref()}function I(){if(Y)return;X(Z),Z=Math.min(Z*2,oH4)}async function W(K){try{let V=await B.send(K),H=A3Q;if(V){if(V.headers&&V.headers[\"retry-after\"])H=UL1.parseRetryAfterHeader(V.headers[\"retry-after\"]);else if((V.statusCode||0)>=400)return V}return X(H),Z=wL1,V}catch(V){if(G&&await J(K,V,Z))return await G.i",
+    "keywords": [
+      "replay_event",
+      "replay_recording",
+      "client_report",
+      "number",
+      "env"
+    ],
+    "category": "config",
+    "startIndex": 1618852,
+    "estimatedLines": 1
+  },
+  {
+    "name": "J",
+    "signature": "function J(K,V,H)",
+    "body": "{if(UL1.envelopeContainsItemType(K,[\"replay_event\",\"replay_recording\",\"client_report\"]))return!1;if(Q.shouldStore)return Q.shouldStore(K,V,H);return!0}",
+    "keywords": [
+      "replay_event",
+      "replay_recording",
+      "client_report",
+      "env"
+    ],
+    "category": "config",
+    "startIndex": 1618939,
+    "estimatedLines": 1
+  },
+  {
+    "name": "NL1",
+    "signature": "function NL1(A,Q)",
+    "body": "{let B;return qL1.forEachEnvelopeItem(A,(G,Z)=>{if(Q.includes(Z))B=Array.isArray(G)?G[1]:void 0;return!!B}),B}",
+    "keywords": [
+      "env"
+    ],
+    "category": "config",
+    "startIndex": 1619957,
+    "estimatedLines": 1
+  },
+  {
+    "name": "BD4",
+    "signature": "function BD4(A,Q)",
+    "body": "{return qL1.createEnvelope(Q?{...A[0],dsn:Q}:A[0],A[1])}",
+    "keywords": [
+      "env"
+    ],
+    "category": "config",
+    "startIndex": 1620252,
+    "estimatedLines": 1
+  }
+]

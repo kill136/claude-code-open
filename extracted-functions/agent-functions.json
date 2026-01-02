@@ -1,0 +1,737 @@
+[
+  {
+    "name": "sF1",
+    "signature": "function sF1()",
+    "body": "{return r0.agentColorMap}",
+    "keywords": [
+      "agent"
+    ],
+    "category": "agent",
+    "startIndex": 34560,
+    "estimatedLines": 1
+  },
+  {
+    "name": "zP0",
+    "signature": "function zP0(A)",
+    "body": "{if(sp!==null)throw Error(\"Analytics sink already attached - cannot attach more than once\");if(sp=A,SEA.length>0){let Q=[...SEA];SEA.length=0,queueMicrotask(()=>{for(let B of Q)if(B.async)sp.logEventAsync(B.eventName,B.metadata);else sp.logEvent(B.eventName,B.metadata)})}}",
+    "keywords": [
+      "task",
+      "ink"
+    ],
+    "category": "agent",
+    "startIndex": 38888,
+    "estimatedLines": 1
+  },
+  {
+    "name": "xm9",
+    "signature": "function xm9()",
+    "body": "{if(typeof window<\"u\"&&window.process&&(window.process.type===\"renderer\"||window.process.__nwjs))return!0;if(typeof navigator<\"u\"&&navigator.userAgent&&navigator.userAgent.toLowerCase().match(/(edge|trident)\\/(\\d+)/))return!1;let A;return typeof document<\"u\"&&document.documentElement&&document.documentElement.style&&document.documentElement.style.WebkitAppearance||typeof window<\"u\"&&window.console&&(window.console.firebug||window.console.exception&&window.console.table)||typeof navigator<\"u\"&&navigator.userAgent&&(A=navigator.userAgent.toLowerCase().match(/firefox\\/(\\d+)/))&&parseInt(A[1],10)>=31||typeof navigator<\"u\"&&navigator.userAgent&&navigator.userAgent.toLowerCase().match(/applewebkit\\/(\\d+)/)}",
+    "keywords": [
+      "renderer",
+      "agent",
+      "render"
+    ],
+    "category": "agent",
+    "startIndex": 219735,
+    "estimatedLines": 1
+  },
+  {
+    "name": "ii9",
+    "signature": "function ii9(A)",
+    "body": "{let Q=A.COMMENT(/^\\s*@?rem\\b/,/$/,{relevance:10});return{name:\"Batch file (DOS)\",aliases:[\"bat\",\"cmd\"],case_insensitive:!0,illegal:/\\/\\*/,keywords:{keyword:\"if else goto for in do call exit not exist errorlevel defined equ neq lss leq gtr geq\",built_in:\"prn nul lpt3 lpt2 lpt1 con com4 com3 com2 com1 aux shift cd dir echo setlocal endlocal set pause copy append assoc at attrib break cacls cd chcp chdir chkdsk chkntfs cls cmd color comp compact convert date dir diskcomp diskcopy doskey erase fs find findstr format ftype graftabl help keyb label md mkdir mode more move path pause print popd pushd promt rd recover rem rename replace restore rmdir shift sort start subst time title tree type ver verify vol ping net ipconfig taskkill xcopy ren del\"},contains:[{className:\"variable\",begin:/%%[^ ]|",
+    "keywords": [
+      "variable",
+      "function",
+      "symbol",
+      "number",
+      "task",
+      "config"
+    ],
+    "category": "agent",
+    "startIndex": 438011,
+    "estimatedLines": 1
+  },
+  {
+    "name": "$n9",
+    "signature": "function $n9(A)",
+    "body": "{return{name:\"Gherkin\",aliases:[\"feature\"],keywords:\"Feature Background Ability Business Need Scenario Scenarios Scenario Outline Scenario Template Examples Given And Then But When\",contains:[{className:\"symbol\",begin:\"\\\\*\",relevance:0},{className:\"meta\",begin:\"@[^@\\\\s]+\"},{begin:\"\\\\|\",end:\"\\\\|\\\\w*$\",contains:[{className:\"string\",begin:\"[^|]+\"}]},{className:\"variable\",begin:\"<\",end:\">\"},A.HASH_COMMENT_MODE,{className:\"string\",begin:'\"\"\"',end:'\"\"\"'},A.QUOTE_STRING_MODE]}}",
+    "keywords": [
+      "Gherkin",
+      "feature",
+      "symbol",
+      "meta",
+      "string",
+      "variable",
+      "background"
+    ],
+    "category": "agent",
+    "startIndex": 480585,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Ln9",
+    "signature": "function Ln9(A)",
+    "body": "{return{name:\"Gradle\",case_insensitive:!0,keywords:{keyword:\"task project allprojects subprojects artifacts buildscript configurations dependencies repositories sourceSets description delete from into include exclude source classpath destinationDir includes options sourceCompatibility targetCompatibility group flatDir doLast doFirst flatten todir fromdir ant def abstract break case catch continue default do else extends final finally for if implements instanceof native new private protected public return static switch synchronized throw throws transient try volatile while strictfp package import false null super this true antlrtask checkstyle codenarc copy boolean byte char class double float int interface long short void compile runTime file fileTree abs any append asList asWritable call ",
+    "keywords": [
+      "Gradle",
+      "grep",
+      "task",
+      "token",
+      "stream",
+      "config"
+    ],
+    "category": "agent",
+    "startIndex": 541480,
+    "estimatedLines": 1
+  },
+  {
+    "name": "co9",
+    "signature": "function co9(A)",
+    "body": "{let Q=\"do if then else end until while abort array attrib by call cards cards4 catname continue datalines datalines4 delete delim delimiter display dm drop endsas error file filename footnote format goto in infile informat input keep label leave length libname link list lostcard merge missing modify options output out page put redirect remove rename replace retain return select set skip startsas stop title update waitsas where window x systask add and alter as cascade check create delete describe distinct drop foreign from group having index insert into in key like message modify msgtype not null on or order primary references reset restrict select set table unique update validate view where\",B=\"abs|addr|airy|arcos|arsin|atan|attrc|attrn|band|betainv|blshift|bnot|bor|brshift|bxor|byte|cdf",
+    "keywords": [
+      "keyword",
+      "variable",
+      "emphasis",
+      "built_in",
+      "name",
+      "meta",
+      "string",
+      "exec",
+      "glob",
+      "fetch",
+      "task",
+      "ink",
+      "message",
+      "sse"
+    ],
+    "category": "agent",
+    "startIndex": 963961,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Yr9",
+    "signature": "function Yr9(A)",
+    "body": "{let Q={className:\"variable\",begin:/\\b_+[a-zA-Z]\\w*/},B={className:\"title\",begin:/[a-zA-Z][a-zA-Z0-9]+_fnc_\\w*/},G={className:\"string\",variants:[{begin:'\"',end:'\"',contains:[{begin:'\"\"',relevance:0}]},{begin:\"'\",end:\"'\",contains:[{begin:\"''\",relevance:0}]}]},Z={className:\"meta\",begin:/#\\s*[a-z]+\\b/,end:/$/,keywords:{\"meta-keyword\":\"define undef ifdef ifndef else endif include\"},contains:[{begin:/\\\\\\n/,relevance:0},A.inherit(G,{className:\"meta-string\"}),{className:\"meta-string\",begin:/<[^\\n>]*>/,end:/$/,illegal:\"\\\\n\"},A.C_LINE_COMMENT_MODE,A.C_BLOCK_COMMENT_MODE]};return{name:\"SQF\",case_insensitive:!0,keywords:{keyword:\"case catch default do else exit exitWith for forEach from if private switch then throw to try waitUntil while with\",built_in:\"abs accTime acos action actionIDs actionKeys ac",
+    "keywords": [
+      "variable",
+      "title",
+      "string",
+      "meta",
+      "spawn",
+      "exec",
+      "command",
+      "edit",
+      "glob",
+      "url",
+      "request",
+      "agent",
+      "task",
+      "background",
+      "completed",
+      "plan",
+      "ink",
+      "react",
+      "component",
+      "history"
+    ],
+    "category": "agent",
+    "startIndex": 984649,
+    "estimatedLines": 1
+  },
+  {
+    "name": "pe0",
+    "signature": "function pe0(A)",
+    "body": "{if(Object.assign(qE,A),!qE.backgroundSync)se9()}",
+    "keywords": [
+      "background"
+    ],
+    "category": "agent",
+    "startIndex": 1161733,
+    "estimatedLines": 1
+  },
+  {
+    "name": "ce0",
+    "signature": "function ce0(A)",
+    "body": "{let{instance:Q,timeout:B,skipCache:G,allowStale:Z,backgroundSync:Y}=A;if(!Y)qE.backgroundSync=!1;return ne9({instance:Q,allowStale:Z,timeout:B,skipCache:G})}",
+    "keywords": [
+      "background",
+      "allow"
+    ],
+    "category": "agent",
+    "startIndex": 1161803,
+    "estimatedLines": 1
+  },
+  {
+    "name": "fN1",
+    "signature": "function fN1(A,Q={})",
+    "body": "{if(Q.user){if(!A.ipAddress&&Q.user.ip_address)A.ipAddress=Q.user.ip_address;if(!A.did&&!Q.did)A.did=Q.user.id||Q.user.email||Q.user.username}if(A.timestamp=Q.timestamp||VCA.timestampInSeconds(),Q.abnormal_mechanism)A.abnormal_mechanism=Q.abnormal_mechanism;if(Q.ignoreDuration)A.ignoreDuration=Q.ignoreDuration;if(Q.sid)A.sid=Q.sid.length===32?Q.sid:VCA.uuid4();if(Q.init!==void 0)A.init=Q.init;if(!A.did&&Q.did)A.did=`${Q.did}`;if(typeof Q.started===\"number\")A.started=Q.started;if(A.ignoreDuration)A.duration=void 0;else if(typeof Q.duration===\"number\")A.duration=Q.duration;else{let B=A.timestamp-A.started;A.duration=B>=0?B:0}if(Q.release)A.release=Q.release;if(Q.environment)A.environment=Q.environment;if(!A.ipAddress&&Q.ipAddress)A.ipAddress=Q.ipAddress;if(!A.userAgent&&Q.userAgent)A.userAge",
+    "keywords": [
+      "number",
+      "agent",
+      "env"
+    ],
+    "category": "agent",
+    "startIndex": 1544447,
+    "estimatedLines": 1
+  },
+  {
+    "name": "dJ4",
+    "signature": "function dJ4(A)",
+    "body": "{return VCA.dropUndefinedKeys({sid:`${A.sid}`,init:A.init,started:new Date(A.started*1000).toISOString(),timestamp:new Date(A.timestamp*1000).toISOString(),status:A.status,errors:A.errors,did:typeof A.did===\"number\"||typeof A.did===\"string\"?`${A.did}`:void 0,duration:A.duration,abnormal_mechanism:A.abnormal_mechanism,attrs:{release:A.release,environment:A.environment,ip_address:A.ipAddress,user_agent:A.userAgent}})}",
+    "keywords": [
+      "number",
+      "string",
+      "agent",
+      "env"
+    ],
+    "category": "agent",
+    "startIndex": 1545458,
+    "estimatedLines": 1
+  },
+  {
+    "name": "uU4",
+    "signature": "function uU4()",
+    "body": "{ke.addPerformanceInstrumentationHandler(\"longtask\",({entries:A})=>{for(let Q of A){let B=Kh.getActiveTransaction();if(!B)return;let G=EV(kZ.browserPerformanceTimeOrigin+Q.startTime),Z=EV(Q.duration);B.startChild({description:\"Main UI thread blocked\",op:\"ui.long-task\",origin:\"auto.ui.browser.metrics\",startTimestamp:G,endTimestamp:G+Z})}})}",
+    "keywords": [
+      "longtask",
+      "task"
+    ],
+    "category": "agent",
+    "startIndex": 1666113,
+    "estimatedLines": 1
+  },
+  {
+    "name": "UL4",
+    "signature": "function UL4(A,Q,B)",
+    "body": "{if(!A)return A;let[G,Z]=A.split(\" \");if(Q.host&&!Q.protocol)Q.protocol=ex([B,\"optionalAccess\",(Y)=>Y.agent,\"optionalAccess\",(Y)=>Y.protocol]),Z=RZQ(Q);if(ex([Z,\"optionalAccess\",(Y)=>Y.startsWith,\"call\",(Y)=>Y(\"///\")]))Z=Z.slice(2);return`${G} ${Z}`}",
+    "keywords": [
+      "optionalAccess",
+      "call",
+      "agent",
+      "protocol"
+    ],
+    "category": "agent",
+    "startIndex": 1714941,
+    "estimatedLines": 1
+  },
+  {
+    "name": "b",
+    "signature": "function b(aA)",
+    "body": "{return new H(function(XA){var GA=aA.transaction($,j),vA=V([\"\"]);GA.objectStore($).put(vA,\"key\"),GA.onabort=function(uA){uA.preventDefault(),uA.stopPropagation(),XA(!1)},GA.oncomplete=function(){var uA=navigator.userAgent.match(/Chrome\\/(\\d+)/),dA=navigator.userAgent.match(/Edge\\//);XA(dA||!uA||parseInt(uA[1],10)>=43)}}).catch(function(){return!1})}",
+    "keywords": [
+      "agent"
+    ],
+    "category": "agent",
+    "startIndex": 1951093,
+    "estimatedLines": 1
+  },
+  {
+    "name": "US4",
+    "signature": "function US4(A,{streamIsTTY:Q,sniffFlags:B=!0}={})",
+    "body": "{let G=CS4();if(G!==void 0)QcA=G;let Z=B?QcA:G;if(Z===0)return 0;if(B){if(gO(\"color=16m\")||gO(\"color=full\")||gO(\"color=truecolor\"))return 3;if(gO(\"color=256\"))return 2}if(\"TF_BUILD\"in ZI&&\"AGENT_NAME\"in ZI)return 1;if(A&&!Q&&Z===void 0)return 0;let Y=Z||0;if(ZI.TERM===\"dumb\")return Y;if(RO1.platform===\"win32\"){let J=zS4.release().split(\".\");if(Number(J[0])>=10&&Number(J[2])>=10586)return Number(J[2])>=14931?3:2;return 1}if(\"CI\"in ZI){if([\"GITHUB_ACTIONS\",\"GITEA_ACTIONS\",\"CIRCLECI\"].some((J)=>(J in ZI)))return 3;if([\"TRAVIS\",\"APPVEYOR\",\"GITLAB_CI\",\"BUILDKITE\",\"DRONE\"].some((J)=>(J in ZI))||ZI.CI_NAME===\"codeship\")return 1;return Y}if(\"TEAMCITY_VERSION\"in ZI)return/^(9\\.(0*[1-9]\\d*)\\.|\\d{2,}\\.)/.test(ZI.TEAMCITY_VERSION)?1:0;if(ZI.COLORTERM===\"truecolor\")return 3;if(ZI.TERM===\"xterm-kitty\")r",
+    "keywords": [
+      "TF_BUILD",
+      "AGENT_NAME",
+      "dumb",
+      "win32",
+      "GITHUB_ACTIONS",
+      "GITEA_ACTIONS",
+      "CIRCLECI",
+      "TRAVIS",
+      "APPVEYOR",
+      "GITLAB_CI",
+      "BUILDKITE",
+      "DRONE",
+      "codeship",
+      "TEAMCITY_VERSION",
+      "truecolor",
+      "TERM_PROGRAM",
+      "Apple_Terminal",
+      "COLORTERM",
+      "agent"
+    ],
+    "category": "agent",
+    "startIndex": 2015378,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Gt4",
+    "signature": "function Gt4(A)",
+    "body": "{let Q=es4.normalizeProvider(A.userAgentAppId??bCQ),{customUserAgent:B}=A;return Object.assign(A,{customUserAgent:typeof B===\"string\"?[[B]]:B,userAgentAppId:async()=>{let G=await Q();if(!Bt4(G)){let Z=A.logger?.constructor?.name===\"NoOpLogger\"||!A.logger?console:A.logger;if(typeof G!==\"string\")Z?.warn(\"userAgentAppId must be a string or undefined.\");else if(G.length>50)Z?.warn(\"The provided userAgentAppId exceeds the maximum length of 50 characters.\")}return G}})}",
+    "keywords": [
+      "string",
+      "NoOpLogger",
+      "agent"
+    ],
+    "category": "agent",
+    "startIndex": 2373512,
+    "estimatedLines": 1
+  },
+  {
+    "name": "E38",
+    "signature": "function E38(A,Q)",
+    "body": "{if(A==null||!PaA(A)||BfQ(A))return;if(typeof A.destroy===\"function\"){if(Object.getPrototypeOf(A).constructor===t88)A.socket=null;A.destroy(Q)}else if(Q)queueMicrotask(()=>{A.emit(\"error\",Q)});if(A.destroyed!==!0)A[obQ]=!0}",
+    "keywords": [
+      "function",
+      "error",
+      "task"
+    ],
+    "category": "agent",
+    "startIndex": 2902227,
+    "estimatedLines": 1
+  },
+  {
+    "name": "OJ8",
+    "signature": "function OJ8(A)",
+    "body": "{if(A&&Object.keys(A).find((B)=>B.toLowerCase()===\"proxy-authorization\"))throw new DoA(\"Proxy-Authorization should be sent in ProxyAgent constructor\")}",
+    "keywords": [
+      "agent",
+      "auth"
+    ],
+    "category": "agent",
+    "startIndex": 3148046,
+    "estimatedLines": 1
+  },
+  {
+    "name": "mwA",
+    "signature": "function mwA(A,Q)",
+    "body": "{return muQ(!A[VN]),new Promise((B,G)=>{if(dJ8(A)){let Z=A._readableState;if(Z.destroyed&&Z.closeEmitted===!1)A.on(\"error\",(Y)=>{G(Y)}).on(\"close\",()=>{G(TypeError(\"unusable\"))});else G(Z.errored??TypeError(\"unusable\"))}else queueMicrotask(()=>{A[VN]={type:Q,stream:A,resolve:B,reject:G,length:0,body:[]},A.on(\"error\",function(Z){Vh1(this[VN],Z)}).on(\"close\",function(){if(this[VN].body!==null)Vh1(this[VN],new duQ)}),pJ8(A[VN])})})}",
+    "keywords": [
+      "error",
+      "close",
+      "unusable",
+      "task",
+      "stream"
+    ],
+    "category": "agent",
+    "startIndex": 3157249,
+    "estimatedLines": 1
+  },
+  {
+    "name": "lJ8",
+    "signature": "function lJ8({callback:A,body:Q,contentType:B,statusCode:G,statusMessage:Z,headers:Y})",
+    "body": "{cJ8(Q);let J=[],X=0;try{for await(let V of Q)if(J.push(V),X+=V.length,X>131072){J=[],X=0;break}}catch{J=[],X=0}let I=`Response status code ${G}${Z?`: ${Z}`:\"\"}`;if(G===204||!B||!X){queueMicrotask(()=>A(new nuQ(I,G,Y)));return}let W=Error.stackTraceLimit;Error.stackTraceLimit=0;let K;try{if(ouQ(B))K=JSON.parse(auQ(J,X));else if(ruQ(B))K=auQ(J,X)}catch{}finally{Error.stackTraceLimit=W}queueMicrotask(()=>A(new nuQ(I,G,Y,K)))}",
+    "keywords": [
+      "task"
+    ],
+    "category": "agent",
+    "startIndex": 3159102,
+    "estimatedLines": 1
+  },
+  {
+    "name": "euQ",
+    "signature": "function euQ(A,Q)",
+    "body": "{if(Q===void 0)return new Promise((B,G)=>{euQ.call(this,A,(Z,Y)=>{return Z?G(Z):B(Y)})});try{this.dispatch(A,new Fh1(A,Q))}catch(B){if(typeof Q!==\"function\")throw B;let G=A?.opaque;queueMicrotask(()=>Q(B,{opaque:G}))}}",
+    "keywords": [
+      "function",
+      "task"
+    ],
+    "category": "agent",
+    "startIndex": 3163025,
+    "estimatedLines": 1
+  },
+  {
+    "name": "JmQ",
+    "signature": "function JmQ(A,Q,B)",
+    "body": "{if(B===void 0)return new Promise((G,Z)=>{JmQ.call(this,A,Q,(Y,J)=>{return Y?Z(Y):G(J)})});try{this.dispatch(A,new YmQ(A,Q,B))}catch(G){if(typeof B!==\"function\")throw G;let Z=A?.opaque;queueMicrotask(()=>B(G,{opaque:Z}))}}",
+    "keywords": [
+      "function",
+      "task"
+    ],
+    "category": "agent",
+    "startIndex": 3166598,
+    "estimatedLines": 1
+  },
+  {
+    "name": "wmQ",
+    "signature": "function wmQ(A,Q)",
+    "body": "{if(Q===void 0)return new Promise((B,G)=>{wmQ.call(this,A,(Z,Y)=>{return Z?G(Z):B(Y)})});try{let B=new UmQ(A,Q);this.dispatch({...A,method:A.method||\"GET\",upgrade:A.protocol||\"Websocket\"},B)}catch(B){if(typeof Q!==\"function\")throw B;let G=A?.opaque;queueMicrotask(()=>Q(B,{opaque:G}))}}",
+    "keywords": [
+      "Websocket",
+      "function",
+      "task",
+      "protocol"
+    ],
+    "category": "agent",
+    "startIndex": 3171037,
+    "estimatedLines": 1
+  },
+  {
+    "name": "RmQ",
+    "signature": "function RmQ(A,Q)",
+    "body": "{if(Q===void 0)return new Promise((B,G)=>{RmQ.call(this,A,(Z,Y)=>{return Z?G(Z):B(Y)})});try{let B=new MmQ(A,Q);this.dispatch({...A,method:\"CONNECT\"},B)}catch(B){if(typeof Q!==\"function\")throw B;let G=A?.opaque;queueMicrotask(()=>Q(B,{opaque:G}))}}",
+    "keywords": [
+      "CONNECT",
+      "function",
+      "task"
+    ],
+    "category": "agent",
+    "startIndex": 3172546,
+    "estimatedLines": 1
+  },
+  {
+    "name": "hX8",
+    "signature": "function hX8(A)",
+    "body": "{if(A){let{agent:Q,...B}=A;return B}}",
+    "keywords": [
+      "agent"
+    ],
+    "category": "agent",
+    "startIndex": 3178468,
+    "estimatedLines": 1
+  },
+  {
+    "name": "_K8",
+    "signature": "function _K8(A,Q,B,G)",
+    "body": "{if(A[QZA]===\"loading\")throw new DOMException(\"Invalid state\",\"InvalidStateError\");A[QZA]=\"loading\",A[bpQ]=null,A[Ag1]=null;let Y=Q.stream().getReader(),J=[],X=Y.read(),I=!0;(async()=>{while(!A[twA])try{let{done:W,value:K}=await X;if(I&&!A[twA])queueMicrotask(()=>{ol(\"loadstart\",A)});if(I=!1,!W&&MK8.isUint8Array(K)){if(J.push(K),(A[Qg1]===void 0||Date.now()-A[Qg1]>=50)&&!A[twA])A[Qg1]=Date.now(),queueMicrotask(()=>{ol(\"progress\",A)});X=Y.read()}else if(W){queueMicrotask(()=>{A[QZA]=\"done\";try{let V=jK8(J,B,Q.type,G);if(A[twA])return;A[bpQ]=V,ol(\"load\",A)}catch(V){A[Ag1]=V,ol(\"error\",A)}if(A[QZA]!==\"loading\")ol(\"loadend\",A)});break}}catch(W){if(A[twA])return;queueMicrotask(()=>{if(A[QZA]=\"done\",A[Ag1]=W,ol(\"error\",A),A[QZA]!==\"loading\")ol(\"loadend\",A)});break}})()}",
+    "keywords": [
+      "loading",
+      "InvalidStateError",
+      "loadstart",
+      "progress",
+      "done",
+      "load",
+      "error",
+      "loadend",
+      "task",
+      "stream"
+    ],
+    "category": "agent",
+    "startIndex": 3242222,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Cg1",
+    "signature": "function Cg1()",
+    "body": "{let A=dj();if(!A)return{};let Q={cert:A.cert,key:A.key,passphrase:A.passphrase},B=new Dg1({connect:Q,pipelining:1});return k(\"mTLS: Created undici agent with custom certificates\"),{dispatcher:B}}",
+    "keywords": [
+      "agent"
+    ],
+    "category": "agent",
+    "startIndex": 3298383,
+    "estimatedLines": 1
+  },
+  {
+    "name": "zqA",
+    "signature": "function zqA()",
+    "body": "{if(Pg1())return\"Sonnet 4.5 with 1M context · Best for everyday tasks\";if(CqA()||$qA())return\"Opus 4.5 · Most capable for complex work\";if(NrA()&&wZA())return\"Opus 4.5 · Most capable for complex work\";return\"Sonnet 4.5 · Best for everyday tasks\"}",
+    "keywords": [
+      "task"
+    ],
+    "category": "agent",
+    "startIndex": 3318607,
+    "estimatedLines": 1
+  },
+  {
+    "name": "qZA",
+    "signature": "function qZA(A,Q,B,G)",
+    "body": "{if(process.env.CLAUDE_CODE_SUBAGENT_MODEL)return process.env.CLAUDE_CODE_SUBAGENT_MODEL;if(B)return $K(B);let Z=A??yD8();if(!Z)return $K(Tg1);if(Z===\"inherit\")return D1A({permissionMode:G??\"default\",mainLoopModel:Q,exceeds200kTokens:!1});return $K(Z)}",
+    "keywords": [
+      "inherit",
+      "default",
+      "subagent",
+      "agent",
+      "token",
+      "permission",
+      "env",
+      "CLAUDE_"
+    ],
+    "category": "agent",
+    "startIndex": 3321621,
+    "estimatedLines": 1
+  },
+  {
+    "name": "GiQ",
+    "signature": "function GiQ()",
+    "body": "{let A=[{value:\"sonnet\",label:\"Sonnet\",description:\"Balanced performance - best for most agents\"}];if(UM())A.push({value:\"opus\",label:\"Opus\",description:\"Most capable for complex reasoning tasks\"});return A.push({value:\"haiku\",label:\"Haiku\",description:\"Fast and efficient for simple tasks\"},{value:\"inherit\",label:\"Inherit from parent\",description:\"Use the same model as the main conversation\"}),A}",
+    "keywords": [
+      "sonnet",
+      "Sonnet",
+      "opus",
+      "Opus",
+      "haiku",
+      "Haiku",
+      "inherit",
+      "agent",
+      "task"
+    ],
+    "category": "agent",
+    "startIndex": 3322030,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Wi",
+    "signature": "function Wi(A={})",
+    "body": "{let Q=A.model?String(A.model):p3(),B=qC(Q),G=await iD8(),Z=nD8();return{model:Q,sessionId:h0(),userType:\"external\",...B.length>0?{betas:B.join(\",\")}:{},envContext:G,...process.env.CLAUDE_CODE_ENTRYPOINT&&{entrypoint:process.env.CLAUDE_CODE_ENTRYPOINT},...process.env.CLAUDE_AGENT_SDK_VERSION&&{agentSdkVersion:process.env.CLAUDE_AGENT_SDK_VERSION},isInteractive:String(mhA()),clientType:dhA(),...Z&&{processMetrics:Z},sweBenchRunId:process.env.SWE_BENCH_RUN_ID||\"\",sweBenchInstanceId:process.env.SWE_BENCH_INSTANCE_ID||\"\",sweBenchTaskId:process.env.SWE_BENCH_TASK_ID||\"\",...cD8()}}",
+    "keywords": [
+      "external",
+      "agent",
+      "task",
+      "session",
+      "env",
+      "CLAUDE_"
+    ],
+    "category": "agent",
+    "startIndex": 3325069,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Ao8",
+    "signature": "function Ao8()",
+    "body": "{return{event_name:\"\",client_timestamp:void 0,model:\"\",session_id:\"\",user_type:\"\",betas:\"\",env:void 0,entrypoint:\"\",agent_sdk_version:\"\",is_interactive:!1,client_type:\"\",process:\"\",additional_metadata:\"\",auth:void 0,server_timestamp:void 0,event_id:\"\",device_id:\"\",swe_bench_run_id:\"\",swe_bench_instance_id:\"\",swe_bench_task_id:\"\",email:\"\"}}",
+    "keywords": [
+      "agent",
+      "task",
+      "session",
+      "auth",
+      "env"
+    ],
+    "category": "agent",
+    "startIndex": 3636101,
+    "estimatedLines": 1
+  },
+  {
+    "name": "rsA",
+    "signature": "function rsA(A,Q,B,G,Z=!1)",
+    "body": "{let Y=\"running\",J,X=fYB(A.stdout),I=fYB(A.stderr);if(G){let z=new VNA(1000),$=0,L=(N)=>{let R=N.toString().split(`\n`).filter((P)=>P.trim());z.addAll(R),$+=R.length;let j=z.getRecent(5);if(j.length>0)G(hp1(j,`\n`),hp1(z.getRecent(100),`\n`),$)};A.stdout.on(\"data\",L),A.stderr.on(\"data\",L)}let W=(z)=>{if(Y=\"killed\",A.pid)hYB.default(A.pid,\"SIGKILL\")},K=null,V,H,D=(z)=>{if(Y===\"running\")return J=z,Y=\"backgrounded\",V(),{stdoutStream:X.asStream(),stderrStream:I.asStream()};return null},F=new Promise((z)=>{let $=()=>W();V=()=>{if(K)clearTimeout(K),K=null;Q.removeEventListener(\"abort\",$)},Q.addEventListener(\"abort\",$,{once:!0}),new Promise((L)=>{let N=W;W=(M)=>{N(),L(M||kYB)},K=setTimeout(()=>{if(Z&&H)H(D);else W(bYB)},B),A.on(\"close\",(M,R)=>{L(M!==null&&M!==void 0?M:R===\"SIGTERM\"?144:1)}),A.on(\"er",
+    "keywords": [
+      "running",
+      "data",
+      "killed",
+      "SIGKILL",
+      "backgrounded",
+      "abort",
+      "close",
+      "SIGTERM",
+      "error",
+      "completed",
+      "command",
+      "task",
+      "background",
+      "stream"
+    ],
+    "category": "agent",
+    "startIndex": 3660550,
+    "estimatedLines": 4
+  },
+  {
+    "name": "f",
+    "signature": "function f(o,r)",
+    "body": "{MA(this,f),this.node=o.createElement(\"div\"),this.border=o.createElement(\"div\"),this.padding=o.createElement(\"div\"),this.content=o.createElement(\"div\"),this.border.style.borderColor=MQ.border,this.padding.style.borderColor=MQ.padding,this.content.style.backgroundColor=MQ.background,_1(this.node.style,{borderColor:MQ.margin,pointerEvents:\"none\",position:\"fixed\"}),this.node.style.zIndex=\"10000000\",this.node.appendChild(this.border),this.border.appendChild(this.padding),this.padding.appendChild(this.content),r.appendChild(this.node)}",
+    "keywords": [
+      "none",
+      "fixed",
+      "background"
+    ],
+    "category": "agent",
+    "startIndex": 4068800,
+    "estimatedLines": 1
+  },
+  {
+    "name": "f",
+    "signature": "function f(o,r)",
+    "body": "{MA(this,f),this.tip=o.createElement(\"div\"),_1(this.tip.style,{display:\"flex\",flexFlow:\"row nowrap\",backgroundColor:\"#333740\",borderRadius:\"2px\",fontFamily:'\"SFMono-Regular\", Consolas, \"Liberation Mono\", Menlo, Courier, monospace',fontWeight:\"bold\",padding:\"3px 5px\",pointerEvents:\"none\",position:\"fixed\",fontSize:\"12px\",whiteSpace:\"nowrap\"}),this.nameSpan=o.createElement(\"span\"),this.tip.appendChild(this.nameSpan),_1(this.nameSpan.style,{color:\"#ee78e6\",borderRight:\"1px solid #aaaaaa\",paddingRight:\"0.5rem\",marginRight:\"0.5rem\"}),this.dimSpan=o.createElement(\"span\"),this.tip.appendChild(this.dimSpan),_1(this.dimSpan.style,{color:\"#d7d7d7\"}),this.tip.style.zIndex=\"10000000\",r.appendChild(this.tip)}",
+    "keywords": [
+      "flex",
+      "bold",
+      "none",
+      "fixed",
+      "nowrap",
+      "span",
+      "background"
+    ],
+    "category": "agent",
+    "startIndex": 4069873,
+    "estimatedLines": 1
+  },
+  {
+    "name": "f",
+    "signature": "function f(o)",
+    "body": "{MA(this,f);var r=window.__REACT_DEVTOOLS_TARGET_WINDOW__||window;this.window=r;var HA=window.__REACT_DEVTOOLS_TARGET_WINDOW__||window;this.tipBoundsWindow=HA;var VA=r.document;this.container=VA.createElement(\"div\"),this.container.style.zIndex=\"10000000\",this.tip=new AQ(VA,this.container),this.rects=[],this.agent=o,VA.body.appendChild(this.container)}",
+    "keywords": [
+      "agent",
+      "react"
+    ],
+    "category": "agent",
+    "startIndex": 4071023,
+    "estimatedLines": 1
+  },
+  {
+    "name": "J0",
+    "signature": "function J0()",
+    "body": "{O1=window.document.createElement(\"canvas\"),O1.style.cssText=`\n    xx-background-color: red;\n    xx-opacity: 0.5;\n    bottom: 0;\n    left: 0;\n    pointer-events: none;\n    position: fixed;\n    right: 0;\n    top: 0;\n    z-index: 1000000000;\n  `;var f=window.document.documentElement;f.insertBefore(O1,f.firstChild)}",
+    "keywords": [
+      "canvas",
+      "background"
+    ],
+    "category": "agent",
+    "startIndex": 4077633,
+    "estimatedLines": 11
+  },
+  {
+    "name": "fNA",
+    "signature": "function fNA(A,Q)",
+    "body": "{let B=A;if(Q.inverse)B=V1.inverse(B);if(Q.strikethrough)B=V1.strikethrough(B);if(Q.underline)B=V1.underline(B);if(Q.italic)B=V1.italic(B);if(Q.bold)B=V1.bold(B);if(Q.dim)B=V1.dim(B);if(Q.color)B=bNA(B,Q.color,\"foreground\");if(Q.backgroundColor)B=bNA(B,Q.backgroundColor,\"background\");return B}",
+    "keywords": [
+      "foreground",
+      "background"
+    ],
+    "category": "agent",
+    "startIndex": 4246548,
+    "estimatedLines": 1
+  },
+  {
+    "name": "as8",
+    "signature": "function as8(A)",
+    "body": "{if(A.length===0)return{};let Q=A[0].styles,B=A.slice(1),G=Q.color!==void 0&&B.every((V)=>V.styles.color===Q.color)?Q.color:void 0,Z=Q.backgroundColor!==void 0&&B.every((V)=>V.styles.backgroundColor===Q.backgroundColor)?Q.backgroundColor:void 0,Y=Q.dim!==void 0&&B.every((V)=>V.styles.dim===Q.dim)?Q.dim:void 0,J=Q.bold!==void 0&&B.every((V)=>V.styles.bold===Q.bold)?Q.bold:void 0,X=Q.italic!==void 0&&B.every((V)=>V.styles.italic===Q.italic)?Q.italic:void 0,I=Q.underline!==void 0&&B.every((V)=>V.styles.underline===Q.underline)?Q.underline:void 0,W=Q.strikethrough!==void 0&&B.every((V)=>V.styles.strikethrough===Q.strikethrough)?Q.strikethrough:void 0,K=Q.inverse!==void 0&&B.every((V)=>V.styles.inverse===Q.inverse)?Q.inverse:void 0;return{...G!==void 0&&{color:G},...Z!==void 0&&{backgroundColor",
+    "keywords": [
+      "background"
+    ],
+    "category": "agent",
+    "startIndex": 4250860,
+    "estimatedLines": 1
+  },
+  {
+    "name": "iU",
+    "signature": "function iU({color:A,backgroundColor:Q,bold:B,dim:G,italic:Z=!1,underline:Y=!1,strikethrough:J=!1,inverse:X=!1,wrap:I=\"wrap\",children:W})",
+    "body": "{if(W===void 0||W===null)return null;let K={...A&&{color:A},...Q&&{backgroundColor:Q},...G&&{dim:G},...B&&{bold:B},...Z&&{italic:Z},...Y&&{underline:Y},...J&&{strikethrough:J},...X&&{inverse:X}};return wWB.default.createElement(\"ink-text\",{style:{flexGrow:0,flexShrink:1,flexDirection:\"row\",textWrap:I},textStyles:K},W)}",
+    "keywords": [
+      "background",
+      "ink"
+    ],
+    "category": "agent",
+    "startIndex": 4289202,
+    "estimatedLines": 1
+  },
+  {
+    "name": "C",
+    "signature": "function C({color:A,backgroundColor:Q,dimColor:B=!1,bold:G=!1,italic:Z=!1,underline:Y=!1,strikethrough:J=!1,inverse:X=!1,wrap:I=\"wrap\",children:W})",
+    "body": "{let[K]=A2(),V=BT(K),H=B?V.inactive:Lt8(A,V),D=Q?V[Q]:void 0;return qWB.default.createElement(iU,{color:H,backgroundColor:D,bold:G,italic:Z,underline:Y,strikethrough:J,inverse:X,wrap:I},W)}",
+    "keywords": [
+      "background"
+    ],
+    "category": "agent",
+    "startIndex": 4289842,
+    "estimatedLines": 1
+  },
+  {
+    "name": "ut8",
+    "signature": "function ut8()",
+    "body": "{if(!process.stdout.isTTY)return!1;if(process.env.WT_SESSION)return!1;if(process.env.ConEmuANSI||process.env.ConEmuPID||process.env.ConEmuTask)return!0;let A=tNA.coerce(process.env.TERM_PROGRAM_VERSION);if(!A)return!1;if(process.env.TERM_PROGRAM===\"ghostty\")return tNA.gte(A,\"1.2.0\");if(process.env.TERM_PROGRAM===\"iTerm.app\")return tNA.gte(A,\"3.6.6\");return!1}",
+    "keywords": [
+      "ghostty",
+      "task",
+      "session",
+      "env"
+    ],
+    "category": "agent",
+    "startIndex": 4305197,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Xe8",
+    "signature": "function Xe8(A)",
+    "body": "{let Q={};if(A.bold)Q.bold=!0;if(A.dim)Q.dim=!0;if(A.italic)Q.italic=!0;if(A.underline!==\"none\")Q.underline=!0;if(A.strikethrough)Q.strikethrough=!0;if(A.inverse)Q.inverse=!0;let B=KKB(A.fg);if(B)Q.color=B;let G=KKB(A.bg);if(G)Q.backgroundColor=G;return Q}",
+    "keywords": [
+      "none",
+      "background"
+    ],
+    "category": "agent",
+    "startIndex": 4325369,
+    "estimatedLines": 1
+  },
+  {
+    "name": "We8",
+    "signature": "function We8(A,Q)",
+    "body": "{return A.color===Q.color&&A.backgroundColor===Q.backgroundColor&&A.bold===Q.bold&&A.dim===Q.dim&&A.italic===Q.italic&&A.underline===Q.underline&&A.strikethrough===Q.strikethrough&&A.inverse===Q.inverse&&A.hyperlink===Q.hyperlink}",
+    "keywords": [
+      "background",
+      "ink"
+    ],
+    "category": "agent",
+    "startIndex": 4325810,
+    "estimatedLines": 1
+  },
+  {
+    "name": "_03",
+    "signature": "function _03(A,Q,B)",
+    "body": "{if(aeA(this.options))this.options.debuglog(\"ignoring previous resize options\");if(this.options.widthPost!==-1)this.options.debuglog(\"operation order will be: extract, resize, extract\");if(N9.defined(A))if(N9.object(A)&&!N9.defined(B))B=A;else if(N9.integer(A)&&A>0)this.options.width=A;else throw N9.invalidParameterError(\"width\",\"positive integer\",A);else this.options.width=-1;if(N9.defined(Q))if(N9.integer(Q)&&Q>0)this.options.height=Q;else throw N9.invalidParameterError(\"height\",\"positive integer\",Q);else this.options.height=-1;if(N9.object(B)){if(N9.defined(B.width))if(N9.integer(B.width)&&B.width>0)this.options.width=B.width;else throw N9.invalidParameterError(\"width\",\"positive integer\",B.width);if(N9.defined(B.height))if(N9.integer(B.height)&&B.height>0)this.options.height=B.height;el",
+    "keywords": [
+      "width",
+      "height",
+      "position",
+      "resizeBackground",
+      "kernel",
+      "withoutEnlargement",
+      "withoutReduction",
+      "fastShrinkOnLoad",
+      "background",
+      "ink"
+    ],
+    "category": "agent",
+    "startIndex": 4431159,
+    "estimatedLines": 1
+  },
+  {
+    "name": "j03",
+    "signature": "function j03(A)",
+    "body": "{if(N9.integer(A)&&A>0)this.options.extendTop=A,this.options.extendBottom=A,this.options.extendLeft=A,this.options.extendRight=A;else if(N9.object(A)){if(N9.defined(A.top))if(N9.integer(A.top)&&A.top>=0)this.options.extendTop=A.top;else throw N9.invalidParameterError(\"top\",\"positive integer\",A.top);if(N9.defined(A.bottom))if(N9.integer(A.bottom)&&A.bottom>=0)this.options.extendBottom=A.bottom;else throw N9.invalidParameterError(\"bottom\",\"positive integer\",A.bottom);if(N9.defined(A.left))if(N9.integer(A.left)&&A.left>=0)this.options.extendLeft=A.left;else throw N9.invalidParameterError(\"left\",\"positive integer\",A.left);if(N9.defined(A.right))if(N9.integer(A.right)&&A.right>=0)this.options.extendRight=A.right;else throw N9.invalidParameterError(\"right\",\"positive integer\",A.right);if(this._se",
+    "keywords": [
+      "bottom",
+      "left",
+      "right",
+      "extendBackground",
+      "extendWith",
+      "extend",
+      "background"
+    ],
+    "category": "agent",
+    "startIndex": 4433092,
+    "estimatedLines": 1
+  },
+  {
+    "name": "P03",
+    "signature": "function P03(A)",
+    "body": "{if(this.options.trimThreshold=10,N9.defined(A))if(N9.object(A)){if(N9.defined(A.background))this._setBackgroundColourOption(\"trimBackground\",A.background);if(N9.defined(A.threshold))if(N9.number(A.threshold)&&A.threshold>=0)this.options.trimThreshold=A.threshold;else throw N9.invalidParameterError(\"threshold\",\"positive number\",A.threshold);if(N9.defined(A.lineArt))this._setBooleanOption(\"trimLineArt\",A.lineArt)}else throw N9.invalidParameterError(\"trim\",\"object\",A);if(Ci1(this.options))this.options.rotateBeforePreExtract=!0;return this}",
+    "keywords": [
+      "trimBackground",
+      "threshold",
+      "trimLineArt",
+      "trim",
+      "object",
+      "background"
+    ],
+    "category": "agent",
+    "startIndex": 4434775,
+    "estimatedLines": 1
+  },
+  {
+    "name": "y03",
+    "signature": "function y03(A,Q)",
+    "body": "{if(this.options.useExifOrientation||this.options.angle||this.options.rotationAngle)this.options.debuglog(\"ignoring previous rotate options\");if(!T0.defined(A))this.options.useExifOrientation=!0;else if(T0.integer(A)&&!(A%90))this.options.angle=A;else if(T0.number(A)){if(this.options.rotationAngle=A,T0.object(Q)&&Q.background){let B=x03(Q.background);this.options.rotationBackground=[B.red(),B.green(),B.blue(),Math.round(B.alpha()*255)]}}else throw T0.invalidParameterError(\"angle\",\"numeric\",A);return this}",
+    "keywords": [
+      "angle",
+      "numeric",
+      "background"
+    ],
+    "category": "agent",
+    "startIndex": 4437748,
+    "estimatedLines": 1
+  },
+  {
+    "name": "b03",
+    "signature": "function b03(A,Q)",
+    "body": "{let B=[].concat(...A);if(B.length===4&&B.every(T0.number))this.options.affineMatrix=B;else throw T0.invalidParameterError(\"matrix\",\"1x4 or 2x2 array\",A);if(T0.defined(Q))if(T0.object(Q)){if(this._setBackgroundColourOption(\"affineBackground\",Q.background),T0.defined(Q.idx))if(T0.number(Q.idx))this.options.affineIdx=Q.idx;else throw T0.invalidParameterError(\"options.idx\",\"number\",Q.idx);if(T0.defined(Q.idy))if(T0.number(Q.idy))this.options.affineIdy=Q.idy;else throw T0.invalidParameterError(\"options.idy\",\"number\",Q.idy);if(T0.defined(Q.odx))if(T0.number(Q.odx))this.options.affineOdx=Q.odx;else throw T0.invalidParameterError(\"options.odx\",\"number\",Q.odx);if(T0.defined(Q.ody))if(T0.number(Q.ody))this.options.affineOdy=Q.ody;else throw T0.invalidParameterError(\"options.ody\",\"number\",Q.ody);if(",
+    "keywords": [
+      "matrix",
+      "affineBackground",
+      "number",
+      "options",
+      "object",
+      "background"
+    ],
+    "category": "agent",
+    "startIndex": 4438399,
+    "estimatedLines": 1
+  }
+]

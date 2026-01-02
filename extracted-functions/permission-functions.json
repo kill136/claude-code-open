@@ -1,0 +1,671 @@
+[
+  {
+    "name": "rT0",
+    "signature": "function rT0()",
+    "body": "{return r0.allowedSettingSources}",
+    "keywords": [
+      "allow",
+      "setting"
+    ],
+    "category": "permission",
+    "startIndex": 35188,
+    "estimatedLines": 1
+  },
+  {
+    "name": "sT0",
+    "signature": "function sT0(A)",
+    "body": "{r0.allowedSettingSources=A}",
+    "keywords": [
+      "allow",
+      "setting"
+    ],
+    "category": "permission",
+    "startIndex": 35235,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Ll9",
+    "signature": "function Ll9(A)",
+    "body": "{let Q={className:\"number\",begin:/[$%]\\d+/},B={className:\"number\",begin:/\\d+/},G={className:\"number\",begin:/\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}(:\\d{1,5})?/},Z={className:\"number\",begin:/:\\d{1,5}/};return{name:\"Apache config\",aliases:[\"apacheconf\"],case_insensitive:!0,contains:[A.HASH_COMMENT_MODE,{className:\"section\",begin:/<\\/?/,end:/>/,contains:[G,Z,A.inherit(A.QUOTE_STRING_MODE,{relevance:0})]},{className:\"attribute\",begin:/\\w+/,relevance:0,keywords:{nomarkup:\"order deny allow setenv rewriterule rewriteengine rewritecond documentroot sethandler errordocument loadmodule options header listen serverroot servername\"},starts:{end:/$/,relevance:0,keywords:{literal:\"on off all deny allow\"},contains:[{className:\"meta\",begin:/\\s\\[/,end:/\\]$/},{className:\"variable\",begin:/[\\$%]\\{/,end:/\\}/,contai",
+    "keywords": [
+      "number",
+      "apacheconf",
+      "section",
+      "attribute",
+      "meta",
+      "variable",
+      "self",
+      "allow",
+      "deny",
+      "config",
+      "env"
+    ],
+    "category": "permission",
+    "startIndex": 328525,
+    "estimatedLines": 1
+  },
+  {
+    "name": "N74",
+    "signature": "function N74(A,Q,B)",
+    "body": "{return(Z)=>{let Y=Q(Z);if(A.allowExclusionByUser){if(!Y.find((X)=>X.name===A.name))return Y}return S4Q(A,Y,B)}}",
+    "keywords": [
+      "allow"
+    ],
+    "category": "permission",
+    "startIndex": 1530115,
+    "estimatedLines": 1
+  },
+  {
+    "name": "uD4",
+    "signature": "function uD4(A={},Q={})",
+    "body": "{return{allowUrls:[...A.allowUrls||[],...Q.allowUrls||[]],denyUrls:[...A.denyUrls||[],...Q.denyUrls||[]],ignoreErrors:[...A.ignoreErrors||[],...Q.ignoreErrors||[],...A.disableErrorDefaults?[]:bD4],ignoreTransactions:[...A.ignoreTransactions||[],...Q.ignoreTransactions||[],...A.disableTransactionDefaults?[]:fD4],ignoreInternal:A.ignoreInternal!==void 0?A.ignoreInternal:!0}}",
+    "keywords": [
+      "url",
+      "allow",
+      "deny"
+    ],
+    "category": "permission",
+    "startIndex": 1626073,
+    "estimatedLines": 1
+  },
+  {
+    "name": "mD4",
+    "signature": "function mD4(A,Q)",
+    "body": "{if(Q.ignoreInternal&&nD4(A))return Se.DEBUG_BUILD&&UH.logger.warn(`Event dropped due to being internal Sentry Error.\nEvent: ${UH.getEventDescription(A)}`),!0;if(dD4(A,Q.ignoreErrors))return Se.DEBUG_BUILD&&UH.logger.warn(`Event dropped due to being matched by \\`ignoreErrors\\` option.\nEvent: ${UH.getEventDescription(A)}`),!0;if(pD4(A,Q.ignoreTransactions))return Se.DEBUG_BUILD&&UH.logger.warn(`Event dropped due to being matched by \\`ignoreTransactions\\` option.\nEvent: ${UH.getEventDescription(A)}`),!0;if(cD4(A,Q.denyUrls))return Se.DEBUG_BUILD&&UH.logger.warn(`Event dropped due to being matched by \\`denyUrls\\` option.\nEvent: ${UH.getEventDescription(A)}.\nUrl: ${tdA(A)}`),!0;if(!lD4(A,Q.allowUrls))return Se.DEBUG_BUILD&&UH.logger.warn(`Event dropped due to not being matched by \\`allowUrls\\`",
+    "keywords": [
+      "url",
+      "allow",
+      "deny"
+    ],
+    "category": "permission",
+    "startIndex": 1626471,
+    "estimatedLines": 8
+  },
+  {
+    "name": "W",
+    "signature": "function W(FA,OA)",
+    "body": "{let X1=OA;for(;OA<FA.length;OA++)if(FA[OA]!=\"?\"&&FA[OA]!=\" \");else{let O1=FA.substr(X1,OA-X1);if(OA>5&&O1===\"xml\")return $(\"InvalidXml\",\"XML declaration allowed only at the start of the document.\",N(FA,OA));if(FA[OA]==\"?\"&&FA[OA+1]==\">\"){OA++;break}}return OA}",
+    "keywords": [
+      "InvalidXml",
+      "allow"
+    ],
+    "category": "permission",
+    "startIndex": 2308287,
+    "estimatedLines": 1
+  },
+  {
+    "name": "E",
+    "signature": "function E(FA,OA)",
+    "body": "{let X1=Z(FA,F),O1={};for(let C1=0;C1<X1.length;C1++){if(X1[C1][1].length===0)return $(\"InvalidAttr\",\"Attribute '\"+X1[C1][2]+\"' has no space in starting.\",M(X1[C1]));if(X1[C1][3]!==void 0&&X1[C1][4]===void 0)return $(\"InvalidAttr\",\"Attribute '\"+X1[C1][2]+\"' is without value.\",M(X1[C1]));if(X1[C1][3]===void 0&&!OA.allowBooleanAttributes)return $(\"InvalidAttr\",\"boolean attribute '\"+X1[C1][2]+\"' is not allowed.\",M(X1[C1]));let z1=X1[C1][2];if(!L(z1))return $(\"InvalidAttr\",\"Attribute '\"+z1+\"' is an invalid name.\",M(X1[C1]));if(O1.hasOwnProperty(z1))return $(\"InvalidAttr\",\"Attribute '\"+z1+\"' is repeated.\",M(X1[C1]));O1[z1]=1}return!0}",
+    "keywords": [
+      "InvalidAttr",
+      "allow"
+    ],
+    "category": "permission",
+    "startIndex": 2309523,
+    "estimatedLines": 1
+  },
+  {
+    "name": "xA",
+    "signature": "function xA(FA,OA,X1)",
+    "body": "{if(this.options.ignoreAttributes!==!0&&typeof FA==\"string\"){let O1=Z(FA,EA),C1=O1.length,z1={};for(let Y0=0;Y0<C1;Y0++){let Z0=this.resolveNameSpace(O1[Y0][1]);if(this.ignoreAttributesFn(Z0,OA))continue;let J0=O1[Y0][4],$Q=this.options.attributeNamePrefix+Z0;if(Z0.length)if(this.options.transformAttributeName&&($Q=this.options.transformAttributeName($Q)),$Q===\"__proto__\"&&($Q=\"#__proto__\"),J0!==void 0){this.options.trimValues&&(J0=J0.trim()),J0=this.replaceEntitiesValue(J0);let yB=this.options.attributeValueProcessor(Z0,J0,OA);z1[$Q]=yB==null?J0:typeof yB!=typeof J0||yB!==J0?yB:kA(J0,this.options.parseAttributeValue,this.options.numberParseOptions)}else this.options.allowBooleanAttributes&&(z1[$Q]=!0)}if(!Object.keys(z1).length)return;if(this.options.attributesGroupName){let Y0={};return ",
+    "keywords": [
+      "string",
+      "__proto__",
+      "allow"
+    ],
+    "category": "permission",
+    "startIndex": 2317020,
+    "estimatedLines": 1
+  },
+  {
+    "name": "C78",
+    "signature": "function C78(A)",
+    "body": "{let Q=$wA(A);if(jhQ(Q)&&J78.has(Q.port))return\"blocked\";return\"allowed\"}",
+    "keywords": [
+      "blocked",
+      "allowed",
+      "allow"
+    ],
+    "category": "permission",
+    "startIndex": 3076667,
+    "estimatedLines": 1
+  },
+  {
+    "name": "N78",
+    "signature": "function N78()",
+    "body": "{return\"allowed\"}",
+    "keywords": [
+      "allowed",
+      "allow"
+    ],
+    "category": "permission",
+    "startIndex": 3077370,
+    "estimatedLines": 1
+  },
+  {
+    "name": "wiQ",
+    "signature": "function wiQ(A,Q)",
+    "body": "{let B=qC(A);if(!Q||Q.length===0)return B;if(zB())return console.warn(\"Warning: Custom betas are only available for API key users. Ignoring provided betas.\"),B;let G=[];for(let Z of Q)if($iQ.includes(Z))G.push(Z);else console.warn(`Warning: Beta header '${Z}' is not allowed. Only the following betas are supported: ${$iQ.join(\", \")}`);return[...B,...G.filter((Z)=>!B.includes(Z))]}",
+    "keywords": [
+      "allow"
+    ],
+    "category": "permission",
+    "startIndex": 3334669,
+    "estimatedLines": 1
+  },
+  {
+    "name": "j7",
+    "signature": "function j7()",
+    "body": "{return!!(window.document&&window.document.featurePolicy&&window.document.featurePolicy.allowsFeature(\"sync-xhr\"))}",
+    "keywords": [
+      "allow"
+    ],
+    "category": "permission",
+    "startIndex": 4103724,
+    "estimatedLines": 1
+  },
+  {
+    "name": "g23",
+    "signature": "function g23(A,Q)",
+    "body": "{if(!A||!A.permissions)return[];let{permissions:B}=A,G=[];for(let Z of f23){let Y=B[Z];if(Y)for(let J of Y)G.push({source:Q,ruleBehavior:Z,ruleValue:gM(J)})}return G}",
+    "keywords": [
+      "permission"
+    ],
+    "category": "permission",
+    "startIndex": 4528805,
+    "estimatedLines": 1
+  },
+  {
+    "name": "gFB",
+    "signature": "function gFB(A)",
+    "body": "{if(!u23.includes(A.source))return!1;let Q=s5(A.ruleValue),B=gB(A.source);if(!B||!B.permissions)return!1;let G=B.permissions[A.ruleBehavior];if(!G||!G.includes(Q))return!1;try{let Z={...B,permissions:{...B.permissions,[A.ruleBehavior]:G.filter((J)=>J!==Q)}},{error:Y}=nB(A.source,Z);if(Y)return!1;return!0}catch(Z){return t(Z instanceof Error?Z:Error(String(Z))),!1}}",
+    "keywords": [
+      "permission"
+    ],
+    "category": "permission",
+    "startIndex": 4529102,
+    "estimatedLines": 1
+  },
+  {
+    "name": "m23",
+    "signature": "function m23()",
+    "body": "{return{permissions:{}}}",
+    "keywords": [
+      "permission"
+    ],
+    "category": "permission",
+    "startIndex": 4529484,
+    "estimatedLines": 1
+  },
+  {
+    "name": "_A1",
+    "signature": "function _A1({ruleValues:A,ruleBehavior:Q},B)",
+    "body": "{if(A.length<1)return!0;let G=A.map(s5),Z=gB(B)||h23(B)||m23();try{let Y=Z.permissions||{},J=Y[Q]||[],X=new Set(J),I=G.filter((V)=>!X.has(V));if(I.length===0)return!0;let W={...Z,permissions:{...Y,[Q]:[...J,...I]}},K=nB(B,W);if(K.error)throw K.error;return!0}catch(Y){return t(Y instanceof Error?Y:Error(String(Y))),!1}}",
+    "keywords": [
+      "permission"
+    ],
+    "category": "permission",
+    "startIndex": 4529522,
+    "estimatedLines": 1
+  },
+  {
+    "name": "WW",
+    "signature": "function WW(A,Q)",
+    "body": "{switch(Q.type){case\"setMode\":return k(`Applying permission update: Setting mode to '${Q.mode}'`),{...A,mode:Q.mode};case\"addRules\":{let B=Q.rules.map((Z)=>s5(Z));k(`Applying permission update: Adding ${Q.rules.length} ${Q.behavior} rule(s) to destination '${Q.destination}': ${JSON.stringify(B)}`);let G=Q.behavior===\"allow\"?\"alwaysAllowRules\":Q.behavior===\"deny\"?\"alwaysDenyRules\":\"alwaysAskRules\";return{...A,[G]:{...A[G],[Q.destination]:[...A[G][Q.destination]||[],...B]}}}case\"replaceRules\":{let B=Q.rules.map((Z)=>s5(Z));k(`Replacing all ${Q.behavior} rules for destination '${Q.destination}' with ${Q.rules.length} rule(s): ${JSON.stringify(B)}`);let G=Q.behavior===\"allow\"?\"alwaysAllowRules\":Q.behavior===\"deny\"?\"alwaysDenyRules\":\"alwaysAskRules\";return{...A,[G]:{...A[G],[Q.destination]:B}}}",
+    "keywords": [
+      "setMode",
+      "addRules",
+      "allow",
+      "alwaysAllowRules",
+      "deny",
+      "alwaysDenyRules",
+      "alwaysAskRules",
+      "replaceRules",
+      "addDirectories",
+      "removeRules",
+      "removeDirectories",
+      "permission",
+      "setting"
+    ],
+    "category": "permission",
+    "startIndex": 4530183,
+    "estimatedLines": 1
+  },
+  {
+    "name": "TA1",
+    "signature": "function TA1(A,Q=\"session\")",
+    "body": "{try{if(jA().statSync(A).isDirectory()){let G=PA1(A);if(G===\"/\")return;return{type:\"addRules\",rules:[{toolName:\"Read\",ruleContent:d23.isAbsolute(G)?`/${G}/**`:`${G}/**`}],behavior:\"allow\",destination:Q}}}catch{}return}",
+    "keywords": [
+      "addRules",
+      "Read",
+      "allow"
+    ],
+    "category": "permission",
+    "startIndex": 4533772,
+    "estimatedLines": 1
+  },
+  {
+    "name": "KEB",
+    "signature": "function KEB(A=!1)",
+    "body": "{try{let Q=Gn1(\"which\",[\"bwrap\"],{stdio:\"ignore\",timeout:1000}),B=Gn1(\"which\",[\"socat\"],{stdio:\"ignore\",timeout:1000}),G=Q.status===0&&B.status===0;if(!A){let Z=Qn1()!==null,Y=kA1()!==null;if(!Z||!Y)FB(`[Sandbox Linux] Seccomp filtering not available (missing binaries for ${process.arch}). Sandbox will run without Unix socket blocking (allowAllUnixSockets mode). This is less restrictive but still provides filesystem and network isolation.`,{level:\"warn\"})}return G}catch{return!1}}",
+    "keywords": [
+      "which",
+      "bwrap",
+      "ignore",
+      "socat",
+      "warn",
+      "sandbox",
+      "allow"
+    ],
+    "category": "permission",
+    "startIndex": 4549387,
+    "estimatedLines": 1
+  },
+  {
+    "name": "H93",
+    "signature": "function H93(A,Q,B={command:\"rg\"},G=Yn1,Z=!1,Y)",
+    "body": "{let J=[];if(Q){J.push(\"--ro-bind\",\"/\",\"/\");let I=[];for(let K of Q.allowOnly||[]){let V=WT(K);if(FB(`[Sandbox Linux] Processing write path: ${K} -> ${V}`),V.startsWith(\"/dev/\")){FB(`[Sandbox Linux] Skipping /dev path: ${V}`);continue}if(!KT.existsSync(V)){FB(`[Sandbox Linux] Skipping non-existent write path: ${V}`);continue}J.push(\"--bind\",V,V),I.push(V)}let W=[...Q.denyWithinAllow||[],...await W93(B,G,Z,Y)];for(let K of W){let V=WT(K);if(V.startsWith(\"/dev/\"))continue;if(!KT.existsSync(V)){FB(`[Sandbox Linux] Skipping non-existent deny path: ${V}`);continue}if(I.some((D)=>V.startsWith(D+\"/\")||V===D))J.push(\"--ro-bind\",V,V);else FB(`[Sandbox Linux] Skipping deny path not within allowed paths: ${V}`)}}else J.push(\"--bind\",\"/\",\"/\");let X=[...A?.denyOnly||[]];if(KT.existsSync(\"/etc/ssh/ssh_c",
+    "keywords": [
+      "sandbox",
+      "allow",
+      "deny",
+      "config"
+    ],
+    "category": "permission",
+    "startIndex": 4552234,
+    "estimatedLines": 1
+  },
+  {
+    "name": "C93",
+    "signature": "function C93(A,Q)",
+    "body": "{if(!A)return[\"(allow file-read*)\"];let B=[];B.push(\"(allow file-read*)\");for(let G of A.denyOnly||[]){let Z=WT(G);if(IT(Z)){let Y=bA1(Z);B.push(\"(deny file-read*\",`  (regex ${xN(Y)})`,`  (with message \"${Q}\"))`)}else B.push(\"(deny file-read*\",`  (subpath ${xN(Z)})`,`  (with message \"${Q}\"))`)}return B.push(...CEB(A.denyOnly||[],Q)),B}",
+    "keywords": [
+      "message",
+      "allow",
+      "deny"
+    ],
+    "category": "permission",
+    "startIndex": 4557491,
+    "estimatedLines": 1
+  },
+  {
+    "name": "$93",
+    "signature": "function $93(A,Q,B=!1)",
+    "body": "{if(!A)return[\"(allow file-write*)\"];let G=[],Z=w93();for(let J of Z){let X=WT(J);G.push(\"(allow file-write*\",`  (subpath ${xN(X)})`,`  (with message \"${Q}\"))`)}for(let J of A.allowOnly||[]){let X=WT(J);if(IT(X)){let I=bA1(X);G.push(\"(allow file-write*\",`  (regex ${xN(I)})`,`  (with message \"${Q}\"))`)}else G.push(\"(allow file-write*\",`  (subpath ${xN(X)})`,`  (with message \"${Q}\"))`)}let Y=[...A.denyWithinAllow||[],...E93(B)];for(let J of Y){let X=WT(J);if(IT(X)){let I=bA1(X);G.push(\"(deny file-write*\",`  (regex ${xN(I)})`,`  (with message \"${Q}\"))`)}else G.push(\"(deny file-write*\",`  (subpath ${xN(X)})`,`  (with message \"${Q}\"))`)}return G.push(...CEB(Y,Q)),G}",
+    "keywords": [
+      "message",
+      "allow",
+      "deny"
+    ],
+    "category": "permission",
+    "startIndex": 4557845,
+    "estimatedLines": 1
+  },
+  {
+    "name": "U93",
+    "signature": "function U93({readConfig:A,writeConfig:Q,httpProxyPort:B,socksProxyPort:G,needsNetworkRestriction:Z,allowUnixSockets:Y,allowAllUnixSockets:J,allowLocalBinding:X,allowPty:I,allowGitConfig:W=!1,logTag:K})",
+    "body": "{let V=[\"(version 1)\",`(deny default (with message \"${K}\"))`,\"\",`; LogTag: ${K}`,\"\",\"; Essential permissions - based on Chrome sandbox policy\",\"; Process permissions\",\"(allow process-exec)\",\"(allow process-fork)\",\"(allow process-info* (target same-sandbox))\",\"(allow signal (target same-sandbox))\",\"(allow mach-priv-task-port (target same-sandbox))\",\"\",\"; User preferences\",\"(allow user-preference-read)\",\"\",\"; Mach IPC - specific services only (no wildcard)\",\"(allow mach-lookup\",'  (global-name \"com.apple.audio.systemsoundserver\")','  (global-name \"com.apple.distributed_notifications@Uv3\")','  (global-name \"com.apple.FontObjectsServer\")','  (global-name \"com.apple.fonts\")','  (global-name \"com.apple.logd\")','  (global-name \"com.apple.lsd.mapdb\")','  (global-name \"com.apple.PowerManagement.con",
+    "keywords": [
+      "IOSurfaceRootUserClient",
+      "RootDomainUserClient",
+      "IOSurfaceSendRight",
+      "exec",
+      "sandbox",
+      "glob",
+      "agent",
+      "task",
+      "protocol",
+      "message",
+      "auth",
+      "sse",
+      "permission",
+      "allow",
+      "deny",
+      "config"
+    ],
+    "category": "permission",
+    "startIndex": 4558536,
+    "estimatedLines": 2
+  },
+  {
+    "name": "MEB",
+    "signature": "function MEB(A,Q,B)",
+    "body": "{if(!E8)return FB(\"No config available, denying network request\"),!1;for(let G of E8.network.deniedDomains)if(NEB(Q,G))return FB(`Denied by config rule: ${Q}:${A}`),!1;for(let G of E8.network.allowedDomains)if(NEB(Q,G))return FB(`Allowed by config rule: ${Q}:${A}`),!0;if(!B)return FB(`No matching config rule, denying: ${Q}:${A}`),!1;FB(`No matching config rule, asking user: ${Q}:${A}`);try{if(await B({host:Q,port:A}))return FB(`User allowed: ${Q}:${A}`),!0;else return FB(`User denied: ${Q}:${A}`),!1}catch(G){return FB(`Error in permission callback: ${G}`,{level:\"error\"}),!1}}",
+    "keywords": [
+      "error",
+      "request",
+      "permission",
+      "allow",
+      "deny",
+      "config"
+    ],
+    "category": "permission",
+    "startIndex": 4568436,
+    "estimatedLines": 1
+  },
+  {
+    "name": "j93",
+    "signature": "function j93()",
+    "body": "{if(!E8)return{};let A=E8.network.allowedDomains,Q=E8.network.deniedDomains;return{...A.length>0&&{allowedHosts:A},...Q.length>0&&{deniedHosts:Q}}}",
+    "keywords": [
+      "allow"
+    ],
+    "category": "permission",
+    "startIndex": 4571575,
+    "estimatedLines": 1
+  },
+  {
+    "name": "jEB",
+    "signature": "function jEB()",
+    "body": "{return E8?.network?.allowUnixSockets}",
+    "keywords": [
+      "allow"
+    ],
+    "category": "permission",
+    "startIndex": 4571736,
+    "estimatedLines": 1
+  },
+  {
+    "name": "LEB",
+    "signature": "function LEB()",
+    "body": "{return E8?.network?.allowAllUnixSockets}",
+    "keywords": [
+      "allow"
+    ],
+    "category": "permission",
+    "startIndex": 4571788,
+    "estimatedLines": 1
+  },
+  {
+    "name": "TEB",
+    "signature": "function TEB()",
+    "body": "{return E8?.network?.allowLocalBinding}",
+    "keywords": [
+      "allow"
+    ],
+    "category": "permission",
+    "startIndex": 4571843,
+    "estimatedLines": 1
+  },
+  {
+    "name": "OEB",
+    "signature": "function OEB()",
+    "body": "{return E8?.filesystem?.allowGitConfig??!1}",
+    "keywords": [
+      "allow",
+      "config"
+    ],
+    "category": "permission",
+    "startIndex": 4572095,
+    "estimatedLines": 1
+  },
+  {
+    "name": "b93",
+    "signature": "function b93()",
+    "body": "{if(uM()!==\"linux\"||!E8)return[];let A=[],Q=[...E8.filesystem.denyRead,...E8.filesystem.allowWrite,...E8.filesystem.denyWrite];for(let B of Q){let G=NLA(B);if(IT(G))A.push(B)}return A}",
+    "keywords": [
+      "linux",
+      "allow",
+      "deny"
+    ],
+    "category": "permission",
+    "startIndex": 4575650,
+    "estimatedLines": 1
+  },
+  {
+    "name": "wn1",
+    "signature": "function wn1(A)",
+    "body": "{let Q=A.permissions||{},B=[],G=[];for(let H of A.sandbox?.network?.allowedDomains||[])B.push(H);for(let H of Q.allow||[]){let D=vLA(H);if(D.toolName===VI&&D.ruleContent?.startsWith(\"domain:\"))B.push(D.ruleContent.substring(7))}for(let H of Q.deny||[]){let D=vLA(H);if(D.toolName===VI&&D.ruleContent?.startsWith(\"domain:\"))G.push(D.ruleContent.substring(7))}let Z=[\".\"],Y=[],J=[],X=SN.map((H)=>PC(H)).filter((H)=>H!==void 0);Y.push(...X);let I=M8A(),W=nQ();if(I!==W)Y.push(Un1(I,\".claude\",\"settings.json\")),Y.push(Un1(I,\".claude\",\"settings.local.json\"));let K=p43(I,\".git\");try{if(c43(K).isFile()){let F=l43(K,{encoding:\"utf8\"}).match(/^gitdir:\\s*(.+)$/m);if(F?.[1]){let E=F[1].trim(),z=E.indexOf(\".git\");if(z>0){let $=E.substring(0,z-1);if($!==I)Z.push($)}}}}catch{}for(let H of SN){let D=gB(H);if(!",
+    "keywords": [
+      "utf8",
+      "command",
+      "sandbox",
+      "ripgrep",
+      "grep",
+      "http",
+      "permission",
+      "allow",
+      "deny",
+      "setting"
+    ],
+    "category": "permission",
+    "startIndex": 4647866,
+    "estimatedLines": 1
+  },
+  {
+    "name": "r43",
+    "signature": "function r43()",
+    "body": "{if(kQ()!==\"linux\")return[];try{let Q=zQ();if(!Q?.sandbox?.enabled)return[];let B=Q?.permissions||{},G=[],Z=(Y)=>{let J=Y.replace(/\\/\\*\\*$/,\"\");return/[*?[\\]]/.test(J)};for(let Y of[...B.allow||[],...B.deny||[]]){let J=vLA(Y);if((J.toolName===j3||J.toolName===T3)&&J.ruleContent&&Z(J.ruleContent))G.push(Y)}return G}catch(Q){return k(`Failed to get Linux glob pattern warnings: ${Q}`),[]}}",
+    "keywords": [
+      "linux",
+      "sandbox",
+      "glob",
+      "pattern",
+      "permission",
+      "allow",
+      "deny"
+    ],
+    "category": "permission",
+    "startIndex": 4649904,
+    "estimatedLines": 1
+  },
+  {
+    "name": "l63",
+    "signature": "function l63({path:A})",
+    "body": "{return z6.createElement(T,{flexDirection:\"column\",paddingX:2,gap:1},z6.createElement(C,{color:\"permission\"},A),z6.createElement($CB,null))}",
+    "keywords": [
+      "column",
+      "permission"
+    ],
+    "category": "permission",
+    "startIndex": 4708480,
+    "estimatedLines": 1
+  },
+  {
+    "name": "JW3",
+    "signature": "function JW3(A,{transitionalProcessing:Q})",
+    "body": "{let B=\"\";for(let G of A){let[Z,Y]=KMB(G.codePointAt(0));switch(Z){case zn.disallowed:B+=G;break;case zn.ignored:break;case zn.mapped:if(Q&&G===\"ẞ\")B+=\"ss\";else B+=Y;break;case zn.deviation:if(Q)B+=Y;else B+=G;break;case zn.valid:B+=G;break}}return B}",
+    "keywords": [
+      "allow"
+    ],
+    "category": "permission",
+    "startIndex": 5112766,
+    "estimatedLines": 1
+  },
+  {
+    "name": "TT3",
+    "signature": "function TT3()",
+    "body": "{var A;return((A=process.env.AZURE_ADDITIONALLY_ALLOWED_TENANTS)!==null&&A!==void 0?A:\"\").split(\";\")}",
+    "keywords": [
+      "allow",
+      "env"
+    ],
+    "category": "permission",
+    "startIndex": 5758812,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Wh3",
+    "signature": "function Wh3(A,Q)",
+    "body": "{if(A.schemaEnv.meta||!A.opts.strictTypes)return;if(Kh3(A,Q),!A.opts.allowUnionTypes)Vh3(A,Q);Hh3(A,A.dataTypes)}",
+    "keywords": [
+      "allow",
+      "env"
+    ],
+    "category": "permission",
+    "startIndex": 6098222,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Kh3",
+    "signature": "function Kh3(A,Q)",
+    "body": "{if(!Q.length)return;if(!A.dataTypes.length){A.dataTypes=Q;return}Q.forEach((B)=>{if(!miB(A.dataTypes,B))Q80(A,`type \"${B}\" not allowed by context \"${A.dataTypes.join(\",\")}\"`)}),Fh3(A,Q)}",
+    "keywords": [
+      "allow"
+    ],
+    "category": "permission",
+    "startIndex": 6098352,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Vh3",
+    "signature": "function Vh3(A,Q)",
+    "body": "{if(Q.length>1&&!(Q.length===2&&Q.includes(\"null\")))Q80(A,\"use allowUnionTypes to allow union type keyword\")}",
+    "keywords": [
+      "null",
+      "allow"
+    ],
+    "category": "permission",
+    "startIndex": 6098556,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Ki3",
+    "signature": "function Ki3(A,Q)",
+    "body": "{if(A.schemaEnv.meta||!A.opts.strictTypes)return;if(Vi3(A,Q),!A.opts.allowUnionTypes)Hi3(A,Q);Di3(A,A.dataTypes)}",
+    "keywords": [
+      "allow",
+      "env"
+    ],
+    "category": "permission",
+    "startIndex": 6222427,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Vi3",
+    "signature": "function Vi3(A,Q)",
+    "body": "{if(!Q.length)return;if(!A.dataTypes.length){A.dataTypes=Q;return}Q.forEach((B)=>{if(!zsB(A.dataTypes,B))e80(A,`type \"${B}\" not allowed by context \"${A.dataTypes.join(\",\")}\"`)}),Ei3(A,Q)}",
+    "keywords": [
+      "allow"
+    ],
+    "category": "permission",
+    "startIndex": 6222557,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Hi3",
+    "signature": "function Hi3(A,Q)",
+    "body": "{if(Q.length>1&&!(Q.length===2&&Q.includes(\"null\")))e80(A,\"use allowUnionTypes to allow union type keyword\")}",
+    "keywords": [
+      "null",
+      "allow"
+    ],
+    "category": "permission",
+    "startIndex": 6222761,
+    "estimatedLines": 1
+  },
+  {
+    "name": "R02",
+    "signature": "function R02(A)",
+    "body": "{if(A=Oe3(A||{}),A.stripIgnoreTag){if(A.onIgnoreTag)console.error('Notes: cannot use these two options \"stripIgnoreTag\" and \"onIgnoreTag\" at the same time');A.onIgnoreTag=_R.onIgnoreTagStripAll}if(A.whiteList||A.allowList)A.whiteList=Me3(A.whiteList||A.allowList);else A.whiteList=_R.whiteList;if(this.attributeWrapSign=A.singleQuotedAttributeValue===!0?\"'\":_R.attributeWrapSign,A.onTag=A.onTag||_R.onTag,A.onTagAttr=A.onTagAttr||_R.onTagAttr,A.onIgnoreTag=A.onIgnoreTag||_R.onIgnoreTag,A.onIgnoreTagAttr=A.onIgnoreTagAttr||_R.onIgnoreTagAttr,A.safeAttrValue=A.safeAttrValue||_R.safeAttrValue,A.escapeHtml=A.escapeHtml||_R.escapeHtml,this.options=A,A.css===!1)this.cssFilter=!1;else A.css=A.css||{},this.cssFilter=new we3(A.css)}",
+    "keywords": [
+      "stripIgnoreTag",
+      "onIgnoreTag",
+      "allow"
+    ],
+    "category": "permission",
+    "startIndex": 6418408,
+    "estimatedLines": 1
+  },
+  {
+    "name": "FP",
+    "signature": "function FP(A,Q)",
+    "body": "{if(!rBA(A)){if(hTA(A))throw Error(`Marketplace source '${RWA(A)}' is blocked by enterprise policy.`);let J=MWA()||[];throw Error(`Marketplace source '${RWA(A)}' is blocked by enterprise policy. `+(J.length>0?`Allowed sources: ${J.map((X)=>RWA(X)).join(\", \")}`:\"No external marketplaces are allowed.\"))}let{marketplace:B,cachePath:G}=await n50(A,Q),Z=n02(B.name,A);if(Z)throw Error(Z);let Y=await t3();if(Y[B.name])throw Error(`Marketplace '${B.name}' is already installed. Please remove it first using '/plugin marketplace remove ${B.name}' if you want to re-install it.`);return Y[B.name]={source:A,installLocation:G,lastUpdated:new Date().toISOString()},await jWA(Y),k(`Added marketplace source: ${B.name}`),{name:B.name}}",
+    "keywords": [
+      "allow"
+    ],
+    "category": "permission",
+    "startIndex": 6480340,
+    "estimatedLines": 1
+  },
+  {
+    "name": "PWA",
+    "signature": "function PWA(A,Q,B)",
+    "body": "{let G=A;return await Promise.all([...A.matchAll(fA5),...A.matchAll(hA5)].map(async(Z)=>{let Y=Z[1]?.trim();if(Y)try{let J=await V$(M9,{command:Y},Q,TF({content:[]}),\"\");if(J.behavior!==\"allow\")throw k(`Bash command permission check failed for command in ${B}: ${Y}. Error: ${J.message}`),new gx(`Bash command permission check failed for pattern \"${Z[0]}\": ${J.message||\"Permission denied\"}`);let{data:X}=await M9.call({command:Y},Q),I=CQ2(X.stdout,X.stderr);G=G.replace(Z[0],I)}catch(J){if(J instanceof gx)throw J;gA5(J,Z[0])}})),G}",
+    "keywords": [
+      "allow",
+      "command",
+      "pattern",
+      "message",
+      "permission"
+    ],
+    "category": "permission",
+    "startIndex": 6496162,
+    "estimatedLines": 1
+  },
+  {
+    "name": "CPA",
+    "signature": "function CPA(A,Q,B,G,Z,Y,J={isSkillMode:!1})",
+    "body": "{try{let{frontmatter:X,content:I}=Q,W=X.description??Um(I,Y?\"Plugin skill\":\"Plugin command\"),K=qP(X[\"allowed-tools\"]),V=X[\"argument-hint\"],H=X.when_to_use,D=X.version,F=X.name,E=X.model===\"inherit\"?void 0:X.model?$K(X.model):void 0,z=X[\"disable-model-invocation\"],$;if(J.isSkillMode)$=z===void 0?!1:F0(z);else $=F0(z);let L=J.isSkillMode?U65:$65,N=`${W} (${L}:${B})`,M=J.isSkillMode?!0:!1;return{type:\"prompt\",name:A,description:N,hasUserSpecifiedDescription:!!X.description,allowedTools:K,argumentHint:V,whenToUse:H,version:D,model:E,disableModelInvocation:$,contentLength:I.length,source:\"plugin\",loadedFrom:Y||J.isSkillMode?\"plugin\":void 0,pluginInfo:{pluginManifest:G,repository:B},isEnabled:()=>!0,isHidden:M,progressMessage:Y||J.isSkillMode?\"loading\":\"running\",userFacingName(){return F||A},asy",
+    "keywords": [
+      "inherit",
+      "prompt",
+      "plugin",
+      "loading",
+      "running",
+      "text",
+      "error",
+      "command",
+      "message",
+      "permission",
+      "allow"
+    ],
+    "category": "permission",
+    "startIndex": 6856551,
+    "estimatedLines": 5
+  },
+  {
+    "name": "BY2",
+    "signature": "function BY2(A)",
+    "body": "{switch(A){case\"allow\":return\"allowed\";case\"deny\":return\"denied\";default:return\"asked for confirmation for\"}}",
+    "keywords": [
+      "allow",
+      "allowed",
+      "deny",
+      "denied"
+    ],
+    "category": "permission",
+    "startIndex": 7279046,
+    "estimatedLines": 1
+  },
+  {
+    "name": "CX5",
+    "signature": "function CX5(A,Q,B)",
+    "body": "{let{rateLimitType:G,claimAbbrev:Z,windowSeconds:Y,thresholds:J}=Q,X=A.get(`anthropic-ratelimit-unified-${Z}-utilization`),I=A.get(`anthropic-ratelimit-unified-${Z}-reset`);if(X===null||I===null)return null;let W=Number(X),K=Number(I),V=FX5(K,Y);if(!J.some((D)=>W>=D.utilization&&V<=D.timePct))return null;return{status:\"allowed_warning\",resetsAt:K,rateLimitType:G,utilization:W,unifiedRateLimitFallbackAvailable:B,isUsingOverage:!1}}",
+    "keywords": [
+      "allowed_warning",
+      "allow"
+    ],
+    "category": "permission",
+    "startIndex": 7283789,
+    "estimatedLines": 1
+  },
+  {
+    "name": "XY2",
+    "signature": "function XY2(A)",
+    "body": "{let Q=A.get(\"anthropic-ratelimit-unified-status\")||\"allowed\",B=A.get(\"anthropic-ratelimit-unified-reset\"),G=B?Number(B):void 0,Z=A.get(\"anthropic-ratelimit-unified-fallback\")===\"available\",Y=A.get(\"anthropic-ratelimit-unified-representative-claim\"),J=A.get(\"anthropic-ratelimit-unified-overage-status\"),X=A.get(\"anthropic-ratelimit-unified-overage-reset\"),I=X?Number(X):void 0,W=A.get(\"anthropic-ratelimit-unified-overage-disabled-reason\"),K=Q===\"rejected\"&&(J===\"allowed\"||J===\"allowed_warning\"),V=Q;if(Q===\"allowed\"||Q===\"allowed_warning\"){let H=$X5(A,Z);if(H)return H;V=\"allowed\"}return{status:V,resetsAt:G,unifiedRateLimitFallbackAvailable:Z,...Y&&{rateLimitType:Y},...J&&{overageStatus:J},...I&&{overageResetsAt:I},...W&&{overageDisabledReason:W},isUsingOverage:K}}",
+    "keywords": [
+      "allowed",
+      "available",
+      "rejected",
+      "allowed_warning",
+      "allow"
+    ],
+    "category": "permission",
+    "startIndex": 7284350,
+    "estimatedLines": 1
+  },
+  {
+    "name": "mY0",
+    "signature": "function mY0(A)",
+    "body": "{let Q=zB();if(!bKA(Q)){if(iR.status!==\"allowed\"||iR.resetsAt)y71({status:\"allowed\",unifiedRateLimitFallbackAvailable:!1,isUsingOverage:!1});return}let B=kY0(A),G=XY2(B);if(!Ze(iR,G))y71(G)}",
+    "keywords": [
+      "allowed",
+      "allow"
+    ],
+    "category": "permission",
+    "startIndex": 7285136,
+    "estimatedLines": 1
+  }
+]

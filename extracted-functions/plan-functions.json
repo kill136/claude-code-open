@@ -1,0 +1,472 @@
+[
+  {
+    "name": "GP0",
+    "signature": "function GP0()",
+    "body": "{return r0.hasExitedPlanMode}",
+    "keywords": [
+      "plan",
+      "PlanMode"
+    ],
+    "category": "plan",
+    "startIndex": 35561,
+    "estimatedLines": 1
+  },
+  {
+    "name": "df",
+    "signature": "function df(A)",
+    "body": "{r0.hasExitedPlanMode=A}",
+    "keywords": [
+      "plan",
+      "PlanMode"
+    ],
+    "category": "plan",
+    "startIndex": 35604,
+    "estimatedLines": 1
+  },
+  {
+    "name": "ZP0",
+    "signature": "function ZP0()",
+    "body": "{return r0.needsPlanModeExitAttachment}",
+    "keywords": [
+      "plan",
+      "PlanMode"
+    ],
+    "category": "plan",
+    "startIndex": 35642,
+    "estimatedLines": 1
+  },
+  {
+    "name": "op",
+    "signature": "function op(A)",
+    "body": "{r0.needsPlanModeExitAttachment=A}",
+    "keywords": [
+      "plan",
+      "PlanMode"
+    ],
+    "category": "plan",
+    "startIndex": 35695,
+    "estimatedLines": 1
+  },
+  {
+    "name": "rp",
+    "signature": "function rp(A,Q)",
+    "body": "{if(Q===\"plan\"&&A!==\"plan\")r0.needsPlanModeExitAttachment=!1;if(A===\"plan\"&&Q!==\"plan\")r0.needsPlanModeExitAttachment=!0}",
+    "keywords": [
+      "plan",
+      "PlanMode"
+    ],
+    "category": "plan",
+    "startIndex": 35743,
+    "estimatedLines": 1
+  },
+  {
+    "name": "PEA",
+    "signature": "function PEA()",
+    "body": "{return r0.planSlugCache}",
+    "keywords": [
+      "plan"
+    ],
+    "category": "plan",
+    "startIndex": 36452,
+    "estimatedLines": 1
+  },
+  {
+    "name": "ho9",
+    "signature": "function ho9(A)",
+    "body": "{return{name:\"RenderMan RIB\",keywords:\"ArchiveRecord AreaLightSource Atmosphere Attribute AttributeBegin AttributeEnd Basis Begin Blobby Bound Clipping ClippingPlane Color ColorSamples ConcatTransform Cone CoordinateSystem CoordSysTransform CropWindow Curves Cylinder DepthOfField Detail DetailRange Disk Displacement Display End ErrorHandler Exposure Exterior Format FrameAspectRatio FrameBegin FrameEnd GeneralPolygon GeometricApproximation Geometry Hider Hyperboloid Identity Illuminate Imager Interior LightSource MakeCubeFaceEnvironment MakeLatLongEnvironment MakeShadow MakeTexture Matte MotionBegin MotionEnd NuPatch ObjectBegin ObjectEnd ObjectInstance Opacity Option Orientation Paraboloid Patch PatchMesh Perspective PixelFilter PixelSamples PixelVariance Points PointsGeneralPolygons Point",
+    "keywords": [
+      "plan",
+      "render",
+      "env"
+    ],
+    "category": "plan",
+    "startIndex": 952118,
+    "estimatedLines": 1
+  },
+  {
+    "name": "wZA",
+    "signature": "function wZA()",
+    "body": "{return pG(\"tengu_opus_default_pro_plan\",\"opus_is_default\",!1)}",
+    "keywords": [
+      "tengu_opus_default_pro_plan",
+      "opus_is_default",
+      "plan"
+    ],
+    "category": "plan",
+    "startIndex": 3317137,
+    "estimatedLines": 1
+  },
+  {
+    "name": "D1A",
+    "signature": "function D1A(A)",
+    "body": "{let{permissionMode:Q,mainLoopModel:B,exceeds200kTokens:G=!1}=A;if(V1A()===\"opusplan\"&&Q===\"plan\"&&!G)return H1A();if(V1A()===\"haiku\"&&Q===\"plan\")return CM();return B}",
+    "keywords": [
+      "opusplan",
+      "plan",
+      "haiku",
+      "token",
+      "permission"
+    ],
+    "category": "plan",
+    "startIndex": 3317214,
+    "estimatedLines": 1
+  },
+  {
+    "name": "kD8",
+    "signature": "function kD8(A)",
+    "body": "{if(A===\"opusplan\")return\"Opus 4.5 in plan mode, else Sonnet 4.5\";return wC($K(A))}",
+    "keywords": [
+      "opusplan",
+      "plan"
+    ],
+    "category": "plan",
+    "startIndex": 3318867,
+    "estimatedLines": 1
+  },
+  {
+    "name": "slQ",
+    "signature": "function slQ(A)",
+    "body": "{if(A===\"opusplan\")return\"Opus Plan\";if(xg1(A))return A.charAt(0).toUpperCase()+A.slice(1);return wC(A)}",
+    "keywords": [
+      "opusplan",
+      "plan"
+    ],
+    "category": "plan",
+    "startIndex": 3318965,
+    "estimatedLines": 1
+  },
+  {
+    "name": "OrA",
+    "signature": "function OrA()",
+    "body": "{let A=mD8(),Q=null,B=qrA(),G=bhA();if(B!==void 0&&B!==null)Q=B;else if(G!==null)Q=G;if(Q===null||A.some((Z)=>Z.value===Q))return A;if(Q===\"opusplan\")return[...A,uD8()];if(!zB()&&xg1(Q))if(Q===\"sonnet\")A.push(Sg1);else if(Q===\"sonnet[1m]\")A.push(AiQ);else if(Q===\"opus\")A.push(QiQ());else if(Q===\"haiku\")A.push(hD8());else A.push({value:Q,label:Q,description:\"Custom model\"});else A.push({value:Q,label:Q,description:\"Custom model\"});return A}",
+    "keywords": [
+      "opusplan",
+      "sonnet",
+      "opus",
+      "haiku",
+      "plan"
+    ],
+    "category": "plan",
+    "startIndex": 3320586,
+    "estimatedLines": 1
+  },
+  {
+    "name": "$K",
+    "signature": "function $K(A)",
+    "body": "{let Q=A.trim(),B=Q.toLowerCase(),G=B.endsWith(\"[1m]\"),Z=G?B.replace(/\\[1m]$/i,\"\").trim():B;if(xg1(Z))switch(Z){case\"opusplan\":return CM()+(G?\"[1m]\":\"\");case\"sonnet\":return CM()+(G?\"[1m]\":\"\");case\"haiku\":return UqA()+(G?\"[1m]\":\"\");case\"opus\":return H1A();default:}if(G)return Q.replace(/\\[1m\\]$/i,\"\").trim()+\"[1m]\";return Q}",
+    "keywords": [
+      "opusplan",
+      "sonnet",
+      "haiku",
+      "opus",
+      "plan"
+    ],
+    "category": "plan",
+    "startIndex": 3321082,
+    "estimatedLines": 1
+  },
+  {
+    "name": "pM",
+    "signature": "function pM(A)",
+    "body": "{switch(A){case\"default\":return\"text\";case\"plan\":return\"planMode\";case\"delegate\":return\"delegateMode\";case\"acceptEdits\":return\"autoAccept\";case\"bypassPermissions\":return\"error\";case\"dontAsk\":return\"error\"}}",
+    "keywords": [
+      "default",
+      "text",
+      "plan",
+      "planMode",
+      "delegate",
+      "delegateMode",
+      "acceptEdits",
+      "autoAccept",
+      "bypassPermissions",
+      "error",
+      "dontAsk",
+      "edit",
+      "task",
+      "PlanMode",
+      "permission"
+    ],
+    "category": "plan",
+    "startIndex": 4654141,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Hw",
+    "signature": "function Hw()",
+    "body": "{let A=I_A(vQ(),\"plans\");if(!jA().existsSync(A))try{jA().mkdirSync(A)}catch(Q){t(Q instanceof Error?Q:Error(String(Q)))}return A}",
+    "keywords": [
+      "plans",
+      "plan"
+    ],
+    "category": "plan",
+    "startIndex": 5787037,
+    "estimatedLines": 1
+  },
+  {
+    "name": "vZ2",
+    "signature": "function vZ2({filePath:A,content:Q,structuredPatch:B,type:G},Z,{style:Y,verbose:J})",
+    "body": "{if(!J&&A.startsWith(Hw()))return X6.createElement(k0,null,X6.createElement(C,{dimColor:!0},\"/plan to preview\"));switch(G){case\"create\":{if(Y===\"condensed\"&&!J){let X=Q.split(RZ2).length;return X6.createElement(C,null,\"Wrote \",X6.createElement(C,{bold:!0},X),\" lines to\",\" \",X6.createElement(C,{bold:!0},_Z2(t1(),A)))}return X6.createElement(rJ5,{filePath:A,content:Q,verbose:J})}case\"update\":return X6.createElement(H71,{filePath:A,structuredPatch:B,firstLine:Q.split(`\n`)[0]??null,verbose:J})}}",
+    "keywords": [
+      "create",
+      "condensed",
+      "update",
+      "plan"
+    ],
+    "category": "plan",
+    "startIndex": 7257011,
+    "estimatedLines": 2
+  },
+  {
+    "name": "ZN5",
+    "signature": "function ZN5(A,Q)",
+    "body": "{if(GN5.includes(A))return{code:Ab.Status.INTERNAL,details:`Invalid status from control plane: ${A} ${Ab.Status[A]} ${Q}`};else return{code:A,details:Q}}",
+    "keywords": [
+      "plan"
+    ],
+    "category": "plan",
+    "startIndex": 7910689,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Ox5",
+    "signature": "function Ox5(A)",
+    "body": "{let Q=0,B=!1;for(let G=A.length-1;G>=0;G--){let Z=A[G];if(Z?.type===\"assistant\"){if(qJ1(Z))continue;Q++}else if(Z?.type===\"attachment\"&&(Z.attachment.type===\"plan_mode\"||Z.attachment.type===\"plan_mode_reentry\")){B=!0;break}}return{turnCount:Q,foundPlanModeAttachment:B}}",
+    "keywords": [
+      "assistant",
+      "attachment",
+      "plan_mode",
+      "plan_mode_reentry",
+      "plan",
+      "PlanMode"
+    ],
+    "category": "plan",
+    "startIndex": 8367892,
+    "estimatedLines": 1
+  },
+  {
+    "name": "RH0",
+    "signature": "function RH0(A)",
+    "body": "{let Q=Jz(A);if(!Q)return null;let B=rC(A);return Q4({type:\"plan_file_reference\",planFilePath:B,planContent:Q})}",
+    "keywords": [
+      "plan_file_reference",
+      "plan"
+    ],
+    "category": "plan",
+    "startIndex": 8387767,
+    "estimatedLines": 1
+  },
+  {
+    "name": "zP2",
+    "signature": "function zP2({filePath:A,structuredPatch:Q,originalFile:B},G,{style:Z,verbose:Y})",
+    "body": "{if(!Y&&A.startsWith(Hw()))return KJ.createElement(k0,null,KJ.createElement(C,{dimColor:!0},\"/plan to preview\"));return KJ.createElement(H71,{filePath:A,structuredPatch:Q,firstLine:B.split(`\n`)[0]??null,style:Z,verbose:Y})}",
+    "keywords": [
+      "plan"
+    ],
+    "category": "plan",
+    "startIndex": 8430561,
+    "estimatedLines": 2
+  },
+  {
+    "name": "ly2",
+    "signature": "function ly2(A,Q)",
+    "body": "{switch(A.name){case DyA:{if(Q&&typeof Q===\"object\"&&\"plan\"in Q){let{plan:B,...G}=Q;return G}return Q}default:return Q}}",
+    "keywords": [
+      "object",
+      "plan"
+    ],
+    "category": "plan",
+    "startIndex": 8547422,
+    "estimatedLines": 1
+  },
+  {
+    "name": "TI1",
+    "signature": "function TI1({plan:A})",
+    "body": "{return jL.createElement(k0,null,jL.createElement(T,{flexDirection:\"column\"},jL.createElement(C,{color:\"subtle\"},\"User rejected Claude's plan:\"),jL.createElement(T,{borderStyle:\"round\",borderColor:\"planMode\",borderDimColor:!0,paddingX:1,overflow:\"hidden\"},jL.createElement(C,{dimColor:!0},jL.createElement(T$,null,A)))))}",
+    "keywords": [
+      "column",
+      "subtle",
+      "round",
+      "planMode",
+      "hidden",
+      "plan",
+      "PlanMode"
+    ],
+    "category": "plan",
+    "startIndex": 9036910,
+    "estimatedLines": 1
+  },
+  {
+    "name": "tg2",
+    "signature": "function tg2(A,Q,{theme:B})",
+    "body": "{let{plan:G}=A,Z=!G||G.trim()===\"\",Y=\"filePath\"in A?A.filePath:void 0,J=Y?r3(Y):\"\",X=\"awaitingLeaderApproval\"in A?A.awaitingLeaderApproval:!1;if(Z)return W6.createElement(T,{flexDirection:\"column\",marginTop:1},W6.createElement(T,{flexDirection:\"row\"},W6.createElement(C,{color:pM(\"plan\")},yX),W6.createElement(C,null,\" Exited plan mode\")));if(X)return W6.createElement(T,{flexDirection:\"column\",marginTop:1},W6.createElement(T,{flexDirection:\"row\"},W6.createElement(C,{color:pM(\"plan\")},yX),W6.createElement(C,null,\" Plan submitted for team lead approval\")),W6.createElement(k0,null,W6.createElement(T,{flexDirection:\"column\"},Y&&W6.createElement(C,{dimColor:!0},\"Plan file: \",J),W6.createElement(C,{dimColor:!0},\"Waiting for team lead to review and approve...\"))));return W6.createElement(T,{flexDir",
+    "keywords": [
+      "filePath",
+      "awaitingLeaderApproval",
+      "column",
+      "plan",
+      "edit"
+    ],
+    "category": "plan",
+    "startIndex": 9037359,
+    "estimatedLines": 1
+  },
+  {
+    "name": "eg2",
+    "signature": "function eg2({plan:A},{theme:Q})",
+    "body": "{let B=A??Jz()??\"No plan found\";return W6.createElement(T,{flexDirection:\"column\"},W6.createElement(TI1,{plan:B}))}",
+    "keywords": [
+      "column",
+      "plan"
+    ],
+    "category": "plan",
+    "startIndex": 9038565,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Cd2",
+    "signature": "function Cd2(A,Q,B)",
+    "body": "{return gV.createElement(T,{flexDirection:\"column\",marginTop:1},gV.createElement(T,{flexDirection:\"row\"},gV.createElement(C,{color:pM(\"plan\")},yX),gV.createElement(C,null,\" Entered plan mode\")),gV.createElement(T,{paddingLeft:2},gV.createElement(C,{dimColor:!0},\"Claude is now exploring and designing an implementation approach.\")))}",
+    "keywords": [
+      "column",
+      "plan"
+    ],
+    "category": "plan",
+    "startIndex": 9180326,
+    "estimatedLines": 1
+  },
+  {
+    "name": "$d2",
+    "signature": "function $d2()",
+    "body": "{return gV.createElement(T,{flexDirection:\"row\",marginTop:1},gV.createElement(C,{color:pM(\"default\")},yX),gV.createElement(C,null,\" User declined to enter plan mode\"))}",
+    "keywords": [
+      "default",
+      "plan"
+    ],
+    "category": "plan",
+    "startIndex": 9180678,
+    "estimatedLines": 1
+  },
+  {
+    "name": "qd2",
+    "signature": "function qd2({toolUseConfirm:A,onDone:Q,onReject:B})",
+    "body": "{let[G]=LQ();function Z(Y){if(Y===\"yes\")rp(G.toolPermissionContext.mode,\"plan\"),Q(),A.onAllow({},[{type:\"setMode\",mode:\"plan\",destination:\"session\"}]);else Q(),B(),A.onReject()}return Iq.default.createElement(WJ,{color:\"planMode\",title:\"Enter plan mode?\"},Iq.default.createElement(T,{flexDirection:\"column\",marginTop:1,paddingX:1},Iq.default.createElement(C,null,\"Claude wants to enter plan mode to explore and design an implementation approach.\"),Iq.default.createElement(T,{marginTop:1,flexDirection:\"column\"},Iq.default.createElement(C,{dimColor:!0},\"In plan mode, Claude will:\"),Iq.default.createElement(C,{dimColor:!0},\" · Explore the codebase thoroughly\"),Iq.default.createElement(C,{dimColor:!0},\" · Identify existing patterns\"),Iq.default.createElement(C,{dimColor:!0},\" · Design an implement",
+    "keywords": [
+      "plan",
+      "setMode",
+      "session",
+      "planMode",
+      "column",
+      "pattern",
+      "PlanMode",
+      "permission",
+      "allow"
+    ],
+    "category": "plan",
+    "startIndex": 9182681,
+    "estimatedLines": 1
+  },
+  {
+    "name": "ka5",
+    "signature": "function ka5(A)",
+    "body": "{let Q=A.tool.userFacingName(A.input);if(A.tool===TL)return\"Claude Code needs your approval for the plan\";if(A.tool===vvA)return\"Claude Code wants to enter plan mode\";if(!Q||Q.trim()===\"\")return\"Claude Code needs your attention\";return`Claude needs your permission to use ${Q}`}",
+    "keywords": [
+      "plan",
+      "permission"
+    ],
+    "category": "plan",
+    "startIndex": 9210161,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Bi2",
+    "signature": "function Bi2({progressMessagesForMessage:A,tool:Q,tools:B,param:G,verbose:Z})",
+    "body": "{if(typeof G.content===\"string\"&&G.content.includes(X_))return LS.createElement(k0,{height:1},LS.createElement(tv,null));if(typeof G.content===\"string\"&&G.content.startsWith(l$0)){let Y=G.content.substring(l$0.length);return LS.createElement(TI1,{plan:Y})}if(typeof G.content===\"string\"&&G.content.startsWith(IkA)){let Y=G.content.substring(IkA.length);return LS.createElement(Ai2,{feedback:Y})}if(!Q)return LS.createElement(o3,{result:G.content,verbose:Z});return Q.renderToolUseErrorMessage(G.content,{progressMessagesForMessage:pi(A),tools:B,verbose:Z})}",
+    "keywords": [
+      "string",
+      "plan",
+      "render",
+      "message"
+    ],
+    "category": "plan",
+    "startIndex": 9359009,
+    "estimatedLines": 1
+  },
+  {
+    "name": "c6A",
+    "signature": "function c6A(_)",
+    "body": "{return o(function(x){var p=x.length,IA=p,gA=hY.prototype.thru;if(_)x.reverse();while(IA--){var Z1=x[IA];if(typeof Z1!=\"function\")throw new BH(Z);if(gA&&!M1&&J1(Z1)==\"wrapper\")var M1=new hY([],!0)}IA=M1?IA:p;while(++IA<p){Z1=x[IA];var d1=J1(Z1),K0=d1==\"wrapper\"?VA(Z1):A;if(K0&&w4(K0[0])&&K0[1]==(R|$|N|j)&&!K0[4].length&&K0[9]==1)M1=M1[J1(K0[0])].apply(M1,K0[3]);else M1=Z1.length==1&&w4(Z1)?M1[d1]():M1.thru(Z1)}return function(){var qQ=arguments,RQ=qQ[0];if(M1&&qQ.length==1&&oB(RQ))return M1.plant(RQ).value();var dQ=0,Z2=p?x[dQ].apply(this,qQ):RQ;while(++dQ<p)Z2=x[dQ].call(this,Z2);return Z2}})}",
+    "keywords": [
+      "function",
+      "wrapper",
+      "plan"
+    ],
+    "category": "plan",
+    "startIndex": 9448594,
+    "estimatedLines": 1
+  },
+  {
+    "name": "z99",
+    "signature": "function z99()",
+    "body": "{let{addNotification:A}=l8();E99.useEffect(()=>{if(b1().subscriptionNoticeCount??0>=HB7)return;DB7().then((Q)=>{if(Q===null)return;d0((B)=>({...B,subscriptionNoticeCount:(B.subscriptionNoticeCount??0)+1})),n(\"tengu_switch_to_subscription_notice_shown\",{}),A({key:\"switch-to-subscription\",jsx:YbA.createElement(C,{color:\"suggestion\"},\"Use your existing Claude \",Q,\" plan with Claude Code\",YbA.createElement(C,{color:\"text\",dimColor:!0},\" \",\"· /login to activate\")),priority:\"low\"})})},[A])}",
+    "keywords": [
+      "tengu_switch_to_subscription_notice_shown",
+      "suggestion",
+      "text",
+      "plan",
+      "useEffect"
+    ],
+    "category": "plan",
+    "startIndex": 9769176,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Y",
+    "signature": "function Y()",
+    "body": "{if(Z&&NZ7(Z)){Q(\"Your plan doesn't include Opus in Claude Code. Turn on /extra-usage or /upgrade to Max to access it.\",{display:\"system\"});return}if(!Z){J(null);return}if(qZ7(Z)){J(Z);return}try{let{valid:X,error:I}=await MI9(Z);if(X)J(Z);else Q(I||`Model '${Z}' not found`,{display:\"system\"})}catch(X){Q(`Failed to validate model: ${X.message}`,{display:\"system\"})}}",
+    "keywords": [
+      "system",
+      "plan",
+      "message"
+    ],
+    "category": "plan",
+    "startIndex": 10485418,
+    "estimatedLines": 1
+  },
+  {
+    "name": "LZ7",
+    "signature": "function LZ7({onDone:A})",
+    "body": "{let[{mainLoopModel:Q,mainLoopModelForSession:B}]=LQ(),G=Q??Xi().label;if(B)A(`Current model: ${V1.bold(ly(B))} (session override from plan mode)\nBase model: ${G}`);else A(`Current model: ${G}`);return null}",
+    "keywords": [
+      "plan",
+      "session"
+    ],
+    "category": "plan",
+    "startIndex": 10486058,
+    "estimatedLines": 2
+  },
+  {
+    "name": "PW7",
+    "signature": "function PW7()",
+    "body": "{let A=$q(vQ(),\"plans\");return TW7(A,\".md\")}",
+    "keywords": [
+      "plans",
+      "plan"
+    ],
+    "category": "plan",
+    "startIndex": 10819151,
+    "estimatedLines": 1
+  },
+  {
+    "name": "Y",
+    "signature": "async function Y()",
+    "body": "{if(Z&&NZ7(Z)){Q(\"Your plan doesn't include Opus in Claude Code. Turn on /extra-usage or /upgrade to Max to access it.\",{display:\"system\"});return}if(!Z){J(null);return}if(qZ7(Z)){J(Z);return}try{let{valid:X,error:I}=await MI9(Z);if(X)J(Z);else Q(I||`Model '${Z}' not found`,{display:\"system\"})}catch(X){Q(`Failed to validate model: ${X.message}`,{display:\"system\"})}}",
+    "keywords": [
+      "system",
+      "plan",
+      "message"
+    ],
+    "category": "plan",
+    "startIndex": 10485412,
+    "estimatedLines": 1
+  }
+]
