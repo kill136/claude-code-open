@@ -276,8 +276,9 @@ async function handleServe(
   }
 
   try {
-    const server = new VisualizationServer(mapFile, port);
-    const url = await server.start();
+    const server = new VisualizationServer({ ontologyPath: mapFile, port });
+    await server.start();
+    const url = server.getAddress();
 
     ui.addMessage(
       'assistant',

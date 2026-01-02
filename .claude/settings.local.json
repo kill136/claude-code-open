@@ -98,7 +98,10 @@
       "Bash(cmd /c \"tasklist /FI \"\"IMAGENAME eq chrome.exe\"\" 2>&1\")",
       "Bash(cmd /c \"tasklist | findstr node\")",
       "Bash(cmd /c \"netstat -ano | findstr :3030\")",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(cmd /c:*)",
+      "Bash(netstat:*)",
+      "Bash(wc:*)"
     ]
   }
 }

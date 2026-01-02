@@ -1,5 +1,5 @@
 /**
- * 文件路径自动完成提供器
+ * 文件路径自动完成提供�?
  */
 
 import * as fs from 'fs';
@@ -10,7 +10,7 @@ import type { CompletionItem } from './types.js';
  * 获取文件路径补全建议
  * @param query 查询路径
  * @param cwd 当前工作目录
- * @param maxResults 最大返回数量
+ * @param maxResults 最大返回数�?
  */
 export async function getFileCompletions(
   query: string,
@@ -18,12 +18,12 @@ export async function getFileCompletions(
   maxResults: number = 10
 ): Promise<CompletionItem[]> {
   try {
-    // 规范化查询路径
+    // 规范化查询路�?
     let searchPath = query;
     let searchDir: string;
     let searchPrefix: string;
 
-    // 处理绝对路径和相对路径
+    // 处理绝对路径和相对路�?
     if (path.isAbsolute(query)) {
       searchDir = path.dirname(query);
       searchPrefix = path.basename(query);
@@ -32,15 +32,15 @@ export async function getFileCompletions(
       searchDir = path.dirname(fullPath);
       searchPrefix = path.basename(fullPath);
 
-      // 如果查询以 ./ 或 ../ 开头,保留它
+      // 如果查询�?./ �?../ 开�?保留�?
       if (!query.startsWith('./') && !query.startsWith('../') && query.length > 0) {
-        // 相对于当前目录
+        // 相对于当前目�?
         searchDir = cwd;
         searchPrefix = query;
       }
     }
 
-    // 检查目录是否存在
+    // 检查目录是否存�?
     if (!fs.existsSync(searchDir)) {
       return [];
     }
@@ -48,10 +48,10 @@ export async function getFileCompletions(
     // 读取目录内容
     const entries = await fs.promises.readdir(searchDir, { withFileTypes: true });
 
-    // 过滤和映射结果
+    // 过滤和映射结�?
     const completions: CompletionItem[] = entries
       .filter(entry => {
-        // 过滤掉隐藏文件(除非明确查询)
+        // 过滤掉隐藏文�?除非明确查询)
         if (entry.name.startsWith('.') && !searchPrefix.startsWith('.')) {
           return false;
         }
@@ -94,24 +94,30 @@ export async function getFileCompletions(
 
     return completions;
   } catch (error) {
-    // 如果出错,返回空数组
+    // 如果出错,返回空数�?
     return [];
   }
 }
 
 /**
- * 检查文本是否正在输入文件路径
+ * 检查文本是否正在输入文件路�?
  * @param text 输入文本
  * @param cursorPosition 光标位置
  */
 export function isTypingFilePath(text: string, cursorPosition: number): boolean {
   const beforeCursor = text.slice(0, cursorPosition);
 
-  // 检查是否包含路径分隔符或以 . 开头(相对路径)
+  // 排除斜杠命令：以 / 开头后跟字母的文本是命令，不是文件路径
+  // 这样可以避免 /map server 被误认为是文件路径补�?
+  if (/^\/[a-zA-Z]/.test(text)) {
+    return false;
+  }
+
+  // 检查是否包含路径分隔符或以 . 开�?相对路径)
   const pathPatterns = [
-    /\s([./~])/, // 空格后跟路径开始符号
-    /^([./~])/, // 行首路径开始符号
-    /\s([a-zA-Z]:)/, // Windows 盘符 (如 C:)
+    /\s([./~])/, // 空格后跟路径开始符�?
+    /^([./~])/, // 行首路径开始符�?
+    /\s([a-zA-Z]:)/, // Windows 盘符 (�?C:)
   ];
 
   return pathPatterns.some(pattern => pattern.test(beforeCursor));
@@ -128,7 +134,7 @@ export function extractFileQuery(text: string, cursorPosition: number): {
 } {
   const beforeCursor = text.slice(0, cursorPosition);
 
-  // 查找路径的起始位置(从最后一个空格或行首开始)
+  // 查找路径的起始位�?从最后一个空格或行首开�?
   const lastSpace = beforeCursor.lastIndexOf(' ');
   const startPosition = lastSpace + 1;
   const query = beforeCursor.slice(startPosition);

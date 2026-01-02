@@ -75,7 +75,7 @@ export { DependencyAnalyzer, analyzeDependencies } from './dependency-analyzer.j
 export { IncrementalCache, createCache } from './incremental-cache.js';
 
 // 可视化服务器
-export { VisualizationServer, createServer } from './server/index.js';
+export { VisualizationServer, startVisualizationServer } from './server/index.js';
 
 // ============================================================================
 // 增强版模块
