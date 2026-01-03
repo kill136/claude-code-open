@@ -34,7 +34,7 @@ import { ListMcpResourcesTool, ReadMcpResourceTool, MCPSearchTool } from './mcp.
 import { AskUserQuestionTool } from './ask.js';
 import { MultiEditTool } from './multiedit.js';
 import { TmuxTool } from './tmux.js';
-import { SkillTool, SlashCommandTool, initializeSkillsAndCommands } from './skill.js';
+import { SkillTool, initializeSkills } from './skill.js';
 import { LSPTool } from './lsp.js';
 import { ChromeTool } from './chrome.js';
 
@@ -87,10 +87,9 @@ export function registerAllTools(): void {
   // Tmux
   toolRegistry.register(new TmuxTool());
 
-  // Skill 和 SlashCommand
-  initializeSkillsAndCommands();
+  // Skill（异步初始化）
+  initializeSkills().catch(err => console.error('Failed to initialize skills:', err));
   toolRegistry.register(new SkillTool());
-  toolRegistry.register(new SlashCommandTool());
 
   // LSP
   toolRegistry.register(new LSPTool());
