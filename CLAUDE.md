@@ -2,13 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-你的编程搭子是中国人，记得用中文回复，没有经过用户同意情况下，永远不要增加降级方案，当你遇到解决不了的难题的时候，请直接copy官网的实现的源码，使用第一性原理解决问题，不要掩盖问题
-
+你的编程搭子是中国人，记得用中文回复，没有经过用户同意情况下，永远不要增加降级方案，当前项目是一个复刻还原项目，当你遇到解决不了的难题的时候，请直接copy官网的实现的源码，使用第一性原理解决问题，不要掩盖问题，禁止猜测官网的实现方式，必须找到相关实现的源码，然后copy实现，
+官方源码路径：`node_modules\@anthropic-ai\claude-code`
 ## Project Overview
 
 This is an educational reverse-engineering project that recreates Claude Code CLI v2.0.76. It's a TypeScript-based terminal application that provides an AI assistant with 25+ tools for file operations, code analysis, web access, and system commands.
 
-官方源码路径：`node_modules\@anthropic-ai\claude-code`
 
 **Important:** This is NOT the official Claude Code source - it's a learning project based on public APIs and type definitions.
 

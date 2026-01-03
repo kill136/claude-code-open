@@ -501,11 +501,9 @@ export const skillsCommand: SlashCommand = {
     const { config } = ctx;
 
     // 返回 JSX 组件，由 App.tsx 显示为交互式对话框
+    // App.tsx 会通过 React.cloneElement 注入 onDone 回调
     const jsx = React.createElement(SkillsDialog, {
       cwd: config.cwd,
-      onClose: () => {
-        // onClose 将由 App.tsx 注入
-      },
     });
 
     return {

@@ -53,7 +53,7 @@ interface AppProps {
 interface MessageItem {
   id: string;  // 唯一标识符，用于 Static 组件
   role: 'user' | 'assistant';
-  content: string;
+  content: string | any[];  // 支持字符串或 ContentBlock 数组（用于 resume 时保留工具调用）
   timestamp: Date;
 }
 
@@ -807,23 +807,16 @@ export const App: React.FC<AppProps> = ({
                 const sessionMessages = loadedSession.getMessages();
 
                 // 将历史消息转换为 UI 消息格式
+                // 关键：保留原始 content 结构，让 Message 组件直接渲染（支持工具调用块）
                 const historyMessages: MessageItem[] = sessionMessages
                   .filter(m => m.role === 'user' || m.role === 'assistant')
                   .map((m, idx) => {
-                    // 提取文本内容
-                    let content = '';
-                    if (typeof m.content === 'string') {
-                      content = m.content;
-                    } else if (Array.isArray(m.content)) {
-                      content = m.content
-                        .filter((block: any) => block.type === 'text')
-                        .map((block: any) => block.text)
-                        .join('\n');
-                    }
+                    // 保留原始 content：字符串或数组
+                    // Message 组件会根据 content 类型自动选择渲染方式
                     return {
                       id: `resumed-${idx}-${Date.now()}`,
                       role: m.role as 'user' | 'assistant',
-                      content: content || '[No text content]',
+                      content: m.content,  // 保留原始结构，包括 tool_use 和 tool_result blocks
                       timestamp: new Date(),
                     };
                   });

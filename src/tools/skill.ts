@@ -5,7 +5,6 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { fileURLToPath } from 'url';
 import { BaseTool } from './base.js';
 import type { ToolResult, ToolDefinition } from '../types/index.js';
 
@@ -22,7 +21,7 @@ interface SkillDefinition {
   name: string;
   description: string;
   prompt: string;
-  location: 'user' | 'project' | 'builtin';
+  location: 'user' | 'project';
   filePath?: string;
   // 新增的frontmatter字段
   allowedTools?: string[];           // 允许的工具列表
@@ -62,29 +61,6 @@ let skillsLoaded = false;
 let commandsLoaded = false;
 let lastLoadTime = 0;
 const CACHE_TTL = 5 * 60 * 1000; // 5分钟缓存
-
-/**
- * 获取内置 skills 目录路径
- */
-function getBuiltinSkillsDir(): string {
-  // 获取当前模块的目录
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = path.dirname(__filename);
-
-  // 内置 skills 应该在 src/skills/ 或 dist/skills/
-  const srcSkillsDir = path.join(__dirname, '..', 'skills');
-  const distSkillsDir = path.join(__dirname, 'skills');
-
-  if (fs.existsSync(srcSkillsDir)) {
-    return srcSkillsDir;
-  }
-  if (fs.existsSync(distSkillsDir)) {
-    return distSkillsDir;
-  }
-
-  // 如果都不存在，返回 src/skills/ 路径（即使不存在）
-  return srcSkillsDir;
-}
 
 /**
  * 解析 YAML frontmatter
@@ -138,10 +114,10 @@ function parseFrontmatter(content: string): { metadata: SkillMetadata; body: str
  */
 export function registerSkill(skill: SkillDefinition): void {
   // 如果已存在同名 skill，根据优先级决定是否覆盖
-  // 优先级: project > user > builtin
+  // 优先级: project > user
   const existing = skillRegistry.get(skill.name);
   if (existing) {
-    const priority = { project: 3, user: 2, builtin: 1 };
+    const priority = { project: 2, user: 1 };
     if (priority[skill.location] <= priority[existing.location]) {
       return; // 不覆盖更高优先级的 skill
     }
@@ -155,7 +131,7 @@ export function registerSkill(skill: SkillDefinition): void {
  */
 export function loadSkillsFromDirectory(
   dir: string,
-  location: 'user' | 'project' | 'builtin',
+  location: 'user' | 'project',
   recursive = false
 ): void {
   if (!fs.existsSync(dir)) return;
@@ -173,7 +149,7 @@ export function loadSkillsFromDirectory(
 /**
  * 从指定路径加载技能文件
  */
-function loadSkillsFromPath(dirPath: string, location: 'user' | 'project' | 'builtin', recursive: boolean): void {
+function loadSkillsFromPath(dirPath: string, location: 'user' | 'project', recursive: boolean): void {
   if (!fs.existsSync(dirPath)) return;
 
   const entries = fs.readdirSync(dirPath, { withFileTypes: true });
@@ -302,25 +278,14 @@ export function initializeSkillsAndCommands(force = false): void {
   const claudeDir = path.join(homeDir, '.claude');
   const projectClaudeDir = path.join(process.cwd(), '.claude');
 
-  // 加载顺序很重要：builtin -> user -> project
-  // 这样后加载的可以覆盖先加载的（根据优先级）
+  // 加载顺序：user -> project
+  // 官方没有内置 skills，所有 skills 都来自用户/项目目录
 
-  // 1. 加载内置 skills
-  const builtinSkillsDir = getBuiltinSkillsDir();
-  if (fs.existsSync(builtinSkillsDir)) {
-    // 直接从 builtin skills 目录加载，不需要 .claude/skills 子目录
-    try {
-      loadSkillsFromPath(builtinSkillsDir, 'builtin', true);
-    } catch (error) {
-      console.warn('Failed to load builtin skills:', error);
-    }
-  }
-
-  // 2. 加载用户级别 skills 和 commands
+  // 1. 加载用户级别 skills 和 commands
   loadSkillsFromDirectory(claudeDir, 'user', false);
   loadSlashCommandsFromDirectory(claudeDir);
 
-  // 3. 加载项目级别 skills 和 commands（最高优先级）
+  // 2. 加载项目级别 skills 和 commands（最高优先级）
   loadSkillsFromDirectory(projectClaudeDir, 'project', false);
   loadSlashCommandsFromDirectory(projectClaudeDir);
 
@@ -660,7 +625,7 @@ export function getAvailableCommands(): SlashCommandDefinition[] {
 /**
  * 获取指定位置的技能
  */
-export function getSkillsByLocation(location: 'user' | 'project' | 'builtin'): SkillDefinition[] {
+export function getSkillsByLocation(location: 'user' | 'project'): SkillDefinition[] {
   ensureSkillsLoaded();
   return Array.from(skillRegistry.values())
     .filter((skill) => skill.location === location)

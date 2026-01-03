@@ -22,7 +22,7 @@ interface SkillInfo {
 }
 
 interface SkillsDialogProps {
-  onClose: () => void;
+  onDone?: () => void;
   cwd: string;
 }
 
@@ -33,7 +33,7 @@ const SOURCE_LABELS: Record<SkillSource, string> = {
   projectSettings: 'Project',
   localSettings: 'Local',
   flagSettings: 'Flag Settings',
-  plugin: 'Plugins',
+  plugin: 'Plugin skills',
   builtin: 'Built-in',
 };
 
@@ -44,7 +44,7 @@ const SOURCE_PATHS: Record<SkillSource, string> = {
   projectSettings: '.claude/commands/',
   localSettings: '.claude/skills/',
   flagSettings: '',
-  plugin: '~/.claude/plugins/',
+  plugin: 'plugin',
   builtin: '',
 };
 
@@ -91,41 +91,104 @@ function scanSkillsDir(dir: string, source: SkillSource): SkillInfo[] {
   return skills;
 }
 
+// 扫描 plugin 中的 skills
+function scanPluginSkills(): SkillInfo[] {
+  const skillsMap = new Map<string, SkillInfo>(); // 用于去重
+  const pluginsCacheDir = path.join(os.homedir(), '.claude', 'plugins', 'cache');
+
+  if (!fs.existsSync(pluginsCacheDir)) return [];
+
+  try {
+    // 遍历 marketplace 目录
+    const marketplaces = fs.readdirSync(pluginsCacheDir, { withFileTypes: true });
+    for (const marketplace of marketplaces) {
+      if (!marketplace.isDirectory()) continue;
+
+      const marketplacePath = path.join(pluginsCacheDir, marketplace.name);
+      const plugins = fs.readdirSync(marketplacePath, { withFileTypes: true });
+
+      for (const plugin of plugins) {
+        if (!plugin.isDirectory()) continue;
+
+        const pluginPath = path.join(marketplacePath, plugin.name);
+        const versions = fs.readdirSync(pluginPath, { withFileTypes: true });
+
+        for (const version of versions) {
+          if (!version.isDirectory()) continue;
+
+          // 检查 skills 目录
+          const skillsPath = path.join(pluginPath, version.name, 'skills');
+          if (!fs.existsSync(skillsPath)) continue;
+
+          const skillDirs = fs.readdirSync(skillsPath, { withFileTypes: true });
+          for (const skillDir of skillDirs) {
+            if (!skillDir.isDirectory()) continue;
+
+            // 如果已经存在同名 skill，跳过（去重）
+            if (skillsMap.has(skillDir.name)) continue;
+
+            // 查找 SKILL.md 或 skill.md
+            const skillMdPath = path.join(skillsPath, skillDir.name, 'SKILL.md');
+            const skillMdPathLower = path.join(skillsPath, skillDir.name, 'skill.md');
+
+            let skillFilePath = '';
+            if (fs.existsSync(skillMdPath)) {
+              skillFilePath = skillMdPath;
+            } else if (fs.existsSync(skillMdPathLower)) {
+              skillFilePath = skillMdPathLower;
+            }
+
+            if (skillFilePath) {
+              try {
+                const stat = fs.statSync(skillFilePath);
+                skillsMap.set(skillDir.name, {
+                  name: skillDir.name,
+                  source: 'plugin',
+                  contentLength: stat.size,
+                  filePath: skillFilePath,
+                });
+              } catch {
+                // ignore
+              }
+            }
+          }
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  return Array.from(skillsMap.values());
+}
+
 // 获取所有可用的 skills
 function getAllSkills(cwd: string): SkillInfo[] {
   const skills: SkillInfo[] = [];
 
-  // 内置 skills
-  const builtinSkills: SkillInfo[] = [
-    { name: 'pdf', source: 'builtin', description: 'Extract and analyze PDF documents' },
-    { name: 'xlsx', source: 'builtin', description: 'Read and process Excel files' },
-    { name: 'csv', source: 'builtin', description: 'Parse and analyze CSV data' },
-    { name: 'json', source: 'builtin', description: 'Format and validate JSON' },
-    { name: 'html', source: 'builtin', description: 'Parse HTML documents' },
-    { name: 'review-pr', source: 'builtin', description: 'Review pull requests' },
-  ];
-  skills.push(...builtinSkills);
+  // 1. Plugin skills (从已安装的 plugins 加载)
+  skills.push(...scanPluginSkills());
 
-  // User skills (~/.claude/skills/)
+  // 2. User skills (~/.claude/skills/)
   const userSkillsDir = path.join(os.homedir(), '.claude', 'skills');
   skills.push(...scanSkillsDir(userSkillsDir, 'userSettings'));
 
-  // Project skills (.claude/commands/)
+  // 3. Project skills (.claude/commands/)
   const projectSkillsDir = path.join(cwd, '.claude', 'commands');
   skills.push(...scanSkillsDir(projectSkillsDir, 'projectSettings'));
 
-  // Local skills (.claude/skills/)
+  // 4. Local skills (.claude/skills/)
   const localSkillsDir = path.join(cwd, '.claude', 'skills');
   skills.push(...scanSkillsDir(localSkillsDir, 'localSettings'));
 
   return skills;
 }
 
-export const SkillsDialog: React.FC<SkillsDialogProps> = ({ onClose, cwd }) => {
+export const SkillsDialog: React.FC<SkillsDialogProps> = ({ onDone, cwd }) => {
   // 处理键盘输入
   useInput((input, key) => {
     if (key.escape || input.toLowerCase() === 'q') {
-      onClose();
+      onDone?.();
     }
   });
 
@@ -225,12 +288,11 @@ export const SkillsDialog: React.FC<SkillsDialogProps> = ({ onClose, cwd }) => {
       </Box>
 
       <Box flexDirection="column">
-        {renderGroup('builtin')}
+        {renderGroup('plugin')}
         {renderGroup('policySettings')}
         {renderGroup('userSettings')}
         {renderGroup('projectSettings')}
         {renderGroup('localSettings')}
-        {renderGroup('plugin')}
       </Box>
 
       <Box marginTop={1}>

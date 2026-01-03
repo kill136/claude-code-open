@@ -69,9 +69,39 @@ const ToolResultBlockComponent: React.FC<{ block: ToolResultBlockParam }> = ({ b
   );
 };
 
+// 合并连续的 text blocks（解决流式消息被拆分成多个小块的问题）
+const mergeTextBlocks = (blocks: AnyContentBlock[]): AnyContentBlock[] => {
+  const merged: AnyContentBlock[] = [];
+  let currentText = '';
+
+  for (const block of blocks) {
+    if (block.type === 'text') {
+      // 累积文本
+      currentText += (block as { text?: string }).text || '';
+    } else {
+      // 遇到非文本块，先保存累积的文本
+      if (currentText) {
+        merged.push({ type: 'text', text: currentText } as AnyContentBlock);
+        currentText = '';
+      }
+      merged.push(block);
+    }
+  }
+
+  // 保存最后的文本块
+  if (currentText) {
+    merged.push({ type: 'text', text: currentText } as AnyContentBlock);
+  }
+
+  return merged;
+};
+
 // 渲染内容块
 const renderContentBlocks = (blocks: AnyContentBlock[]) => {
-  return blocks.map((block, index) => {
+  // 先合并连续的 text blocks
+  const mergedBlocks = mergeTextBlocks(blocks);
+
+  return mergedBlocks.map((block, index) => {
     switch (block.type) {
       case 'text':
         return <Text key={index}>{(block as { text?: string }).text || ''}</Text>;
@@ -139,37 +169,42 @@ export const Message: React.FC<MessageProps> = React.memo(({
     });
   };
 
-  // 如果内容是 ContentBlock 数组，直接渲染
-  if (typeof content !== 'string') {
-    return (
-      <Box flexDirection="column" marginY={1}>
-        <Box>
-          <Text bold color={getRoleColor()}>
-            {getRoleLabel()}
-          </Text>
-          {timestamp && (
-            <Text color="gray" dimColor>
-              {' '}{getTimeString()}
-            </Text>
-          )}
-        </Box>
-        <Box flexDirection="column" marginLeft={2}>
-          {renderContentBlocks(content)}
-        </Box>
-      </Box>
-    );
-  }
-
   // 用户消息 - 官方风格（只显示 > 符号，内容在同一行）
+  // 优先处理用户消息，无论 content 是字符串还是数组
   if (isUser) {
+    // 从 content 中提取纯文本（用户消息通常只有文本）
+    const userText = typeof content === 'string'
+      ? content
+      : content
+          .filter((block: any) => block.type === 'text')
+          .map((block: any) => block.text || '')
+          .join('\n') || displayedContent;
+
     return (
       <Box flexDirection="column" marginY={1}>
         <Box>
           <Text bold color="blue">{'>'}</Text>
         </Box>
         <Box marginLeft={2}>
-          <Text>{displayedContent}</Text>
+          <Text>{userText}</Text>
         </Box>
+      </Box>
+    );
+  }
+
+  // 如果内容是 ContentBlock 数组，直接渲染（助手消息支持工具调用块）
+  if (typeof content !== 'string') {
+    return (
+      <Box flexDirection="column" marginY={1}>
+        <Box flexDirection="column" marginLeft={0}>
+          {renderContentBlocks(content)}
+        </Box>
+        {/* 流式渲染指示器 */}
+        {streaming && (
+          <Box marginLeft={2}>
+            <Text color="gray" dimColor italic>⋯</Text>
+          </Box>
+        )}
       </Box>
     );
   }
