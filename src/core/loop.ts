@@ -221,6 +221,9 @@ export class ConversationLoop {
   private promptBuilder: SystemPromptBuilder;
   private promptContext: PromptContext;
 
+  // ESC 中断支持
+  private abortController: AbortController | null = null;
+
   /**
    * 处理权限请求（询问用户是否允许工具执行）
    * @param toolName 工具名称
@@ -736,7 +739,7 @@ Guidelines:
   }
 
   async *processMessageStream(userInput: string): AsyncGenerator<{
-    type: 'text' | 'tool_start' | 'tool_end' | 'done';
+    type: 'text' | 'tool_start' | 'tool_end' | 'done' | 'interrupted';
     content?: string;
     toolName?: string;
     toolInput?: unknown;
@@ -745,6 +748,9 @@ Guidelines:
   }> {
     // 确保认证已完成（处理 OAuth API Key 创建）
     await this.ensureAuthenticated();
+
+    // 创建新的 AbortController 用于此次请求
+    this.abortController = new AbortController();
 
     this.session.addMessage({
       role: 'user',
@@ -768,6 +774,12 @@ Guidelines:
     }
 
     while (turns < maxTurns) {
+      // 检查是否已被中断
+      if (this.abortController?.signal.aborted) {
+        yield { type: 'interrupted', content: 'Request interrupted by user' };
+        break;
+      }
+
       turns++;
 
       // 在发送请求前清理旧的持久化输出
@@ -786,8 +798,15 @@ Guidelines:
           {
             enableThinking: this.options.thinking?.enabled,
             thinkingBudget: this.options.thinking?.budgetTokens,
+            signal: this.abortController?.signal,
           }
         )) {
+          // 检查是否已被中断
+          if (this.abortController?.signal.aborted) {
+            yield { type: 'interrupted', content: 'Request interrupted by user' };
+            break;
+          }
+
           if (event.type === 'text') {
             yield { type: 'text', content: event.text };
             assistantContent.push({ type: 'text', text: event.text });
@@ -812,11 +831,21 @@ Guidelines:
           }
         }
       } catch (streamError: any) {
+        // 检查是否是因为中断导致的错误
+        if (this.abortController?.signal.aborted || streamError.name === 'AbortError') {
+          yield { type: 'interrupted', content: 'Request interrupted by user' };
+          break;
+        }
         console.error(chalk.red(`[Loop] Stream failed: ${streamError.message}`));
         if (this.options.debug) {
           console.error(chalk.red('[Loop] Full error:'), streamError);
         }
         yield { type: 'tool_end', toolError: streamError.message };
+        break;
+      }
+
+      // 如果被中断，跳出循环
+      if (this.abortController?.signal.aborted) {
         break;
       }
 
@@ -916,5 +945,31 @@ Guidelines:
    */
   getModel(): string {
     return this.client.getModel();
+  }
+
+  /**
+   * 中断当前正在进行的请求
+   * ESC 键触发时调用此方法
+   */
+  abort(): void {
+    if (this.abortController) {
+      this.abortController.abort();
+      this.abortController = null;
+    }
+  }
+
+  /**
+   * 获取当前的 AbortSignal（如果存在）
+   * 用于检查是否正在处理请求
+   */
+  getAbortSignal(): AbortSignal | null {
+    return this.abortController?.signal || null;
+  }
+
+  /**
+   * 检查当前请求是否已被中断
+   */
+  isAborted(): boolean {
+    return this.abortController?.signal.aborted ?? false;
   }
 }

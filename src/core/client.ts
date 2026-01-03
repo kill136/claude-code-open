@@ -610,6 +610,7 @@ export class ClaudeClient {
     options?: {
       enableThinking?: boolean;
       thinkingBudget?: number;
+      signal?: AbortSignal;
     }
   ): AsyncGenerator<{
     type: 'text' | 'thinking' | 'tool_use_start' | 'tool_use_delta' | 'stop' | 'usage' | 'error';
@@ -631,6 +632,7 @@ export class ClaudeClient {
     let stream: any;
     let retryCount = 0;
     const maxStreamRetries = this.maxRetries;
+    const abortSignal = options?.signal;
 
     // 创建流的辅助函数（支持重试）
     const attemptCreateStream = async (): Promise<any> => {
@@ -724,6 +726,18 @@ export class ClaudeClient {
 
     try {
       for await (const event of stream) {
+        // 检查是否被中断
+        if (abortSignal?.aborted) {
+          // 尝试取消流
+          try {
+            stream.abort?.();
+          } catch {
+            // 忽略取消时的错误
+          }
+          yield { type: 'error', error: 'Request aborted by user' };
+          return;
+        }
+
         if (event.type === 'content_block_delta') {
           const delta = event.delta as any;
           if (delta.type === 'text_delta') {

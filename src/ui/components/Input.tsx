@@ -19,7 +19,12 @@ interface InputProps {
   onSubmit: (value: string) => void;
   disabled?: boolean;
   suggestion?: string;
+  /** 双击 ESC 触发 Rewind 的回调 */
+  onRewindRequest?: () => void;
 }
+
+// 双击检测间隔（毫秒）
+const DOUBLE_PRESS_INTERVAL = 300;
 
 export const Input: React.FC<InputProps> = ({
   prompt = '> ',
@@ -27,6 +32,7 @@ export const Input: React.FC<InputProps> = ({
   onSubmit,
   disabled = false,
   suggestion,
+  onRewindRequest,
 }) => {
   const [value, setValue] = useState('');
   const [cursor, setCursor] = useState(0);

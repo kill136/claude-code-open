@@ -8,3 +8,5 @@ export type { GlobalKeybinding, UseGlobalKeybindingsOptions } from './useGlobalK
 export { useAutoScroll, useMessageAutoScroll } from './useAutoScroll.js';
 export { useTerminalSize, useTerminalWidth, useTerminalHeight } from './useTerminalSize.js';
 export type { TerminalSize } from './useTerminalSize.js';
+
+export { useRewind } from './useRewind.js';

@@ -14,6 +14,8 @@ import { Spinner } from './components/Spinner.js';
 import { WelcomeScreen } from './components/WelcomeScreen.js';
 import { ShortcutHelp } from './components/ShortcutHelp.js';
 import { LoginSelector, type LoginMethod } from './LoginSelector.js';
+import { RewindUI } from './components/MessageSelector.js';
+import { useRewind } from './hooks/useRewind.js';
 import { ConversationLoop } from '../core/loop.js';
 import { initializeCommands, executeCommand } from '../commands/index.js';
 import { isPlanModeActive } from '../tools/planmode.js';
@@ -153,6 +155,9 @@ export const App: React.FC<AppProps> = ({
   // 官方 local-jsx 命令支持：用于显示命令返回的 JSX 组件
   const [commandJsx, setCommandJsx] = useState<React.ReactElement | null>(null);
   const [hidePromptForJsx, setHidePromptForJsx] = useState(false);
+
+  // Rewind 状态
+  const [showRewindUI, setShowRewindUI] = useState(false);
 
   // 会话 ID
   const sessionId = useRef(uuidv4());
@@ -314,14 +319,40 @@ export const App: React.FC<AppProps> = ({
     if (input === '?' && !isProcessing) {
       setShowShortcuts((prev) => !prev);
     }
-    // Escape 关闭弹窗
+    // Escape 键处理
     if (key.escape) {
+      // 1. 如果正在处理请求，中断它
+      if (isProcessing) {
+        loop.abort();
+        setIsProcessing(false);
+        // 添加中断提示到当前流式块
+        setStreamBlocks((prev) => [
+          ...prev,
+          {
+            type: 'text',
+            id: `interrupt-${Date.now()}`,
+            timestamp: new Date(),
+            text: '\n\n[Interrupted by user]',
+            isStreaming: false,
+          },
+        ]);
+        addActivity('Request interrupted by ESC');
+        return;
+      }
+      // 2. 关闭弹窗
       if (showShortcuts) setShowShortcuts(false);
       if (showWelcome) setShowWelcome(false);
     }
   });
 
   // 添加活动记录
+  // 处理双击 ESC 触发 Rewind
+  const handleRewindRequest = useCallback(() => {
+    if (!isProcessing && messages.length > 0) {
+      setShowRewindUI(true);
+    }
+  }, [isProcessing, messages.length]);
+
   const addActivity = useCallback((description: string) => {
     setRecentActivity((prev) => [
       {
@@ -820,13 +851,39 @@ export const App: React.FC<AppProps> = ({
         isVisible={showBackgroundPanel}
       />
 
+      {/* Rewind UI - 双击 ESC 触发 */}
+      {showRewindUI && (
+        <RewindUI
+          messages={messages.filter(m => m.role === 'user').map((m, idx) => ({
+            uuid: m.id,
+            index: idx,
+            role: m.role as 'user',
+            preview: m.content.slice(0, 60) + (m.content.length > 60 ? '...' : ''),
+            hasFileChanges: false,
+            timestamp: m.timestamp.getTime(),
+          }))}
+          totalMessages={messages.length}
+          getPreview={() => ({
+            filesWillChange: [],
+            messagesWillRemove: 0,
+            insertions: 0,
+            deletions: 0,
+          })}
+          onRewind={async () => {
+            setShowRewindUI(false);
+          }}
+          onCancel={() => setShowRewindUI(false)}
+        />
+      )}
+
       {/* Input with suggestion - 当显示 JSX 命令组件时隐藏输入框 */}
-      {!hidePromptForJsx && (
+      {!hidePromptForJsx && !showRewindUI && (
         <Box marginTop={1}>
           <Input
             onSubmit={handleSubmit}
             disabled={isProcessing}
             suggestion={showWelcome ? currentSuggestion : undefined}
+            onRewindRequest={handleRewindRequest}
           />
         </Box>
       )}
@@ -836,9 +893,18 @@ export const App: React.FC<AppProps> = ({
         <Text color="gray" dimColor>
           ? for shortcuts
         </Text>
-        <Text color="gray" dimColor>
-          {isProcessing ? 'Processing...' : 'Auto-updating...'}
-        </Text>
+        <Box>
+          {/* 当正在处理时显示 esc to interrupt */}
+          {isProcessing && (
+            <Text color="yellow" bold>
+              esc to interrupt
+            </Text>
+          )}
+          {isProcessing && <Text color="gray" dimColor> · </Text>}
+          <Text color="gray" dimColor>
+            {isProcessing ? 'Processing...' : 'Ready'}
+          </Text>
+        </Box>
       </Box>
     </Box>
   );

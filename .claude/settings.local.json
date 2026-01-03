@@ -114,7 +114,8 @@
       "Bash(git -C f:/claude-code-open log --oneline -10)",
       "Bash(timeout 3 npm run dev:*)",
       "Bash(gh issue list:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(git -C f:/claude-code-open checkout:*)"
     ]
   }
 }
